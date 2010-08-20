@@ -37,7 +37,9 @@ UBool is_binary_uchar(UChar32 c)
 
 extern reader_t mm_reader;
 extern reader_t stdio_reader;
+#ifdef HAVE_ZLIB
 extern reader_t gz_reader;
+#endif /* HAVE_ZLIB */
 
 UBool fd_open(fd_t *fd, const char *filename)
 {
@@ -129,9 +131,9 @@ int fd_is_binary(fd_t *fd)
     UChar32 buffer[MAX_BIN_REL_LEN + 1];
 
     buffer_len = fd->reader->readuchars(fd->reader_data, buffer, MAX_BIN_REL_LEN);
-    buffer[buffer_len] = U_EOB;
+    buffer[buffer_len] = U_NUL;
     // controler buffer_len
-    for (p = buffer; U_EOB != *p; p++) {
+    for (p = buffer; U_NUL != *p; p++) {
         if (is_binary_uchar(*p)) {
             return TRUE;
         }
@@ -215,7 +217,7 @@ static UBool stdout_is_tty()
     return (isatty(STDOUT_FILENO) == 1);
 }
 
-int binbehave, color = COLOR_AUTO;
+int binbehave = BIN_FILE_SKIP, color = COLOR_AUTO;
 
 UBool nflag = FALSE;
 UBool vflag = FALSE;
@@ -226,16 +228,6 @@ UBool colorize = TRUE;
 
 int main(int argc, char **argv)
 {
-    /*FILE *fp;
-    char buffer[65];
-
-    fp = fopen(argv[1], "r");
-    if (!fp) {exit(-1);}
-    while (NULL != fgets(buffer, sizeof(buffer) - 1, fp)) {
-        printf("ligne = '%s'", buffer);
-    }
-    fclose(fp);*/
-
     int c;
     fd_t fd;
     uint32_t reflags;
@@ -247,11 +239,8 @@ int main(int argc, char **argv)
     reflags = 0;
     status = U_ZERO_ERROR;
     ustdout = u_finit(stdout, NULL, NULL);
-    //ustderr = u_finit(stderr, NULL, NULL);
 
-    printf("locale = %s\n", u_fgetlocale(ustdout));
-    printf("codepage = %s\n", u_fgetcodepage(ustdout));
-
+    debug("default locale = %s", u_fgetlocale(ustdout));
     debug("stdout encoding = %s", u_fgetcodepage(ustdout));
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
@@ -260,7 +249,7 @@ int main(int argc, char **argv)
                 // TODO
                 break;
             case 'F':
-                reflags |= UREGEX_LITERAL;
+                reflags |= UREGEX_LITERAL; // Not implemented by ICU
                 break;
             case 'H':
                 print_file = TRUE;
@@ -313,19 +302,38 @@ int main(int argc, char **argv)
                 break;
             case READER_OPT:
                 {
+#if 0
                     struct readers {
                         const char *name;
                         reader_t *reader;
                     } available_readers[] = {
                         {"mmap",  &mm_reader},
                         {"stdio", &stdio_reader},
-                        //{"gzip",  &gz_reader},
+#ifdef HAVE_ZLIB
+                        {"gzip", &compressedgz_reader},
+#endif /* HAVE_ZLIB */
                         {NULL,    NULL}
                     }, *r;
 
                     for (r = available_readers, fd.reader = NULL; r->name && r->reader; r++) {
                         if (!strcmp(r->name, optarg)) {
                             fd.reader = r->reader;
+                            break;
+                        }
+                    }
+#endif
+                    reader_t *available_readers[] = {
+                        &mm_reader,
+                        &stdio_reader,
+#ifdef HAVE_ZLIB
+                        &gz_reader,
+#endif /* HAVE_ZLIB */
+                        NULL
+                    }, **r;
+
+                    for (r = available_readers, fd.reader = NULL; *r; r++) {
+                        if (!strcmp((*r)->name, optarg)) {
+                            fd.reader = *r;
                             break;
                         }
                     }

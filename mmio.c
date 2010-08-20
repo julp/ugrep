@@ -123,7 +123,7 @@ static size_t mmfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
         }
         buffer[i] = c;
     }
-    //buffer[i + 1] = U_EOB;
+    //buffer[i + 1] = U_NUL;
 
     return i;
 }
@@ -202,6 +202,7 @@ static void mmfd_set_signature_length(void *data, size_t signature_length)
 
 reader_t mm_reader =
 {
+    "mmap",
     mmfd_open,
     mmfd_close,
     mmfd_readline,

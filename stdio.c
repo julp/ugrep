@@ -21,13 +21,17 @@ static void *stdiofd_open(const char *filename)
     stdiofd = mem_new(*stdiofd);
     //if (NULL == (stdiofd->fp = fopen(filename, "r"))) {
     if (NULL == (stdiofd->ufp = u_fopen(filename, "r", NULL, NULL))) {
-        return NULL;
+        goto failed;
     }
     stdiofd->signature_length = 0;
     //stdiofd->ufp = NULL;
     stdiofd->fp = u_fgetfile(stdiofd->ufp);
 
     return stdiofd;
+
+failed:
+    free(stdiofd);
+    return NULL;
 }
 
 static void stdiofd_close(void *data)
@@ -57,7 +61,7 @@ static size_t stdiofd_readuchars(void *data, UChar32 *buffer, size_t max_len)
     for (i = 0; U_EOF != (c = u_fgetcx(stdiofd->ufp)) && i < max_len; i++) {
         buffer[i] = c;
     }
-    //buffer[i + 1] = U_EOB;
+    //buffer[i + 1] = U_NUL;
 
     return i;
 }
@@ -116,6 +120,7 @@ static void stdiofd_set_signature_length(void *data, size_t signature_length)
 
 reader_t stdio_reader =
 {
+    "stdio",
     stdiofd_open,
     stdiofd_close,
     stdiofd_readline,

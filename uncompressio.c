@@ -1,0 +1,226 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+#include "ugrep.h"
+
+typedef struct {
+    UConverter *ucnv;
+    char *start, *base, *ptr, *end;
+    size_t len;
+} compressedfd_t;
+
+#ifdef HAVE_ZLIB
+
+# include <zlib.h>
+
+#define zlib(zfp, function)                                                      \
+    do {                                                                         \
+        int errnum;                                                              \
+        const char *zerrstr = gzerror((zfp), &errnum);                           \
+        if (Z_ERRNO == errnum) {                                                 \
+            msg("zlib external error from " function "(): %s", strerror(errno)); \
+        } else {                                                                 \
+            msg("zlib internal error from " function "(): %s", zerrstr);         \
+        }                                                                        \
+    } while(0);
+
+static void *compressedfdgz_open(const char *filename)
+{
+    gzFile zfp;
+    char *dst;
+    int fd, ret;
+    size_t dst_len;
+    struct stat st;
+    compressedfd_t *compressedfd;
+
+    compressedfd = mem_new(*compressedfd);
+    if (-1 == (fd = open(filename, O_RDONLY))) {
+        msg("can't open %s: %s", filename, strerror(errno));
+        goto free;
+    }
+    if (-1 == (fstat(fd, &st))) {
+        msg("can't stat %s: %s", filename, strerror(errno));
+        goto close;
+    }
+    if (!S_ISREG(st.st_mode)) {
+        msg("%s is not a regular file", filename);
+        goto close;
+    }
+    if (NULL == (zfp = gzdopen(fd, "rb"))) {
+        msg("gzdopen failed");
+        goto close;
+    }
+    dst_len = 2 * st.st_size;
+    dst = mem_new_n(*dst, dst_len + 1);
+    if (-1 == (ret = gzread(zfp, dst, dst_len))) {
+        zlib(zfp, "gzread");
+        gzclose(zfp);
+        goto free;
+    }
+    gzclose(zfp);
+    compressedfd->base = compressedfd->start = compressedfd->ptr = dst;
+    compressedfd->len = ret;
+    compressedfd->end = compressedfd->start + compressedfd->len;
+    compressedfd->ucnv = NULL;
+
+    return compressedfd;
+
+close:
+    close(fd);
+free:
+    free(compressedfd);
+    return NULL;
+}
+
+#endif /* HAVE_ZLIB */
+
+#ifdef HAVE_BZLIB
+
+# include <zlib.h>
+
+# define bzlib()
+
+//
+
+#endif /* HAVE_BZLIB */
+
+static void compressedfd_close(void *data)
+{
+    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+
+    if (NULL != compressedfd->ucnv) {
+        ucnv_close(compressedfd->ucnv);
+    }
+    free(compressedfd->start);
+}
+
+#ifdef WITH_IS_BINARY
+static int compressedfd_is_binary(void *data, size_t max_len)
+{
+    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+
+    // TODO
+    return 0;
+}
+#else
+static size_t compressedfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
+{
+    UChar32 c;
+    size_t i, len;
+    UErrorCode status;
+    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+
+    status = U_ZERO_ERROR;
+    len = compressedfd->len > max_len ? max_len : compressedfd->len;
+    for (i = 0; i < len; i++) {
+        c = ucnv_getNextUChar(compressedfd->ucnv, &compressedfd->ptr, compressedfd->end, &status);
+        if (U_FAILURE(status)) {
+            if (U_INDEX_OUTOFBOUNDS_ERROR == status) {
+                break;
+            } else {
+                icu(status, "ucnv_getNextUChar");
+                return 0;
+            }
+        }
+        buffer[i] = c;
+    }
+    //buffer[i + 1] = U_NUL;
+
+    return i;
+}
+#endif /* WITH_IS_BINARY */
+
+static void compressedfd_rewind(void *data)
+{
+    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+
+    compressedfd->ptr = compressedfd->base;
+}
+
+static UBool compressedfd_readline(void *data, UString *ustr)
+{
+    UChar32 c;
+    UErrorCode status;
+    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+
+    status = U_ZERO_ERROR;
+    do {
+        c = ucnv_getNextUChar(compressedfd->ucnv, &compressedfd->ptr, compressedfd->end, &status);
+        if (U_FAILURE(status)) {
+            if (U_INDEX_OUTOFBOUNDS_ERROR == status) { // c == U_EOF
+                if (!ustring_empty(ustr)) {
+                    break;
+                } else {
+                    return FALSE;
+                }
+            } else {
+                icu(status, "ucnv_getNextUChar");
+                return FALSE;
+            }
+        }
+        ustring_append_char(ustr, c);
+    } while (U_LF != c);
+
+    return TRUE;
+}
+
+static size_t compressedfd_readbytes(void *data, char *buffer, size_t max_len)
+{
+    size_t n;
+    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+
+    if (compressedfd->len > max_len) {
+        n = max_len;
+    } else {
+        n = compressedfd->len;
+    }
+    memcpy(buffer, compressedfd->ptr, n);
+    buffer[n + 1] = '\0';
+
+    return n;
+}
+
+static void/*UBool*/ compressedfd_set_encoding(void *data, const char *encoding)
+{
+    UErrorCode status;
+    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+
+    status = U_ZERO_ERROR;
+    compressedfd->ucnv = ucnv_open(encoding, &status);
+    if (U_FAILURE(status)) {
+        icu(status, "ucnv_open");
+    }
+}
+
+static void compressedfd_set_signature_length(void *data, size_t signature_length)
+{
+    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+
+    compressedfd->len -= signature_length;
+    compressedfd->base += signature_length;
+}
+
+#ifdef HAVE_ZLIB
+reader_t gz_reader =
+{
+    "gzip",
+    compressedfdgz_open,
+    compressedfd_close,
+    compressedfd_readline,
+    compressedfd_readbytes,
+# ifdef WITH_IS_BINARY
+    compressedfd_is_binary,
+# else
+    compressedfd_readuchars,
+# endif /* WITH_IS_BINARY */
+    compressedfd_set_signature_length,
+    compressedfd_set_encoding,
+    compressedfd_rewind
+};
+#endif /* HAVE_ZLIB */

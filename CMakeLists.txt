@@ -2,6 +2,8 @@ project(ugrep)
 
 cmake_minimum_required(VERSION 2.6)
 
+include(CheckLibraryExists)
+
 set(UGREP_VERSION_MAJOR 0)
 set(UGREP_VERSION_MINOR 1)
 
@@ -20,6 +22,8 @@ configure_file(
 find_package(ICU REQUIRED)
 
 find_package(ZLIB)
+check_library_exists(z uncompress "/lib;/usr/lib;/usr/local/lib;/usr/pkg/lib" HAVE_ZLIB)
+message(STATUS ZLIB_FOUND = ${ZLIB_FOUND})
 
 set(BASE_SOURCES ugrep.c alloc.c ustring.c mmio.c stdio.c)
 set(EXTRA_SOURCES)
@@ -31,9 +35,9 @@ if(DEBUG)
 endif(DEBUG)
 
 if(ZLIB_FOUND)
-    SET(EXTRA_SOURCES ${EXTRA_SOURCES} zlib.c)
-    INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIR})
-    SET(EXTRA_LIBS ${EXTRA_LIBS} ${ZLIB_LIBRARIES} )
+    set(EXTRA_SOURCES ${EXTRA_SOURCES} uncompressio.c)
+    include_directories(${ZLIB_INCLUDE_DIR})
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${ZLIB_LIBRARIES})
 endif(ZLIB_FOUND)
 
 add_executable(ugrep ${BASE_SOURCES} ${EXTRA_SOURCES})

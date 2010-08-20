@@ -1,0 +1,9 @@
+License : BSD
+
+Build depends :
+* cmake
+* ICU libraries
+* gcc (others compilers not tested)
+
+Run depends :
+* ICU libraries

@@ -54,7 +54,7 @@
 # define U_BS  0x0008 /* backspace */
 # define U_CR  0x000D /* \r */
 # define U_LF  0x000A /* \n */
-# define U_EOB 0x0000 /* \0 */
+# define U_NUL 0x0000 /* \0 */
 
 # include "config.h"
 # include "alloc.h"
@@ -68,6 +68,7 @@ UBool is_binary_uchar(UChar32);
 //# define WITH_IS_BINARY 1
 
 typedef struct {
+    const char *name;
     void *(*open)(const char *);
     void (*close)(void *);
     UBool (*readline)(void *, UString *); // add boolean to copy or not (\r)\n ?

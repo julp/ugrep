@@ -10,7 +10,7 @@ UString *ustring_new()
     ustr->len = 0;
     ustr->allocated = USTRING_INITIAL_LENGTH;
     ustr->ptr = mem_new_n(UChar, ustr->allocated + 1);
-    *ustr->ptr = U_EOB;
+    *ustr->ptr = U_NUL;
 
     return ustr;
 }
@@ -34,7 +34,7 @@ void ustring_append_char(UString *ustr, UChar c)
         _ustring_expand(ustr);
     }
     ustr->ptr[ustr->len++] = c;
-    ustr->ptr[ustr->len] = U_EOB;*/
+    ustr->ptr[ustr->len] = U_NUL;*/
     ustring_append_string_len(ustr, &c, 1);
 }
 
@@ -51,16 +51,16 @@ void ustring_append_string_len(UString *ustr, const UChar *str, int32_t length)
     }
     u_memcpy(ustr->ptr + ustr->len, str, length);
     ustr->len += length;
-    ustr->ptr[ustr->len] = U_EOB;
+    ustr->ptr[ustr->len] = U_NUL;
 }
 
 UChar *ustring_chomp(UString *ustr)
 {
     if (ustr->len > 0) {
         if (U_LF == ustr->ptr[ustr->len - 1]) {
-            ustr->ptr[ustr->len--] = U_EOB;
+            ustr->ptr[ustr->len--] = U_NUL;
             if (ustr->len > 0 && U_CR == ustr->ptr[ustr->len - 1]) {
-                ustr->ptr[ustr->len--] = U_EOB;
+                ustr->ptr[ustr->len--] = U_NUL;
             }
         }
     }
@@ -83,7 +83,7 @@ UBool ustring_empty(const UString *ustr)
 
 void ustring_truncate(UString *ustr)
 {
-    *ustr->ptr = U_EOB;
+    *ustr->ptr = U_NUL;
     ustr->len = 0;
 }
 
@@ -92,6 +92,6 @@ UChar ustring_last_char(const UString *ustr)
     if (ustr->len) {
         return ustr->ptr[ustr->len - 1];
     } else {
-        return U_EOB;
+        return U_NUL;
     }
 }
