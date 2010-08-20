@@ -40,6 +40,9 @@ extern reader_t stdio_reader;
 #ifdef HAVE_ZLIB
 extern reader_t gz_reader;
 #endif /* HAVE_ZLIB */
+#ifdef HAVE_BZIP2
+extern reader_t bz2_reader;
+#endif /* HAVE_BZIP2 */
 
 UBool fd_open(fd_t *fd, const char *filename)
 {
@@ -328,6 +331,9 @@ int main(int argc, char **argv)
 #ifdef HAVE_ZLIB
                         &gz_reader,
 #endif /* HAVE_ZLIB */
+#ifdef HAVE_BZIP2
+                        &bz2_reader,
+#endif /* HAVE_BZIP2 */
                         NULL
                     }, **r;
 

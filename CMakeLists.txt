@@ -22,11 +22,13 @@ configure_file(
 find_package(ICU REQUIRED)
 
 find_package(ZLIB)
-check_library_exists(z uncompress "/lib;/usr/lib;/usr/local/lib;/usr/pkg/lib" HAVE_ZLIB)
 message(STATUS ZLIB_FOUND = ${ZLIB_FOUND})
 
+find_package(BZip2)
+message(STATUS BZIP2_FOUND = ${BZIP2_FOUND})
+
 set(BASE_SOURCES ugrep.c alloc.c ustring.c mmio.c stdio.c)
-set(EXTRA_SOURCES)
+set(EXTRA_SOURCES )
 set(EXTRA_LIBS)
 
 option(DEBUG "debug" OFF)
@@ -38,12 +40,19 @@ if(ZLIB_FOUND)
     set(EXTRA_SOURCES ${EXTRA_SOURCES} uncompressio.c)
     include_directories(${ZLIB_INCLUDE_DIR})
     set(EXTRA_LIBS ${EXTRA_LIBS} ${ZLIB_LIBRARIES})
+    add_definitions(-DHAVE_ZLIB)
 endif(ZLIB_FOUND)
+
+if(BZIP2_FOUND)
+    set(EXTRA_SOURCES ${EXTRA_SOURCES} uncompressio.c)
+    include_directories(${BZIP2_INCLUDE_DIR})
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${BZIP2_LIBRARIES})
+    add_definitions(-DHAVE_BZIP2)
+endif(BZIP2_FOUND)
+
+list(REMOVE_DUPLICATES EXTRA_SOURCES)
 
 add_executable(ugrep ${BASE_SOURCES} ${EXTRA_SOURCES})
 target_link_libraries(ugrep icudata icui18n icuio icule iculx icutu ${EXTRA_LIBS})
-
-add_executable(utf16 utf16.c)
-target_link_libraries(utf16 icudata icui18n icuio icule iculx icutu)
 
 install(TARGETS ugrep DESTINATION bin)

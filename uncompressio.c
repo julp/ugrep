@@ -80,15 +80,78 @@ free:
 
 #endif /* HAVE_ZLIB */
 
-#ifdef HAVE_BZLIB
+#ifdef HAVE_BZIP2
 
-# include <zlib.h>
+# include <bzlib.h>
 
-# define bzlib()
+# define bzip2(jfp, errnum, function) \
+    msg("bzip2 internal error from " function "(): %s", BZ2_bzerror(jfp, errnum))
 
-//
+#if 0
 
-#endif /* HAVE_BZLIB */
+http://www.bzip.org/1.0.5/bzip2-manual-1.0.5.html
+
+typedef void BZFILE;
+
+BZFILE * BZ2_bzdopen ( int        fd,    const char *mode );
+BZFILE *BZ2_bzReadOpen( int *bzerror, FILE *f, int verbosity, int small, void *unused, int nUnused);
+
+int BZ2_bzRead ( int *bzerror, BZFILE *b, void *buf, int len );
+
+void BZ2_bzReadClose ( int *bzerror, BZFILE *b );
+
+extern void bz_internal_error ( int errcode );
+#endif
+
+static void *compressedfdbz2_open(const char *filename)
+{
+    BZFILE *jfp;
+    char *dst;
+    int fd, ret, bzerror;
+    size_t dst_len;
+    struct stat st;
+    compressedfd_t *compressedfd;
+
+    compressedfd = mem_new(*compressedfd);
+    if (-1 == (fd = open(filename, O_RDONLY))) {
+        msg("can't open %s: %s", filename, strerror(errno));
+        goto free;
+    }
+    if (-1 == (fstat(fd, &st))) {
+        msg("can't stat %s: %s", filename, strerror(errno));
+        goto close;
+    }
+    if (!S_ISREG(st.st_mode)) {
+        msg("%s is not a regular file", filename);
+        goto close;
+    }
+    if (NULL == (jfp = BZ2_bzdopen(fd, "rb"))) {
+        msg("bzdopen failed");
+        goto close;
+    }
+    dst_len = 2 * st.st_size;
+    dst = mem_new_n(*dst, dst_len + 1);
+    if (-1 == (ret = BZ2_bzRead(&bzerror, jfp, dst, dst_len))) {
+        bzip2(jfp, bzerror, "BZ2_bzread");
+        BZ2_bzReadClose(&bzerror, jfp);
+        goto free;
+    }
+    BZ2_bzReadClose(&bzerror, jfp);
+    compressedfd->base = compressedfd->start = compressedfd->ptr = dst;
+    compressedfd->len = ret;
+    compressedfd->end = compressedfd->start + compressedfd->len;
+    compressedfd->ucnv = NULL;
+
+    return compressedfd;
+
+close:
+    close(fd);
+free:
+    free(compressedfd);
+    return NULL;
+}
+
+#endif /* HAVE_BZLIP2 */
 
 static void compressedfd_close(void *data)
 {
@@ -224,3 +287,23 @@ reader_t gz_reader =
     compressedfd_rewind
 };
 #endif /* HAVE_ZLIB */
+
+#ifdef HAVE_BZIP2
+reader_t bz2_reader =
+{
+    "bzip2",
+    compressedfdbz2_open,
+    compressedfd_close,
+    compressedfd_readline,
+    compressedfd_readbytes,
+# ifdef WITH_IS_BINARY
+    compressedfd_is_binary,
+# else
+    compressedfd_readuchars,
+# endif /* WITH_IS_BINARY */
+    compressedfd_set_signature_length,
+    compressedfd_set_encoding,
+    compressedfd_rewind
+};
+#endif /* HAVE_BZIP2 */
+
