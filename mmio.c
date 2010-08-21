@@ -64,7 +64,7 @@ free:
 
 static void mmfd_close(void *data)
 {
-    FETCH_READER_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, mmfd, mmfd_t);
 
     if (NULL != mmfd->ucnv) {
         ucnv_close(mmfd->ucnv);
@@ -80,7 +80,7 @@ static int mmfd_is_binary(void *data, size_t max_len)
     UChar32 c;
     size_t i, len;
     UErrorCode status;
-    FETCH_READER_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, mmfd, mmfd_t);
 
     status = U_ZERO_ERROR;
     len = mmfd->len > max_len ? max_len : mmfd->len;
@@ -107,7 +107,7 @@ static size_t mmfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
     UChar32 c;
     size_t i, len;
     UErrorCode status;
-    FETCH_READER_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, mmfd, mmfd_t);
 
     status = U_ZERO_ERROR;
     len = mmfd->len > max_len ? max_len : mmfd->len;
@@ -131,7 +131,7 @@ static size_t mmfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
 
 static void mmfd_rewind(void *data)
 {
-    FETCH_READER_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, mmfd, mmfd_t);
 
     mmfd->ptr = mmfd->base;
 }
@@ -140,7 +140,7 @@ static UBool mmfd_readline(void *data, UString *ustr)
 {
     UChar32 c;
     UErrorCode status;
-    FETCH_READER_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, mmfd, mmfd_t);
 
     status = U_ZERO_ERROR;
     do {
@@ -166,7 +166,7 @@ static UBool mmfd_readline(void *data, UString *ustr)
 static size_t mmfd_readbytes(void *data, char *buffer, size_t max_len)
 {
     size_t n;
-    FETCH_READER_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, mmfd, mmfd_t);
 
     if (mmfd->len > max_len) {
         n = max_len;
@@ -182,7 +182,7 @@ static size_t mmfd_readbytes(void *data, char *buffer, size_t max_len)
 static void/*UBool*/ mmfd_set_encoding(void *data, const char *encoding)
 {
     UErrorCode status;
-    FETCH_READER_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, mmfd, mmfd_t);
 
     mmfd->ucnv = ucnv_open(encoding, &status);
     if (U_FAILURE(status)) {
@@ -194,7 +194,7 @@ static void/*UBool*/ mmfd_set_encoding(void *data, const char *encoding)
 
 static void mmfd_set_signature_length(void *data, size_t signature_length)
 {
-    FETCH_READER_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, mmfd, mmfd_t);
 
     mmfd->len -= signature_length;
     mmfd->ptr = mmfd->base += signature_length;

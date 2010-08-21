@@ -4,6 +4,10 @@ Build depends :
 * cmake
 * ICU libraries
 * gcc (others compilers not tested)
+* zlib library (optional)
+* bzlib library (optional)
 
 Run depends :
 * ICU libraries
+* zlib library (optional)
+* bzlib library (optional)

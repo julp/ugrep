@@ -1,14 +1,19 @@
 TODO :
 
+* mmap already used internaly by icu ?
+
+* add eof callback to reader_t
+
 * implement recursive option (-r) with FTS
 
 * implement (multiple) ICU pattern matching
 
 * implement (multiple) fixed string matching (don't forget to convert them to Unicode)
   * line match : str(case)cmp
-  * word match : look UChars before (^ or !is_alpha(c[-1]) ?) and after ($ or !is_alpha([c-1]) ?)
+  * word match : look UChars before (^ or !is_alpha([c-1]) ?) and after ($ or !is_alpha([c-1]) ?)
 
 * a smart switcher from pattern to fixed string if pattern doesn't contain any meta-character (\ + * ? [ ^ ] $ ( ) { } = ! < > | : -)
 
-* write ucat, a cat replacement ?
+* handle stdin
 
+* write ucat, a cat replacement ?

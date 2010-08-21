@@ -36,7 +36,7 @@ failed:
 
 static void stdiofd_close(void *data)
 {
-    FETCH_READER_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, stdiofd, stdiofd_t);
 
     u_fclose(stdiofd->ufp);
     //free(stdiofd);
@@ -45,7 +45,7 @@ static void stdiofd_close(void *data)
 #ifdef WITH_IS_BINARY
 static int stdiofd_is_binary(void *data, size_t max_len)
 {
-    FETCH_READER_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, stdiofd, stdiofd_t);
 
     // TODO
     return 0;
@@ -55,7 +55,7 @@ static size_t stdiofd_readuchars(void *data, UChar32 *buffer, size_t max_len)
 {
     size_t i;
     UChar32 c;
-    FETCH_READER_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, stdiofd, stdiofd_t);
 
     //return u_file_read(buffer, max_len, stdiofd->ufp);
     for (i = 0; U_EOF != (c = u_fgetcx(stdiofd->ufp)) && i < max_len; i++) {
@@ -69,7 +69,7 @@ static size_t stdiofd_readuchars(void *data, UChar32 *buffer, size_t max_len)
 
 static void stdiofd_rewind(void *data)
 {
-    FETCH_READER_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, stdiofd, stdiofd_t);
 
     fseek(stdiofd->fp, (long) stdiofd->signature_length, SEEK_SET);
 }
@@ -77,7 +77,7 @@ static void stdiofd_rewind(void *data)
 static UBool stdiofd_readline(void *data, UString *ustr)
 {
     UChar c;
-    FETCH_READER_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, stdiofd, stdiofd_t);
 
     while (U_EOF != (c = u_fgetc(stdiofd->ufp)) && U_LF != c) {
         ustring_append_char(ustr, c);
@@ -90,7 +90,7 @@ static size_t stdiofd_readbytes(void *data, char *buffer, size_t max_len)
 {
     /*int fd;
     struct stat st;*/
-    FETCH_READER_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, stdiofd, stdiofd_t);
 
     /*if (-1 == (fd = fileno(stdiofd->fp))) {
         msg("fileno %s: %s", "TODO: filename", strerror(errno));
@@ -105,7 +105,7 @@ static size_t stdiofd_readbytes(void *data, char *buffer, size_t max_len)
 
 static void/*UBool*/ stdiofd_set_encoding(void *data, const char *encoding)
 {
-    FETCH_READER_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, stdiofd, stdiofd_t);
 
     //stdiofd->ufp = u_fadopt(stdiofd->fp, NULL, encoding);
     u_fsetcodepage(encoding, stdiofd->ufp);
@@ -113,7 +113,7 @@ static void/*UBool*/ stdiofd_set_encoding(void *data, const char *encoding)
 
 static void stdiofd_set_signature_length(void *data, size_t signature_length)
 {
-    FETCH_READER_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, stdiofd, stdiofd_t);
 
     stdiofd->signature_length = signature_length;
 }

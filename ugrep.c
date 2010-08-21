@@ -20,6 +20,18 @@
 
 #define EXIT_USAGE 2
 
+#define RED(str) "\e[1;31m" str "\e[0m"
+#define GREEN(str) "\e[1;32m" str "\e[0m"
+
+/*
+UChar* CharsToUChars(const char* str) {
+    int32_t len = u_unescape(str, 0, 0);
+    UChar *buf = (UChar*) malloc(sizeof(UChar) * (len + 1));
+    u_unescape(str, buf, len + 1);
+    return buf;
+}
+*/
+
 typedef struct {
     const char *filename;
     const char *encoding;
@@ -28,6 +40,7 @@ typedef struct {
     size_t filesize;
     size_t lineno;
     size_t matches;
+    UBool binary;
 } fd_t;
 
 UBool is_binary_uchar(UChar32 c)
@@ -69,6 +82,7 @@ UBool fd_open(fd_t *fd, const char *filename)
     fd->lineno = 0;
     /*fd->filesize = st.st_size;*/
     fd->matches = 0;
+    fd->binary = FALSE;
 
     if (0 == (buffer_len = fd->reader->readbytes(fd->reader_data, buffer, MAX_ENC_REL_LEN))) {
         goto failed;
@@ -166,8 +180,7 @@ int fd_readline(fd_t *fd, UString *ustr)
 enum {
     COLOR_OPT = CHAR_MAX + 1,
     BINARY_OPT,
-    READER_OPT,
-    X
+    READER_OPT
 };
 
 enum {
@@ -182,7 +195,7 @@ enum {
     COLOR_ALWAYS
 };
 
-static char optstr[] = "EFHVcefhinqsvwx";
+static char optstr[] = "EFHVce:f:hinqsvwx";
 
 struct option long_options[] =
 {
@@ -217,10 +230,10 @@ static void usage()
 
 static UBool stdout_is_tty()
 {
-    return (isatty(STDOUT_FILENO) == 1);
+    return (1 == isatty(STDOUT_FILENO));
 }
 
-int binbehave = BIN_FILE_SKIP, color = COLOR_AUTO;
+int binbehave = BIN_FILE_SKIP;
 
 UBool nflag = FALSE;
 UBool vflag = FALSE;
@@ -229,17 +242,301 @@ UBool wflag = FALSE;
 UBool print_file = TRUE;
 UBool colorize = TRUE;
 
+typedef enum {
+    E_FIXED_STR,
+    E_ICU_REGEXP,
+    _E_COUNT
+} engine_type_t;
+
+typedef struct {
+    void *(*compute)(const UChar *, int32_t);
+    void *(*computeC)(const char *);
+    UBool (*match)(void *, const UString *);
+    UBool (*whole_line_match)(void *, const UString *);
+    //Range **(*get_match)(void *);
+    void (*reset)(void *); // remove it?
+    void (*destroy)(void *);
+} engine_t;
+
+typedef struct {
+    void *pattern;
+    //engine_type_t type;
+    engine_t *engine;
+} pattern_data_t;
+
+void *engine_icure_compute(const UChar *upattern, int32_t length)
+{
+    UFILE *ustderr;
+    UParseError pe;
+    UErrorCode status;
+    URegularExpression *uregex;
+
+    status = U_ZERO_ERROR;
+    ustderr = u_finit(stdout, NULL, NULL);
+    /* don't make a copy of upattern, ICU does this */
+    uregex = uregex_open(upattern, length, /*TODO*/UREGEX_CASE_INSENSITIVE, &pe, &status);
+    if (U_FAILURE(status)) {
+        if (U_REGEX_RULE_SYNTAX == status) {
+            //u_fprintf(ustderr, "Error at offset %d %S %S\n", pe.offset, pe.preContext, pe.postContext);
+            u_fprintf(ustderr, "Invalid pattern: error at offset %d\n", pe.offset);
+            u_fprintf(ustderr, "\t%S\n", upattern);
+            u_fprintf(ustderr, "\t%*c\n", pe.offset, '^');
+        } else {
+            icu(status, "uregex_openC");
+        }
+        return NULL;
+    }
+
+    return uregex;
+}
+
+void *engine_icure_computeC(const char *pattern)
+{
+    UParseError pe;
+    UErrorCode status;
+    URegularExpression *uregex;
+
+    status = U_ZERO_ERROR;
+    uregex = uregex_openC(pattern, /*TODO*/UREGEX_CASE_INSENSITIVE, &pe, &status);
+    if (U_FAILURE(status)) {
+        if (U_REGEX_RULE_SYNTAX == status) {
+            //u_fprintf(ustderr, "Error at offset %d %S %S\n", pe.offset, pe.preContext, pe.postContext);
+            fprintf(stderr, "Invalid pattern: error at offset %d\n", pe.offset);
+            fprintf(stderr, "\t%s\n", pattern);
+            fprintf(stderr, "\t%*c\n", pe.offset, '^');
+        } else {
+            icu(status, "uregex_openC");
+        }
+        return NULL;
+    }
+
+    return uregex;
+}
+
+UBool engine_icure_match(void *data, const UString *subject)
+{
+    UBool ret;
+    UErrorCode status;
+    FETCH_DATA(data, uregex, URegularExpression);
+
+    status = U_ZERO_ERROR;
+    uregex_setText(uregex, subject->ptr, subject->len, &status);
+    if (U_FAILURE(status)) {
+        icu(status, "uregex_setText");
+    }
+    ret = uregex_find(uregex, 0, &status);
+    if (U_FAILURE(status)) {
+        icu(status, "uregex_find");
+    }
+
+    return ret;
+}
+
+UBool engine_icure_whole_line_match(void *data, const UString *subject)
+{
+    FETCH_DATA(data, uregex, URegularExpression);
+}
+
+void engine_icure_reset(void *data)
+{
+    UErrorCode status;
+    FETCH_DATA(data, uregex, URegularExpression);
+
+    status = U_ZERO_ERROR;
+    uregex_setText(uregex, 0, 0, &status);
+}
+
+void engine_icure_destroy(void *data)
+{
+    UErrorCode status;
+    FETCH_DATA(data, uregex, URegularExpression);
+
+    uregex_close(uregex);
+}
+
+/* ========== */
+
+UChar *ustrndup(const UChar *src, int32_t length)
+{
+    UChar *dst;
+
+    dst = mem_new_n(*dst, length + 1);
+    u_strncpy(dst, src, length);
+
+    return dst;
+}
+
+void *engine_fixed_compute(const UChar *upattern, int32_t length)
+{
+    if (length < 0) {
+        length = u_strlen(upattern);
+    }
+    return ustrndup(upattern, length);
+}
+
+void *engine_fixed_computeC(const char *pattern)
+{
+    UChar *upattern;
+    UConverter *ucnv;
+    UErrorCode status;
+
+    status = U_ZERO_ERROR;
+    ucnv = ucnv_open(NULL, &status);
+    if (U_FAILURE(status)) {
+        icu(status, "ucnv_open");
+        return NULL;
+    }
+    upattern = mem_new_n(*upattern, strlen(pattern) * ucnv_getMaxCharSize(ucnv) + 1);
+    ucnv_close(ucnv);
+
+    return upattern;
+}
+
+UBool engine_fixed_match(void *data, const UString *subject)
+{
+    FETCH_DATA(data, upattern, UChar);
+
+    if (1/*iFlag*/) {
+        // Case Insensitive version
+    } else {
+        return (NULL != u_strFindFirst(subject->ptr, subject->len, upattern, -1));
+    }
+}
+
+UBool engine_fixed_whole_line_match(void *data, const UString *subject)
+{
+    FETCH_DATA(data, pattern, UChar);
+
+    // u_str(case)cmp
+}
+
+void engine_fixed_reset(void *data)
+{
+    /* NOP */
+    return;
+}
+
+void engine_fixed_destroy(void *data)
+{
+    FETCH_DATA(data, upattern, UChar);
+
+    free(upattern);
+}
+
+engine_t engine_icure = {
+    engine_icure_compute,
+    engine_icure_computeC,
+    engine_icure_match,
+    engine_icure_whole_line_match,
+    engine_icure_reset,
+    engine_icure_destroy
+};
+
+engine_t engine_fixed = {
+    engine_fixed_compute,
+    engine_fixed_computeC,
+    engine_fixed_match,
+    engine_fixed_whole_line_match,
+    engine_fixed_reset,
+    engine_fixed_destroy
+};
+
+/* ========== */
+
+typedef struct slist_t {
+    struct slist_t *next;
+    pattern_data_t *data;
+} slist_t;
+
+slist_t *patterns = NULL, *queue = NULL;
+
+void add_pattern(const UChar *pattern, int32_t length/*, int type*/)
+{
+    void *data;
+    slist_t *n;
+    pattern_data_t *pdata;
+
+    n = mem_new(*n);
+    pdata = mem_new(*pdata);
+    if (NULL == (data = engine_icure/*engine_fixed*/.compute(pattern, length))) {
+        //
+    }
+    n->next = NULL;
+    n->data = pdata;
+    pdata->pattern = data;
+    //pdata->type = E_ICU_REGEXP;
+    pdata->engine = &engine_icure/*&engine_fixed*/;
+
+    if (NULL != queue) {
+        queue->next = n;
+
+    } else {
+        patterns = n;
+    }
+    queue = n;
+}
+
+void add_patternC(const char *pattern/*, int type*/)
+{
+    void *data;
+    slist_t *n;
+    pattern_data_t *pdata;
+
+    n = mem_new(*n);
+    pdata = mem_new(*pdata);
+    if (NULL == (data = engine_icure.computeC(pattern))) {
+        //
+    }
+    n->next = NULL;
+    n->data = pdata;
+    pdata->pattern = data;
+    //pdata->type = E_ICU_REGEXP;
+    pdata->engine = &engine_icure;
+
+    if (NULL != queue) {
+        queue->next = n;
+
+    } else {
+        patterns = n;
+    }
+    queue = n;
+}
+
+void source_patterns(const char *filename)
+{
+    fd_t fd;
+    UString *ustr;
+
+    fd.reader = &stdio_reader;
+
+    ustr = ustring_new();
+    if (!fd_open(&fd, filename)) {
+        // TODO
+        exit(EXIT_FAILURE);
+    }
+    while (fd_readline(&fd, ustr)) {
+        ustring_chomp(ustr);
+        add_pattern(ustr->ptr, ustr->len);
+    }
+    fd_close(&fd);
+    ustring_destroy(ustr);
+}
+
 int main(int argc, char **argv)
 {
     int c;
     fd_t fd;
-    uint32_t reflags;
+    int color;
+    slist_t *p;
+    UString *ustr;
+    //uint32_t reflags;
     UFILE *ustdout;
     UErrorCode status;
 
     fd.reader = &mm_reader;
 
-    reflags = 0;
+    //reflags = 0;
+    color = COLOR_AUTO;
     status = U_ZERO_ERROR;
     ustdout = u_finit(stdout, NULL, NULL);
 
@@ -252,7 +549,7 @@ int main(int argc, char **argv)
                 // TODO
                 break;
             case 'F':
-                reflags |= UREGEX_LITERAL; // Not implemented by ICU
+                //reflags |= UREGEX_LITERAL; // Not implemented by ICU
                 break;
             case 'H':
                 print_file = TRUE;
@@ -261,11 +558,18 @@ int main(int argc, char **argv)
                 fprintf(stderr, "ugrep version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
                 break;
+            case 'e':
+                // TODO
+                add_patternC(optarg/*, type*/);
+                break;
+            case 'f':
+                source_patterns(optarg);
+                break;
             case 'h':
                 print_file = FALSE;
                 break;
             case 'i':
-                reflags |= UREGEX_CASE_INSENSITIVE;
+                //reflags |= UREGEX_CASE_INSENSITIVE;
                 break;
             case 'l':
                 // TODO: line-regexp
@@ -360,6 +664,69 @@ int main(int argc, char **argv)
 
     colorize = (COLOR_ALWAYS == color) || (COLOR_AUTO == color && stdout_is_tty());
 
+    if (NULL == queue) {
+        if (argc < 2) {
+            usage();
+        } else {
+            add_patternC(*argv++);
+            argc--;
+        }
+    }
+
+    ustr = ustring_new();
+    for ( ; argc--; ++argv) {
+        if (fd_open(&fd, *argv)) {
+            if (BIN_FILE_TEXT != binbehave) {
+                fd.binary = fd_is_binary(&fd);
+                debug("%s, binary file : %s", *argv, fd.binary ? RED("yes") : GREEN("no"));
+                if (fd.binary) {
+                    if (BIN_FILE_SKIP == binbehave) {
+                        goto endloop;
+                    }
+                }
+                fd_rewind(&fd);
+            }
+            while (fd_readline(&fd, ustr)) {
+                fd.lineno++;
+                ustring_chomp(ustr);
+                for (p = patterns; NULL != p; p = p->next) {
+                    if (p->data->engine->match(p->data->pattern, ustr)) {
+                        fd.matches++; // increment just once per line ?
+                        if (!vflag) {
+                            if (print_file) {
+                                u_fprintf(ustdout, "\e[35m%s\e[0m:", fd.filename);
+                            }
+                            if (nflag) {
+                                u_fprintf(ustdout, "\e[32m%d\e[0m:", fd.lineno);
+                            }
+                            u_fputs(ustr->ptr, ustdout);
+                        }
+                    } else {
+                        if (vflag) {
+                            if (print_file) {
+                                u_fprintf(ustdout, "\e[35m%s\e[0m:", fd.filename);
+                            }
+                            if (nflag) {
+                                u_fprintf(ustdout, "\e[32m%d\e[0m:", fd.lineno);
+                            }
+                            u_fputs(ustr->ptr, ustdout);
+                        }
+                    }
+                }
+            }
+endloop:
+            fd_close(&fd);
+        }
+    }
+
+    ustring_destroy(ustr);
+
+    for (p = patterns; NULL != p; p = p->next) {
+        p->data->engine->destroy(p->data->pattern);
+    }
+
+
+#if 0
     if (argc != 2) {
         usage();
     } else {
@@ -437,6 +804,30 @@ int main(int argc, char **argv)
         }
         uregex_close(uregex);
     }
+#endif
 
     return EXIT_SUCCESS;
 }
+
+/*
+switch (binbehave) {
+    case BIN_FILE_TEXT:
+        // don't call fd_is_binary, treat it as text
+        break;
+    case BIN_FILE_BIN:
+        // at first match: print match and continue
+        break;
+    case BIN_FILE_SKIP:
+        // continue
+        break;
+    default:
+        // bug !
+}
+*/
+
+/*
+matching/printing process :
+!colorize : stop and print at the first match
+colorize : search all match but matches should be treated by range before colorize them else result should be irrelevant
+           (eg : echo eleve | grep -e el -e le)
+*/

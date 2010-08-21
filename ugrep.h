@@ -62,7 +62,7 @@
 
 UBool is_binary_uchar(UChar32);
 
-# define FETCH_READER_DATA(from, to, type) \
+# define FETCH_DATA(from, to, type) \
     type *to = (type *) from
 
 //# define WITH_IS_BINARY 1

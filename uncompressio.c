@@ -155,7 +155,7 @@ free:
 
 static void compressedfd_close(void *data)
 {
-    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, compressedfd, compressedfd_t);
 
     if (NULL != compressedfd->ucnv) {
         ucnv_close(compressedfd->ucnv);
@@ -166,7 +166,7 @@ static void compressedfd_close(void *data)
 #ifdef WITH_IS_BINARY
 static int compressedfd_is_binary(void *data, size_t max_len)
 {
-    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, compressedfd, compressedfd_t);
 
     // TODO
     return 0;
@@ -177,7 +177,7 @@ static size_t compressedfd_readuchars(void *data, UChar32 *buffer, size_t max_le
     UChar32 c;
     size_t i, len;
     UErrorCode status;
-    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, compressedfd, compressedfd_t);
 
     status = U_ZERO_ERROR;
     len = compressedfd->len > max_len ? max_len : compressedfd->len;
@@ -201,7 +201,7 @@ static size_t compressedfd_readuchars(void *data, UChar32 *buffer, size_t max_le
 
 static void compressedfd_rewind(void *data)
 {
-    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, compressedfd, compressedfd_t);
 
     compressedfd->ptr = compressedfd->base;
 }
@@ -210,7 +210,7 @@ static UBool compressedfd_readline(void *data, UString *ustr)
 {
     UChar32 c;
     UErrorCode status;
-    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, compressedfd, compressedfd_t);
 
     status = U_ZERO_ERROR;
     do {
@@ -236,7 +236,7 @@ static UBool compressedfd_readline(void *data, UString *ustr)
 static size_t compressedfd_readbytes(void *data, char *buffer, size_t max_len)
 {
     size_t n;
-    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, compressedfd, compressedfd_t);
 
     if (compressedfd->len > max_len) {
         n = max_len;
@@ -252,7 +252,7 @@ static size_t compressedfd_readbytes(void *data, char *buffer, size_t max_len)
 static void/*UBool*/ compressedfd_set_encoding(void *data, const char *encoding)
 {
     UErrorCode status;
-    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, compressedfd, compressedfd_t);
 
     status = U_ZERO_ERROR;
     compressedfd->ucnv = ucnv_open(encoding, &status);
@@ -263,7 +263,7 @@ static void/*UBool*/ compressedfd_set_encoding(void *data, const char *encoding)
 
 static void compressedfd_set_signature_length(void *data, size_t signature_length)
 {
-    FETCH_READER_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, compressedfd, compressedfd_t);
 
     compressedfd->len -= signature_length;
     compressedfd->base += signature_length;

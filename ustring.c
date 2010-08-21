@@ -68,10 +68,10 @@ UChar *ustring_chomp(UString *ustr)
     return ustr->ptr;
 }
 
-void ustring_sync(const UString *ustr, UString *buffer, double ratio)
+void ustring_sync(const UString *ref, UString *buffer, double ratio)
 {
-    if (buffer->allocated <= ustr->allocated * ratio) {
-        buffer->allocated = ustr->allocated * ratio;
+    if (buffer->allocated <= ref->allocated * ratio) {
+        buffer->allocated = ref->allocated * ratio;
         buffer->ptr = mem_renew(buffer->ptr, UChar, buffer->allocated + 1);
     }
 }
