@@ -16,14 +16,6 @@
 #define RED(str) "\e[1;31m" str "\e[0m"
 #define GREEN(str) "\e[1;32m" str "\e[0m"
 
-#ifdef DEBUG
-# define u_printf(...)                                \
-    do {                                              \
-        UFILE *ustdout = u_finit(stdout, NULL, NULL); \
-        u_fprintf(ustdout, ## __VA_ARGS__);           \
-    } while (0);
-#endif
-
 enum {
     BIN_FILE_BIN,
     BIN_FILE_SKIP,

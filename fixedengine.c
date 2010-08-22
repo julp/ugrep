@@ -4,6 +4,8 @@ extern UBool iFlag; // drop this
 
 // TODO: switch from UChar * to UString * for upattern ?
 
+static void engine_fixed_replace1(void *data, const UString *subject);
+
 static UChar *ustrndup(const UChar *src, int32_t length)
 {
     UChar *dst;
@@ -53,6 +55,8 @@ static UBool engine_fixed_match(void *data, const UString *subject)
 {
     FETCH_DATA(data, upattern, UChar);
 
+    engine_fixed_replace1(data, subject); // for test
+
     if (iFlag) {
         // Case Insensitive version
         return FALSE; // TODO
@@ -75,7 +79,6 @@ static UBool engine_fixed_whole_line_match(void *data, const UString *subject)
 static void engine_fixed_reset(void *data)
 {
     /* NOP */
-    return;
 }
 
 static void engine_fixed_destroy(void *data)
@@ -83,6 +86,25 @@ static void engine_fixed_destroy(void *data)
     FETCH_DATA(data, upattern, UChar);
 
     free(upattern);
+}
+
+static void engine_fixed_replace1(void *data, const UString *subject)
+{
+    UChar *m;
+    int32_t pos, upattern_len;
+    FETCH_DATA(data, upattern, UChar);
+    UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
+    UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL};
+    int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
+
+    pos = 0;
+    upattern_len = u_strlen(upattern);
+    while (NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, upattern, upattern_len))) {
+        pos = m - subject->ptr;
+        ustring_insert_len(subject, pos, before, before_len);
+        ustring_insert_len(subject, pos + before_len + upattern_len, after, after_len);
+        pos += before_len + upattern_len + after_len;
+    }
 }
 
 engine_t fixed_engine = {

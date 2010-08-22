@@ -45,6 +45,12 @@
 #define debug(format, ...) \
     fprintf(stderr, "[DEBUG] %s:%d:" format " in %s()\n", basename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
     //fprintf(stderr, "[DEBUG] " __FILE__ ":%d:" format " in %s()\n", __LINE__, ## __VA_ARGS__, __func__)
+
+# define u_printf(...)                                \
+    do {                                              \
+        UFILE *ustdout = u_finit(stdout, NULL, NULL); \
+        u_fprintf(ustdout, ## __VA_ARGS__);           \
+    } while (0);
 #else
 # define msg(format, ...) \
     fprintf(stderr, "[ERROR] " format "\n", ## __VA_ARGS__)
@@ -55,6 +61,7 @@
 # define icu(status, function) \
     msg("ICU Error \"%s\" from " function "()", u_errorName(status))
 
+# define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
 # define U_BS  0x0008 /* backspace */
 # define U_CR  0x000D /* \r */
