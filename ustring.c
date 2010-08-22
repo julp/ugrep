@@ -58,9 +58,9 @@ UChar *ustring_chomp(UString *ustr)
 {
     if (ustr->len > 0) {
         if (U_LF == ustr->ptr[ustr->len - 1]) {
-            ustr->ptr[ustr->len--] = U_NUL;
+            ustr->ptr[--ustr->len] = U_NUL;
             if (ustr->len > 0 && U_CR == ustr->ptr[ustr->len - 1]) {
-                ustr->ptr[ustr->len--] = U_NUL;
+                ustr->ptr[--ustr->len] = U_NUL;
             }
         }
     }
