@@ -4,9 +4,14 @@
 
 # include <stdlib.h>
 # include <stdio.h>
+# include <string.h>
 
 # include <unicode/utypes.h>
 # include <unicode/ucnv.h>
+# include <unicode/ustdio.h>
+# include <unicode/ustring.h>
+# include <unicode/ucsdet.h>
+# include <unicode/uregex.h>
 
 # ifdef __GNUC__
 #  define GCC_VERSION (__GNUC__ * 1000 + __GNUC_MINOR__)
@@ -22,13 +27,13 @@
 #  define UNEXPECTED(condition) (condition)
 # endif /* (UN)EXPECTED */
 
-# define ensure(expr)                                                                                            \
-    do {                                                                                                         \
-        if (EXPECTED(expr)) {                                                                                    \
-        } else {                                                                                                 \
-            fprintf(stderr, "[%s: %d]: assertion \"%s\" failed in %s()\n", __FILE__, __LINE__, #expr, __func__); \
-            exit(EXIT_FAILURE);                                                                                  \
-        }                                                                                                        \
+# define ensure(expr)                                                                                           \
+    do {                                                                                                        \
+        if (EXPECTED(expr)) {                                                                                   \
+        } else {                                                                                                \
+            fprintf(stderr, "[%s:%d]: assertion \"%s\" failed in %s()\n", __FILE__, __LINE__, #expr, __func__); \
+            exit(EXIT_FAILURE);                                                                                 \
+        }                                                                                                       \
     } while (0);
 
 #ifdef DEBUG
@@ -58,6 +63,7 @@
 
 # include "config.h"
 # include "alloc.h"
+# include "slist.h"
 # include "ustring.h"
 
 UBool is_binary_uchar(UChar32);
@@ -83,5 +89,22 @@ typedef struct {
     void (*rewind)(void *);
     // add UBool (*eof)(void *); ?
 } reader_t;
+
+typedef struct {
+    void *(*compute)(const UChar *, int32_t);
+    void *(*computeC)(const char *);
+    UBool (*match)(void *, const UString *);
+    UBool (*whole_line_match)(void *, const UString *);
+    //Range **(*get_match)(void *);
+    void (*reset)(void *); // remove it?
+    void (*destroy)(void *);
+} engine_t;
+
+typedef struct {
+    void *pattern;
+    /*UBool case_insensitive;*/
+    //engine_type_t type;
+    engine_t *engine;
+} pattern_data_t;
 
 #endif /* !UGREP_H */

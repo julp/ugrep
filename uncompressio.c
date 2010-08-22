@@ -87,22 +87,6 @@ free:
 # define bzip2(jfp, errnum, function) \
     msg("bzip2 internal error from " function "(): %s", BZ2_bzerror(jfp, errnum))
 
-#if 0
-
-http://www.bzip.org/1.0.5/bzip2-manual-1.0.5.html
-
-typedef void BZFILE;
-
-BZFILE * BZ2_bzdopen ( int        fd,    const char *mode );
-BZFILE *BZ2_bzReadOpen( int *bzerror, FILE *f, int verbosity, int small, void *unused, int nUnused);
-
-int BZ2_bzRead ( int *bzerror, BZFILE *b, void *buf, int len );
-
-void BZ2_bzReadClose ( int *bzerror, BZFILE *b );
-
-extern void bz_internal_error ( int errcode );
-#endif
-
 static void *compressedfdbz2_open(const char *filename)
 {
     BZFILE *jfp;
@@ -132,7 +116,7 @@ static void *compressedfdbz2_open(const char *filename)
     dst_len = 2 * st.st_size;
     dst = mem_new_n(*dst, dst_len + 1);
     if (-1 == (ret = BZ2_bzRead(&bzerror, jfp, dst, dst_len))) {
-        bzip2(jfp, bzerror, "BZ2_bzread");
+        bzip2(jfp, &bzerror, "BZ2_bzread");
         BZ2_bzReadClose(&bzerror, jfp);
         goto free;
     }

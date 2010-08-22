@@ -14,9 +14,9 @@
 #  define ALLOC_SIZE(...)
 # endif /* ALLOC_SIZE */
 
-#define mem_new(type)           _mem_alloc(sizeof(type))
-#define mem_new_n(type, n)      _mem_alloc(sizeof(type) * (n))
-#define mem_renew(ptr, type, n) _mem_realloc(ptr, sizeof(type) * (n))
+# define mem_new(type)           _mem_alloc(sizeof(type))
+# define mem_new_n(type, n)      _mem_alloc(sizeof(type) * (n))
+# define mem_renew(ptr, type, n) _mem_realloc(ptr, sizeof(type) * (n))
 
 void *_mem_alloc(size_t) MALLOC ALLOC_SIZE(1);
 void *_mem_realloc(void *, size_t) MALLOC ALLOC_SIZE(2);

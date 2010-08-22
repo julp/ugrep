@@ -1,6 +1,6 @@
-#ifndef USTRING_H
+#ifndef UGREP_USTRING_H
 
-# define USTRING_H
+# define UGREP_USTRING_H
 
 typedef struct {
     UChar *ptr;
@@ -19,4 +19,4 @@ UString *ustring_new(void);
 void ustring_sync(const UString *, UString *, double);
 void ustring_truncate(UString *);
 
-#endif /* STRING_H */
+#endif /* UGREP_STRING_H */

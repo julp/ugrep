@@ -27,7 +27,7 @@ message(STATUS ZLIB_FOUND = ${ZLIB_FOUND})
 find_package(BZip2)
 message(STATUS BZIP2_FOUND = ${BZIP2_FOUND})
 
-set(BASE_SOURCES ugrep.c alloc.c ustring.c mmio.c stdio.c)
+set(BASE_SOURCES ugrep.c alloc.c ustring.c mmio.c stdio.c slist.c fixedengine.c icureengine.c)
 set(EXTRA_SOURCES )
 set(EXTRA_LIBS)
 

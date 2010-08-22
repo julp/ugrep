@@ -1,0 +1,14 @@
+élève
+abc
+UTF-8 sans BOM
+def
+élÈve
+ghi
+j'ai 23 élèves dans ma classe
+jkl
+élève
+012
+ils élèveront une chèvre
+3z5
+j'ai mis un élève au coin
+élÈve

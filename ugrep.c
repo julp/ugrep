@@ -2,16 +2,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <getopt.h>
 #include <errno.h>
 #include <unistd.h>
-
-#include <unicode/ustdio.h>
-#include <unicode/ucsdet.h>
-#include <unicode/uregex.h>
 
 #include "ugrep.h"
 
@@ -23,14 +16,105 @@
 #define RED(str) "\e[1;31m" str "\e[0m"
 #define GREEN(str) "\e[1;32m" str "\e[0m"
 
-/*
-UChar* CharsToUChars(const char* str) {
-    int32_t len = u_unescape(str, 0, 0);
-    UChar *buf = (UChar*) malloc(sizeof(UChar) * (len + 1));
-    u_unescape(str, buf, len + 1);
-    return buf;
+#ifdef DEBUG
+# define u_printf(...)                                \
+    do {                                              \
+        UFILE *ustdout = u_finit(stdout, NULL, NULL); \
+        u_fprintf(ustdout, ## __VA_ARGS__);           \
+    } while (0);
+#endif
+
+enum {
+    BIN_FILE_BIN,
+    BIN_FILE_SKIP,
+    BIN_FILE_TEXT
+};
+
+/* ========== global variables ========== */
+
+extern reader_t mm_reader;
+extern reader_t stdio_reader;
+#ifdef HAVE_ZLIB
+extern reader_t gz_reader;
+#endif /* HAVE_ZLIB */
+#ifdef HAVE_BZIP2
+extern reader_t bz2_reader;
+#endif /* HAVE_BZIP2 */
+
+reader_t *available_readers[] = {
+    &mm_reader,
+    &stdio_reader,
+#ifdef HAVE_ZLIB
+    &gz_reader,
+#endif /* HAVE_ZLIB */
+#ifdef HAVE_BZIP2
+    &bz2_reader,
+#endif /* HAVE_BZIP2 */
+    NULL
+};
+
+extern engine_t fixed_engine;
+extern engine_t icure_engine;
+
+engine_t *engines[] = {
+    &icure_engine,
+    &fixed_engine
+};
+
+int binbehave = BIN_FILE_SKIP;
+
+UBool nFlag = FALSE; // move to main()?
+UBool vFlag = FALSE; // move to main()?
+UBool wFlag = FALSE; // move to main()?
+UBool iFlag = FALSE; // move to main()?
+
+UBool print_file = TRUE; // -H/h
+UBool colorize = TRUE;
+UBool literal = FALSE; // -E/F
+
+/* ========== general helper functions ========== */
+
+static UBool stdout_is_tty()
+{
+    return (1 == isatty(STDOUT_FILENO));
 }
-*/
+
+UBool is_binary_uchar(UChar32 c)
+{
+    return !u_isprint(c) && !u_isspace(c) && U_BS != c;
+}
+
+static UBool is_pattern(const UChar *pattern)
+{
+    // quotemeta : ".\+*?[^]($)"
+    // PCRE : "\\+*?[^]$(){}=!<>|:-"
+    const UChar meta[] = {
+        0x005c, // esc
+        0x002b, // +
+        0x002a, // *
+        0x003f, // ?
+        0x005b, // [
+        0x005d, // ]
+        0x005e, // ^
+        0x0024, // $
+        0x0028, // (
+        0x0029, // )
+        0x007b, // {
+        0x007d, // }
+        0x003d, // =
+        0x0021, // !
+        0x003c, // <
+        0x003e, // >
+        0x007c, // |
+        0x003a, // :
+        0x002d, // -
+        U_NUL
+    };
+
+    return (NULL != u_strpbrk(pattern, meta));
+}
+
+/* ========== fd helper functions ========== */
 
 typedef struct {
     const char *filename;
@@ -42,20 +126,6 @@ typedef struct {
     size_t matches;
     UBool binary;
 } fd_t;
-
-UBool is_binary_uchar(UChar32 c)
-{
-    return !u_isprint(c) && !u_isspace(c) && U_BS != c;
-}
-
-extern reader_t mm_reader;
-extern reader_t stdio_reader;
-#ifdef HAVE_ZLIB
-extern reader_t gz_reader;
-#endif /* HAVE_ZLIB */
-#ifdef HAVE_BZIP2
-extern reader_t bz2_reader;
-#endif /* HAVE_BZIP2 */
 
 UBool fd_open(fd_t *fd, const char *filename)
 {
@@ -118,7 +188,7 @@ UBool fd_open(fd_t *fd, const char *filename)
         } else {
             fd->reader->set_signature_length(fd->reader_data, signature_length);
         }
-        debug("file encoding = %s", encoding);
+        debug("%s, file encoding = %s", filename, encoding);
         fd->encoding = encoding;
         fd->reader->set_encoding(fd->reader_data, encoding); // a tester ?
         fd->reader->rewind(fd->reader_data);
@@ -177,27 +247,17 @@ int fd_readline(fd_t *fd, UString *ustr)
     return fd->reader->readline(fd->reader_data, ustr);
 }
 
+/* ========== getopt stuff ========== */
+
 enum {
     COLOR_OPT = CHAR_MAX + 1,
     BINARY_OPT,
     READER_OPT
 };
 
-enum {
-    BIN_FILE_BIN,
-    BIN_FILE_SKIP,
-    BIN_FILE_TEXT
-};
-
-enum {
-    COLOR_AUTO,
-    COLOR_NEVER,
-    COLOR_ALWAYS
-};
-
 static char optstr[] = "EFHVce:f:hinqsvwx";
 
-struct option long_options[] =
+static struct option long_options[] =
 {
     {"color",           required_argument, NULL, COLOR_OPT},
     {"colour",          required_argument, NULL, COLOR_OPT},
@@ -228,281 +288,41 @@ static void usage()
     exit(EXIT_USAGE);
 }
 
-static UBool stdout_is_tty()
-{
-    return (1 == isatty(STDOUT_FILENO));
-}
+/* ========== adding patterns ========== */
 
-int binbehave = BIN_FILE_SKIP;
-
-UBool nflag = FALSE;
-UBool vflag = FALSE;
-UBool wflag = FALSE;
-
-UBool print_file = TRUE;
-UBool colorize = TRUE;
-
-typedef enum {
-    E_FIXED_STR,
-    E_ICU_REGEXP,
-    _E_COUNT
-} engine_type_t;
-
-typedef struct {
-    void *(*compute)(const UChar *, int32_t);
-    void *(*computeC)(const char *);
-    UBool (*match)(void *, const UString *);
-    UBool (*whole_line_match)(void *, const UString *);
-    //Range **(*get_match)(void *);
-    void (*reset)(void *); // remove it?
-    void (*destroy)(void *);
-} engine_t;
-
-typedef struct {
-    void *pattern;
-    //engine_type_t type;
-    engine_t *engine;
-} pattern_data_t;
-
-void *engine_icure_compute(const UChar *upattern, int32_t length)
-{
-    UFILE *ustderr;
-    UParseError pe;
-    UErrorCode status;
-    URegularExpression *uregex;
-
-    status = U_ZERO_ERROR;
-    ustderr = u_finit(stdout, NULL, NULL);
-    /* don't make a copy of upattern, ICU does this */
-    uregex = uregex_open(upattern, length, /*TODO*/UREGEX_CASE_INSENSITIVE, &pe, &status);
-    if (U_FAILURE(status)) {
-        if (U_REGEX_RULE_SYNTAX == status) {
-            //u_fprintf(ustderr, "Error at offset %d %S %S\n", pe.offset, pe.preContext, pe.postContext);
-            u_fprintf(ustderr, "Invalid pattern: error at offset %d\n", pe.offset);
-            u_fprintf(ustderr, "\t%S\n", upattern);
-            u_fprintf(ustderr, "\t%*c\n", pe.offset, '^');
-        } else {
-            icu(status, "uregex_openC");
-        }
-        return NULL;
-    }
-
-    return uregex;
-}
-
-void *engine_icure_computeC(const char *pattern)
-{
-    UParseError pe;
-    UErrorCode status;
-    URegularExpression *uregex;
-
-    status = U_ZERO_ERROR;
-    uregex = uregex_openC(pattern, /*TODO*/UREGEX_CASE_INSENSITIVE, &pe, &status);
-    if (U_FAILURE(status)) {
-        if (U_REGEX_RULE_SYNTAX == status) {
-            //u_fprintf(ustderr, "Error at offset %d %S %S\n", pe.offset, pe.preContext, pe.postContext);
-            fprintf(stderr, "Invalid pattern: error at offset %d\n", pe.offset);
-            fprintf(stderr, "\t%s\n", pattern);
-            fprintf(stderr, "\t%*c\n", pe.offset, '^');
-        } else {
-            icu(status, "uregex_openC");
-        }
-        return NULL;
-    }
-
-    return uregex;
-}
-
-UBool engine_icure_match(void *data, const UString *subject)
-{
-    UBool ret;
-    UErrorCode status;
-    FETCH_DATA(data, uregex, URegularExpression);
-
-    status = U_ZERO_ERROR;
-    uregex_setText(uregex, subject->ptr, subject->len, &status);
-    if (U_FAILURE(status)) {
-        icu(status, "uregex_setText");
-    }
-    ret = uregex_find(uregex, 0, &status);
-    if (U_FAILURE(status)) {
-        icu(status, "uregex_find");
-    }
-
-    return ret;
-}
-
-UBool engine_icure_whole_line_match(void *data, const UString *subject)
-{
-    FETCH_DATA(data, uregex, URegularExpression);
-}
-
-void engine_icure_reset(void *data)
-{
-    UErrorCode status;
-    FETCH_DATA(data, uregex, URegularExpression);
-
-    status = U_ZERO_ERROR;
-    uregex_setText(uregex, 0, 0, &status);
-}
-
-void engine_icure_destroy(void *data)
-{
-    UErrorCode status;
-    FETCH_DATA(data, uregex, URegularExpression);
-
-    uregex_close(uregex);
-}
-
-/* ========== */
-
-UChar *ustrndup(const UChar *src, int32_t length)
-{
-    UChar *dst;
-
-    dst = mem_new_n(*dst, length + 1);
-    u_strncpy(dst, src, length);
-
-    return dst;
-}
-
-void *engine_fixed_compute(const UChar *upattern, int32_t length)
-{
-    if (length < 0) {
-        length = u_strlen(upattern);
-    }
-    return ustrndup(upattern, length);
-}
-
-void *engine_fixed_computeC(const char *pattern)
-{
-    UChar *upattern;
-    UConverter *ucnv;
-    UErrorCode status;
-
-    status = U_ZERO_ERROR;
-    ucnv = ucnv_open(NULL, &status);
-    if (U_FAILURE(status)) {
-        icu(status, "ucnv_open");
-        return NULL;
-    }
-    upattern = mem_new_n(*upattern, strlen(pattern) * ucnv_getMaxCharSize(ucnv) + 1);
-    ucnv_close(ucnv);
-
-    return upattern;
-}
-
-UBool engine_fixed_match(void *data, const UString *subject)
-{
-    FETCH_DATA(data, upattern, UChar);
-
-    if (1/*iFlag*/) {
-        // Case Insensitive version
-    } else {
-        return (NULL != u_strFindFirst(subject->ptr, subject->len, upattern, -1));
-    }
-}
-
-UBool engine_fixed_whole_line_match(void *data, const UString *subject)
-{
-    FETCH_DATA(data, pattern, UChar);
-
-    // u_str(case)cmp
-}
-
-void engine_fixed_reset(void *data)
-{
-    /* NOP */
-    return;
-}
-
-void engine_fixed_destroy(void *data)
-{
-    FETCH_DATA(data, upattern, UChar);
-
-    free(upattern);
-}
-
-engine_t engine_icure = {
-    engine_icure_compute,
-    engine_icure_computeC,
-    engine_icure_match,
-    engine_icure_whole_line_match,
-    engine_icure_reset,
-    engine_icure_destroy
-};
-
-engine_t engine_fixed = {
-    engine_fixed_compute,
-    engine_fixed_computeC,
-    engine_fixed_match,
-    engine_fixed_whole_line_match,
-    engine_fixed_reset,
-    engine_fixed_destroy
-};
-
-/* ========== */
-
-typedef struct slist_t {
-    struct slist_t *next;
-    pattern_data_t *data;
-} slist_t;
-
-slist_t *patterns = NULL, *queue = NULL;
-
-void add_pattern(const UChar *pattern, int32_t length/*, int type*/)
+void add_pattern(slist_t *l, const UChar *pattern, int32_t length/*, int type*/)
 {
     void *data;
-    slist_t *n;
     pattern_data_t *pdata;
 
-    n = mem_new(*n);
     pdata = mem_new(*pdata);
-    if (NULL == (data = engine_icure/*engine_fixed*/.compute(pattern, length))) {
-        //
+    if (NULL == (data = engines[!!literal]->compute(pattern, length))) {
+        // TODO
+        exit(EXIT_FAILURE);
     }
-    n->next = NULL;
-    n->data = pdata;
     pdata->pattern = data;
-    //pdata->type = E_ICU_REGEXP;
-    pdata->engine = &engine_icure/*&engine_fixed*/;
+    pdata->engine = engines[!!literal];
 
-    if (NULL != queue) {
-        queue->next = n;
-
-    } else {
-        patterns = n;
-    }
-    queue = n;
+    slist_append(l, pdata);
 }
 
-void add_patternC(const char *pattern/*, int type*/)
+void add_patternC(slist_t *l, const char *pattern/*, int type*/)
 {
     void *data;
-    slist_t *n;
     pattern_data_t *pdata;
 
-    n = mem_new(*n);
     pdata = mem_new(*pdata);
-    if (NULL == (data = engine_icure.computeC(pattern))) {
-        //
+    if (NULL == (data = engines[!!literal]->computeC(pattern))) {
+        // TODO
+        exit(EXIT_FAILURE);
     }
-    n->next = NULL;
-    n->data = pdata;
     pdata->pattern = data;
-    //pdata->type = E_ICU_REGEXP;
-    pdata->engine = &engine_icure;
+    pdata->engine = engines[!!literal];
 
-    if (NULL != queue) {
-        queue->next = n;
-
-    } else {
-        patterns = n;
-    }
-    queue = n;
+    slist_append(l, pdata);
 }
 
-void source_patterns(const char *filename)
+void source_patterns(const char *filename, slist_t *l)
 {
     fd_t fd;
     UString *ustr;
@@ -516,40 +336,49 @@ void source_patterns(const char *filename)
     }
     while (fd_readline(&fd, ustr)) {
         ustring_chomp(ustr);
-        add_pattern(ustr->ptr, ustr->len);
+        add_pattern(l, ustr->ptr, ustr->len);
     }
     fd_close(&fd);
     ustring_destroy(ustr);
 }
 
+/* ========== main ========== */
+
 int main(int argc, char **argv)
 {
+    enum {
+        COLOR_AUTO,
+        COLOR_NEVER,
+        COLOR_ALWAYS
+    };
+
     int c;
     fd_t fd;
     int color;
-    slist_t *p;
     UString *ustr;
-    //uint32_t reflags;
     UFILE *ustdout;
     UErrorCode status;
+    slist_t *patterns;
+    slist_element_t *p;
+    UBool xFlag = FALSE;
 
     fd.reader = &mm_reader;
 
-    //reflags = 0;
     color = COLOR_AUTO;
     status = U_ZERO_ERROR;
+    patterns = slist_new(NULL);
     ustdout = u_finit(stdout, NULL, NULL);
 
-    debug("default locale = %s", u_fgetlocale(ustdout));
-    debug("stdout encoding = %s", u_fgetcodepage(ustdout));
+    debug("system locale = %s", u_fgetlocale(ustdout));
+    debug("system codepage = %s", u_fgetcodepage(ustdout));
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
             case 'E':
-                // TODO
+                literal = FALSE; // NOP
                 break;
             case 'F':
-                //reflags |= UREGEX_LITERAL; // Not implemented by ICU
+                literal = TRUE;
                 break;
             case 'H':
                 print_file = TRUE;
@@ -560,28 +389,28 @@ int main(int argc, char **argv)
                 break;
             case 'e':
                 // TODO
-                add_patternC(optarg/*, type*/);
+                add_patternC(patterns, optarg/*, type*/);
                 break;
             case 'f':
-                source_patterns(optarg);
+                source_patterns(optarg, patterns);
                 break;
             case 'h':
                 print_file = FALSE;
                 break;
             case 'i':
-                //reflags |= UREGEX_CASE_INSENSITIVE;
-                break;
-            case 'l':
-                // TODO: line-regexp
+                iFlag = TRUE;
                 break;
             case 'n':
-                nflag = TRUE;
+                nFlag = TRUE;
                 break;
             case 'v':
-                vflag = TRUE;
+                vFlag = TRUE;
                 break;
             case 'w':
                 // TODO: word-regexp
+                break;
+            case 'x':
+                xFlag = TRUE;
                 break;
             case COLOR_OPT:
                 if (!strcmp("never", optarg)) {
@@ -609,37 +438,7 @@ int main(int argc, char **argv)
                 break;
             case READER_OPT:
                 {
-#if 0
-                    struct readers {
-                        const char *name;
-                        reader_t *reader;
-                    } available_readers[] = {
-                        {"mmap",  &mm_reader},
-                        {"stdio", &stdio_reader},
-#ifdef HAVE_ZLIB
-                        {"gzip", &compressedgz_reader},
-#endif /* HAVE_ZLIB */
-                        {NULL,    NULL}
-                    }, *r;
-
-                    for (r = available_readers, fd.reader = NULL; r->name && r->reader; r++) {
-                        if (!strcmp(r->name, optarg)) {
-                            fd.reader = r->reader;
-                            break;
-                        }
-                    }
-#endif
-                    reader_t *available_readers[] = {
-                        &mm_reader,
-                        &stdio_reader,
-#ifdef HAVE_ZLIB
-                        &gz_reader,
-#endif /* HAVE_ZLIB */
-#ifdef HAVE_BZIP2
-                        &bz2_reader,
-#endif /* HAVE_BZIP2 */
-                        NULL
-                    }, **r;
+                    reader_t **r;
 
                     for (r = available_readers, fd.reader = NULL; *r; r++) {
                         if (!strcmp((*r)->name, optarg)) {
@@ -664,11 +463,11 @@ int main(int argc, char **argv)
 
     colorize = (COLOR_ALWAYS == color) || (COLOR_AUTO == color && stdout_is_tty());
 
-    if (NULL == queue) {
+    if (slist_empty(patterns)) {
         if (argc < 2) {
             usage();
         } else {
-            add_patternC(*argv++);
+            add_patternC(patterns, *argv++);
             argc--;
         }
     }
@@ -689,24 +488,25 @@ int main(int argc, char **argv)
             while (fd_readline(&fd, ustr)) {
                 fd.lineno++;
                 ustring_chomp(ustr);
-                for (p = patterns; NULL != p; p = p->next) {
-                    if (p->data->engine->match(p->data->pattern, ustr)) {
+                for (p = patterns->head; NULL != p; p = p->next) {
+                    FETCH_DATA(p->data, pdata, pattern_data_t);
+                    if (xFlag ? pdata->engine->whole_line_match(pdata->pattern, ustr) : pdata->engine->match(pdata->pattern, ustr)) {
                         fd.matches++; // increment just once per line ?
-                        if (!vflag) {
+                        if (!vFlag) {
                             if (print_file) {
                                 u_fprintf(ustdout, "\e[35m%s\e[0m:", fd.filename);
                             }
-                            if (nflag) {
+                            if (nFlag) {
                                 u_fprintf(ustdout, "\e[32m%d\e[0m:", fd.lineno);
                             }
                             u_fputs(ustr->ptr, ustdout);
                         }
                     } else {
-                        if (vflag) {
+                        if (vFlag) {
                             if (print_file) {
                                 u_fprintf(ustdout, "\e[35m%s\e[0m:", fd.filename);
                             }
-                            if (nflag) {
+                            if (nFlag) {
                                 u_fprintf(ustdout, "\e[32m%d\e[0m:", fd.lineno);
                             }
                             u_fputs(ustr->ptr, ustdout);
@@ -721,9 +521,13 @@ endloop:
 
     ustring_destroy(ustr);
 
-    for (p = patterns; NULL != p; p = p->next) {
-        p->data->engine->destroy(p->data->pattern);
+    // put this in a destructor function
+    for (p = patterns->head; NULL != p; p = p->next) {
+        FETCH_DATA(p->data, pdata, pattern_data_t);
+        pdata->engine->destroy(pdata->pattern);
     }
+
+    slist_destroy(patterns);
 
 
 #if 0
