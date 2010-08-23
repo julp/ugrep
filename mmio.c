@@ -71,37 +71,8 @@ static void mmfd_close(void *data)
     }
     munmap(mmfd->base, mmfd->len);
     close(mmfd->fd);
-    //free(mmfd);
 }
 
-#ifdef WITH_IS_BINARY
-static int mmfd_is_binary(void *data, size_t max_len)
-{
-    UChar32 c;
-    size_t i, len;
-    UErrorCode status;
-    FETCH_DATA(data, mmfd, mmfd_t);
-
-    status = U_ZERO_ERROR;
-    len = mmfd->len > max_len ? max_len : mmfd->len;
-    for (i = 0; i < len; i++) {
-        c = ucnv_getNextUChar(mmfd->ucnv, &mmfd->ptr, mmfd->end, &status);
-        if (U_FAILURE(status)) {
-            if (U_INDEX_OUTOFBOUNDS_ERROR == status) {
-                return 0;
-            } else {
-                icu(status, "ucnv_getNextUChar");
-                return -1;
-            }
-        }
-        if (is_binary_uchar(c)) {
-            return 1;
-        }
-    }
-
-    return 0;
-}
-#else
 static size_t mmfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
 {
     UChar32 c;
@@ -112,7 +83,7 @@ static size_t mmfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
     status = U_ZERO_ERROR;
     len = mmfd->len > max_len ? max_len : mmfd->len;
     for (i = 0; i < len; i++) {
-        c = ucnv_getNextUChar(mmfd->ucnv, &mmfd->ptr, mmfd->end, &status);
+        c = ucnv_getNextUChar(mmfd->ucnv, (const char **) &mmfd->ptr, mmfd->end, &status);
         if (U_FAILURE(status)) {
             if (U_INDEX_OUTOFBOUNDS_ERROR == status) {
                 break;
@@ -127,7 +98,6 @@ static size_t mmfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
 
     return i;
 }
-#endif /* WITH_IS_BINARY */
 
 static void mmfd_rewind(void *data)
 {
@@ -144,14 +114,15 @@ static UBool mmfd_readline(void *data, UString *ustr)
 
     status = U_ZERO_ERROR;
     do {
-        c = ucnv_getNextUChar(mmfd->ucnv, &mmfd->ptr, mmfd->end, &status);
+        c = ucnv_getNextUChar(mmfd->ucnv, (const char **) &mmfd->ptr, mmfd->end, &status);
         if (U_FAILURE(status)) {
             if (U_INDEX_OUTOFBOUNDS_ERROR == status) { // c == U_EOF
-                if (!ustring_empty(ustr)) {
+                /*if (!ustring_empty(ustr)) {
                     break;
                 } else {
                     return FALSE;
-                }
+                }*/
+                break;
             } else {
                 icu(status, "ucnv_getNextUChar");
                 return FALSE;
@@ -200,18 +171,22 @@ static void mmfd_set_signature_length(void *data, size_t signature_length)
     mmfd->ptr = mmfd->base += signature_length;
 }
 
+static UBool mmfd_eof(void *data)
+{
+    FETCH_DATA(data, mmfd, mmfd_t);
+
+    return mmfd->ptr >= mmfd->end;
+}
+
 reader_t mm_reader =
 {
     "mmap",
     mmfd_open,
     mmfd_close,
+    mmfd_eof,
     mmfd_readline,
     mmfd_readbytes,
-#ifdef WITH_IS_BINARY
-    mmfd_is_binary,
-#else
     mmfd_readuchars,
-#endif /* WITH_IS_BINARY */
     mmfd_set_signature_length,
     mmfd_set_encoding,
     mmfd_rewind

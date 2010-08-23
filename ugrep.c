@@ -61,10 +61,11 @@ engine_t *engines[] = {
 
 int binbehave = BIN_FILE_SKIP;
 
-UBool nFlag = FALSE; // move to main()?
-UBool vFlag = FALSE; // move to main()?
-UBool wFlag = FALSE; // move to main()?
-UBool iFlag = FALSE; // move to main()?
+// move to main()?
+UBool nFlag = FALSE;
+UBool vFlag = FALSE;
+UBool wFlag = FALSE;
+UBool iFlag = FALSE;
 
 UBool print_file = TRUE; // -H/h
 UBool colorize = TRUE;
@@ -76,7 +77,7 @@ static UBool stdout_is_tty()
     return (1 == isatty(STDOUT_FILENO));
 }
 
-UBool is_binary_uchar(UChar32 c)
+static UBool is_binary_uchar(UChar32 c)
 {
     return !u_isprint(c) && !u_isspace(c) && U_BS != c;
 }
@@ -207,12 +208,6 @@ failed:
     return FALSE;
 }
 
-#ifdef WITH_IS_BINARY
-int fd_is_binary(fd_t *fd)
-{
-    return fd->reader->is_binary(fd->reader_data, MAX_BIN_REL_LEN);
-}
-#else
 int fd_is_binary(fd_t *fd)
 {
     UChar32 *p;
@@ -230,7 +225,6 @@ int fd_is_binary(fd_t *fd)
 
     return (p - buffer) < buffer_len;
 }
-#endif /* WITH_IS_BINARY */
 
 void fd_close(fd_t *fd)
 {
@@ -246,7 +240,7 @@ void fd_rewind(fd_t *fd)
 int fd_readline(fd_t *fd, UString *ustr)
 {
     ustring_truncate(ustr);
-    return fd->reader->readline(fd->reader_data, ustr);
+    return !fd->reader->eof(fd->reader_data) && fd->reader->readline(fd->reader_data, ustr);
 }
 
 /* ========== getopt stuff ========== */
@@ -626,24 +620,9 @@ endloop:
 }
 
 /*
-switch (binbehave) {
-    case BIN_FILE_TEXT:
-        // don't call fd_is_binary, treat it as text
-        break;
-    case BIN_FILE_BIN:
-        // at first match: print match and continue
-        break;
-    case BIN_FILE_SKIP:
-        // continue
-        break;
-    default:
-        // bug !
-}
-*/
-
-/*
 matching/printing process :
 !colorize : stop and print at the first match
-colorize : search all match but matches should be treated by range before colorize them else result should be irrelevant
+colorize : search all matches but matches should be treated by range before colorize them else result should be irrelevant
            (eg : echo eleve | grep -e el -e le)
+           except for whole line matching: stop and print at the first match
 */

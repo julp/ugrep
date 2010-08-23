@@ -147,15 +147,6 @@ static void compressedfd_close(void *data)
     free(compressedfd->start);
 }
 
-#ifdef WITH_IS_BINARY
-static int compressedfd_is_binary(void *data, size_t max_len)
-{
-    FETCH_DATA(data, compressedfd, compressedfd_t);
-
-    // TODO
-    return 0;
-}
-#else
 static size_t compressedfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
 {
     UChar32 c;
@@ -166,7 +157,7 @@ static size_t compressedfd_readuchars(void *data, UChar32 *buffer, size_t max_le
     status = U_ZERO_ERROR;
     len = compressedfd->len > max_len ? max_len : compressedfd->len;
     for (i = 0; i < len; i++) {
-        c = ucnv_getNextUChar(compressedfd->ucnv, &compressedfd->ptr, compressedfd->end, &status);
+        c = ucnv_getNextUChar(compressedfd->ucnv, (const char **) &compressedfd->ptr, compressedfd->end, &status);
         if (U_FAILURE(status)) {
             if (U_INDEX_OUTOFBOUNDS_ERROR == status) {
                 break;
@@ -181,7 +172,6 @@ static size_t compressedfd_readuchars(void *data, UChar32 *buffer, size_t max_le
 
     return i;
 }
-#endif /* WITH_IS_BINARY */
 
 static void compressedfd_rewind(void *data)
 {
@@ -198,14 +188,15 @@ static UBool compressedfd_readline(void *data, UString *ustr)
 
     status = U_ZERO_ERROR;
     do {
-        c = ucnv_getNextUChar(compressedfd->ucnv, &compressedfd->ptr, compressedfd->end, &status);
+        c = ucnv_getNextUChar(compressedfd->ucnv, (const char **) &compressedfd->ptr, compressedfd->end, &status);
         if (U_FAILURE(status)) {
             if (U_INDEX_OUTOFBOUNDS_ERROR == status) { // c == U_EOF
-                if (!ustring_empty(ustr)) {
+                /*if (!ustring_empty(ustr)) {
                     break;
                 } else {
                     return FALSE;
-                }
+                }*/
+                break;
             } else {
                 icu(status, "ucnv_getNextUChar");
                 return FALSE;
@@ -253,19 +244,23 @@ static void compressedfd_set_signature_length(void *data, size_t signature_lengt
     compressedfd->base += signature_length;
 }
 
+static UBool compressedfd_eof(void *data)
+{
+    FETCH_DATA(data, compressedfd, compressedfd_t);
+
+    return compressedfd->ptr >= compressedfd->end;
+}
+
 #ifdef HAVE_ZLIB
 reader_t gz_reader =
 {
     "gzip",
     compressedfdgz_open,
     compressedfd_close,
+    compressedfd_eof,
     compressedfd_readline,
     compressedfd_readbytes,
-# ifdef WITH_IS_BINARY
-    compressedfd_is_binary,
-# else
     compressedfd_readuchars,
-# endif /* WITH_IS_BINARY */
     compressedfd_set_signature_length,
     compressedfd_set_encoding,
     compressedfd_rewind
@@ -278,13 +273,10 @@ reader_t bz2_reader =
     "bzip2",
     compressedfdbz2_open,
     compressedfd_close,
+    compressedfd_eof,
     compressedfd_readline,
     compressedfd_readbytes,
-# ifdef WITH_IS_BINARY
-    compressedfd_is_binary,
-# else
     compressedfd_readuchars,
-# endif /* WITH_IS_BINARY */
     compressedfd_set_signature_length,
     compressedfd_set_encoding,
     compressedfd_rewind

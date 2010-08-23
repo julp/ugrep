@@ -39,18 +39,8 @@ static void stdiofd_close(void *data)
     FETCH_DATA(data, stdiofd, stdiofd_t);
 
     u_fclose(stdiofd->ufp);
-    //free(stdiofd);
 }
 
-#ifdef WITH_IS_BINARY
-static int stdiofd_is_binary(void *data, size_t max_len)
-{
-    FETCH_DATA(data, stdiofd, stdiofd_t);
-
-    // TODO
-    return 0;
-}
-#else
 static size_t stdiofd_readuchars(void *data, UChar32 *buffer, size_t max_len)
 {
     size_t i;
@@ -65,7 +55,6 @@ static size_t stdiofd_readuchars(void *data, UChar32 *buffer, size_t max_len)
 
     return i;
 }
-#endif /* WITH_IS_BINARY */
 
 static void stdiofd_rewind(void *data)
 {
@@ -83,7 +72,7 @@ static UBool stdiofd_readline(void *data, UString *ustr)
         ustring_append_char(ustr, c);
     }
 
-    return !ustring_empty(ustr);
+    return TRUE;
 }
 
 static size_t stdiofd_readbytes(void *data, char *buffer, size_t max_len)
@@ -118,18 +107,22 @@ static void stdiofd_set_signature_length(void *data, size_t signature_length)
     stdiofd->signature_length = signature_length;
 }
 
+static UBool stdiofd_eof(void *data)
+{
+    FETCH_DATA(data, stdiofd, stdiofd_t);
+
+    return u_feof(stdiofd->ufp);
+}
+
 reader_t stdio_reader =
 {
     "stdio",
     stdiofd_open,
     stdiofd_close,
+    stdiofd_eof,
     stdiofd_readline,
     stdiofd_readbytes,
-#ifdef WITH_IS_BINARY
-    stdiofd_is_binary,
-#else
     stdiofd_readuchars,
-#endif /* WITH_IS_BINARY */
     stdiofd_set_signature_length,
     stdiofd_set_encoding,
     stdiofd_rewind

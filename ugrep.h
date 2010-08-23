@@ -73,28 +73,20 @@
 # include "slist.h"
 # include "ustring.h"
 
-UBool is_binary_uchar(UChar32);
-
 # define FETCH_DATA(from, to, type) \
     type *to = (type *) from
-
-//# define WITH_IS_BINARY 1
 
 typedef struct {
     const char *name;
     void *(*open)(const char *);
     void (*close)(void *);
+    UBool (*eof)(void *);
     UBool (*readline)(void *, UString *); // add boolean to copy or not (\r)\n ?
     size_t (*readbytes)(void *, char *, size_t);
-# ifdef WITH_IS_BINARY
-    int (*is_binary)(void *, size_t); // revert to is_binary instead of readuchars ?
-# else
     size_t (*readuchars)(void *, UChar32 *, size_t);
-# endif /* WITH_IS_BINARY */
     void (*set_signature_length)(void *, size_t);
     void (*set_encoding)(void *, const char *);
     void (*rewind)(void *);
-    // add UBool (*eof)(void *); ?
 } reader_t;
 
 typedef struct {
@@ -110,7 +102,6 @@ typedef struct {
 typedef struct {
     void *pattern;
     /*UBool case_insensitive;*/
-    //engine_type_t type;
     engine_t *engine;
 } pattern_data_t;
 
