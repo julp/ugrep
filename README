@@ -1,13 +1,23 @@
-License : BSD
+License: BSD
 
-Build depends :
+Build depends:
 * cmake
 * ICU libraries
 * gcc (others compilers not tested)
 * zlib library (optional)
 * bzlib library (optional)
 
-Run depends :
+Run depends:
 * ICU libraries
 * zlib library (optional)
 * bzlib library (optional)
+
+
+
+Unix/Linux installation from sources:
+0) Download sources
+1) Go to ugrep path source: cd /.../ugrep
+2) Generate Makefiles: cmake . -DCMAKE_INSTALL_PREFIX:PATH=/usr/local
+3) Compile: make
+4) Install it: (sudo) make install
+(ugrep will be installed in /usr/local/bin/ here)
