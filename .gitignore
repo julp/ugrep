@@ -10,3 +10,5 @@ test
 test/*
 old
 old/*
+cmake_install.cmake
+install_manifest.txt
