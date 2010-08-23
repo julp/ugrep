@@ -55,8 +55,6 @@ static UBool engine_fixed_match(void *data, const UString *subject)
 {
     FETCH_DATA(data, upattern, UChar);
 
-    engine_fixed_replace1(data, subject); // for test
-
     if (iFlag) {
         // Case Insensitive version
         return FALSE; // TODO
@@ -88,6 +86,7 @@ static void engine_fixed_destroy(void *data)
     free(upattern);
 }
 
+#if 0
 static void engine_fixed_replace1(void *data, const UString *subject)
 {
     UChar *m;
@@ -99,6 +98,7 @@ static void engine_fixed_replace1(void *data, const UString *subject)
 
     pos = 0;
     upattern_len = u_strlen(upattern);
+    // TODO: found a case insensitive way
     while (NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, upattern, upattern_len))) {
         pos = m - subject->ptr;
         ustring_insert_len(subject, pos, before, before_len);
@@ -106,6 +106,7 @@ static void engine_fixed_replace1(void *data, const UString *subject)
         pos += before_len + upattern_len + after_len;
     }
 }
+#endif
 
 engine_t fixed_engine = {
     engine_fixed_compute,
