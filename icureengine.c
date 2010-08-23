@@ -61,10 +61,12 @@ static UBool engine_icure_match(void *data, const UString *subject)
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
         icu(status, "uregex_setText");
+        // TODO
     }
     ret = uregex_find(uregex, 0, &status);
     if (U_FAILURE(status)) {
         icu(status, "uregex_find");
+        // TODO
     }
 
     return ret;
@@ -72,7 +74,23 @@ static UBool engine_icure_match(void *data, const UString *subject)
 
 static UBool engine_icure_whole_line_match(void *data, const UString *subject)
 {
+    UBool ret;
+    UErrorCode status;
     FETCH_DATA(data, uregex, URegularExpression);
+
+    status = U_ZERO_ERROR;
+    uregex_setText(uregex, subject->ptr, subject->len, &status);
+    if (U_FAILURE(status)) {
+        icu(status, "uregex_setText");
+        // TODO
+    }
+    ret = uregex_matches(uregex, -1, &status);
+    if (U_FAILURE(status)) {
+        icu(status, "uregex_matches");
+        // TODO
+    }
+
+    return ret;
 }
 
 static void engine_icure_reset(void *data)

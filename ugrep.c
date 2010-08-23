@@ -22,6 +22,12 @@ enum {
     BIN_FILE_TEXT
 };
 
+enum {
+    PATTERN_LITERAL,
+    PATTERN_REGEXP,
+    PATTERN_AUTO
+};
+
 /* ========== global variables ========== */
 
 extern reader_t mm_reader;
@@ -49,8 +55,8 @@ extern engine_t fixed_engine;
 extern engine_t icure_engine;
 
 engine_t *engines[] = {
-    &icure_engine,
-    &fixed_engine
+    &fixed_engine,
+    &icure_engine
 };
 
 int binbehave = BIN_FILE_SKIP;
@@ -62,7 +68,6 @@ UBool iFlag = FALSE; // move to main()?
 
 UBool print_file = TRUE; // -H/h
 UBool colorize = TRUE;
-UBool literal = FALSE; // -E/F
 
 /* ========== general helper functions ========== */
 
@@ -282,39 +287,45 @@ static void usage()
 
 /* ========== adding patterns ========== */
 
-void add_pattern(slist_t *l, const UChar *pattern, int32_t length/*, int type*/)
+void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_type)
 {
     void *data;
     pattern_data_t *pdata;
 
     pdata = mem_new(*pdata);
-    if (NULL == (data = engines[!!literal]->compute(pattern, length))) {
+    if (PATTERN_AUTO == pattern_type) {
+        pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
+    }
+    if (NULL == (data = engines[!!pattern_type]->compute(pattern, length))) {
         // TODO
         exit(EXIT_FAILURE);
     }
     pdata->pattern = data;
-    pdata->engine = engines[!!literal];
+    pdata->engine = engines[!!pattern_type];
 
     slist_append(l, pdata);
 }
 
-void add_patternC(slist_t *l, const char *pattern/*, int type*/)
+void add_patternC(slist_t *l, const char *pattern, int pattern_type)
 {
     void *data;
     pattern_data_t *pdata;
 
     pdata = mem_new(*pdata);
-    if (NULL == (data = engines[!!literal]->computeC(pattern))) {
+    if (PATTERN_AUTO == pattern_type) {
+        pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
+    }
+    if (NULL == (data = engines[!!pattern_type]->computeC(pattern))) {
         // TODO
         exit(EXIT_FAILURE);
     }
     pdata->pattern = data;
-    pdata->engine = engines[!!literal];
+    pdata->engine = engines[!!pattern_type];
 
     slist_append(l, pdata);
 }
 
-void source_patterns(const char *filename, slist_t *l)
+void source_patterns(const char *filename, slist_t *l, int pattern_type)
 {
     fd_t fd;
     UString *ustr;
@@ -328,7 +339,7 @@ void source_patterns(const char *filename, slist_t *l)
     }
     while (fd_readline(&fd, ustr)) {
         ustring_chomp(ustr);
-        add_pattern(l, ustr->ptr, ustr->len);
+        add_pattern(l, ustr->ptr, ustr->len, pattern_type);
     }
     fd_close(&fd);
     ustring_destroy(ustr);
@@ -352,13 +363,17 @@ int main(int argc, char **argv)
     UErrorCode status;
     slist_t *patterns;
     slist_element_t *p;
-    UBool xFlag = FALSE;
+
+    UBool xFlag;
+    int pattern_type; // -E/F
 
     fd.reader = &mm_reader;
 
+    xFlag = FALSE;
     color = COLOR_AUTO;
     status = U_ZERO_ERROR;
     patterns = slist_new(NULL);
+    pattern_type = PATTERN_AUTO;
     ustdout = u_finit(stdout, NULL, NULL);
 
     debug("system locale = %s", u_fgetlocale(ustdout));
@@ -367,10 +382,10 @@ int main(int argc, char **argv)
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
             case 'E':
-                literal = FALSE; // NOP
+                pattern_type = PATTERN_REGEXP;
                 break;
             case 'F':
-                literal = TRUE;
+                pattern_type = PATTERN_LITERAL;
                 break;
             case 'H':
                 print_file = TRUE;
@@ -381,10 +396,10 @@ int main(int argc, char **argv)
                 break;
             case 'e':
                 // TODO
-                add_patternC(patterns, optarg/*, type*/);
+                add_patternC(patterns, optarg, pattern_type);
                 break;
             case 'f':
-                source_patterns(optarg, patterns);
+                source_patterns(optarg, patterns, pattern_type);
                 break;
             case 'h':
                 print_file = FALSE;
@@ -459,7 +474,7 @@ int main(int argc, char **argv)
         if (argc < 2) {
             usage();
         } else {
-            add_patternC(patterns, *argv++);
+            add_patternC(patterns, *argv++, pattern_type);
             argc--;
         }
     }
@@ -483,7 +498,7 @@ int main(int argc, char **argv)
                 for (p = patterns->head; NULL != p; p = p->next) {
                     FETCH_DATA(p->data, pdata, pattern_data_t);
                     if (xFlag ? pdata->engine->whole_line_match(pdata->pattern, ustr) : pdata->engine->match(pdata->pattern, ustr)) {
-                        fd.matches++; // increment just once per line ?
+                        fd.matches++; // increment just once per line
                         if (!vFlag) {
                             if (print_file) {
                                 u_fprintf(ustdout, "\e[35m%s\e[0m:", fd.filename);
