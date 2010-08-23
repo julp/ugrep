@@ -13,12 +13,7 @@ configure_file(
 )
 
 # http://github.com/facebook/hiphop-php/blob/master/CMake/FindICU.cmake
-#find_library(ICUDATA icudata)
-#find_library(ICUI18N icui18n)
-#find_library(ICUIO icuio)
-#find_library(ICULE icule)
-#find_library(ICULX iculx)
-#find_library(ICUTU icutu)
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
 find_package(ICU REQUIRED)
 
 find_package(ZLIB)
