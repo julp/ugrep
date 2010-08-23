@@ -111,6 +111,11 @@ static UBool is_pattern(const UChar *pattern)
     return (NULL != u_strpbrk(pattern, meta));
 }
 
+static UBool is_patternC(const char *pattern)
+{
+    return (NULL != strpbrk(pattern, "\\+*?[^]$(){}=!<>|:-"));
+}
+
 /* ========== fd helper functions ========== */
 
 typedef struct {
@@ -313,7 +318,7 @@ void add_patternC(slist_t *l, const char *pattern, int pattern_type)
 
     pdata = mem_new(*pdata);
     if (PATTERN_AUTO == pattern_type) {
-        pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
+        pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
     if (NULL == (data = engines[!!pattern_type]->computeC(pattern))) {
         // TODO
