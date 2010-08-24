@@ -2,7 +2,7 @@ project(ugrep)
 
 cmake_minimum_required(VERSION 2.6)
 
-include(CheckLibraryExists)
+include(CheckCCompilerFlag)
 
 set(UGREP_VERSION_MAJOR 0)
 set(UGREP_VERSION_MINOR 1)
@@ -28,7 +28,20 @@ set(EXTRA_LIBS)
 
 option(DEBUG "debug" OFF)
 if(DEBUG)
+    foreach(cflag -Wall -Wextra -std=c99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wunreachable-code -Wno-comment -Wnonnull ${DEBUG_C_FLAGS})
+        check_c_compiler_flag(${cflag} SUPPORT_C_FLAG)
+        if(SUPPORT_C_FLAG)
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${cflag}")
+        endif(SUPPORT_C_FLAG)
+        unset(SUPPORT_C_FLAG)
+    endforeach(cflag)
+    set(CMAKE_REQUIRED_FLAGS ${CMAKE_C_FLAGS})
+    add_definitions(${CMAKE_C_FLAGS})
+
     add_definitions(-DDEBUG)
+    set(DEBUG_C_FLAGS -g)
+else(DEBUG)
+    set(DEBUG_C_FLAGS -O2 -Wuninitialized)
 endif(DEBUG)
 
 if(ZLIB_FOUND)
