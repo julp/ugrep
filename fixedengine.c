@@ -1,12 +1,11 @@
 #include "ugrep.h"
 
-extern UBool iFlag; // drop this
+typedef struct {
+    UString *pattern;
+    UBool case_insensitive;
+} fixed_pattern_t;
 
-// TODO: switch from UChar * to UString * for upattern ?
-
-static void engine_fixed_replace1(void *data, const UString *subject);
-
-static UChar *ustrndup(const UChar *src, int32_t length)
+/*static UChar *ustrndup(const UChar *src, int32_t length)
 {
     UChar *dst;
 
@@ -14,23 +13,37 @@ static UChar *ustrndup(const UChar *src, int32_t length)
     u_strncpy(dst, src, length);
 
     return dst;
+}*/
+
+static void pattern_destroy(fixed_pattern_t *p)
+{
+    ustring_destroy(p->pattern);
+    free(p);
 }
 
-static void *engine_fixed_compute(const UChar *upattern, int32_t length)
+static void *engine_fixed_compile(const UChar *upattern, int32_t length, UBool case_insensitive)
 {
-    if (length < 0) {
+    /*if (length < 0) {
         length = u_strlen(upattern);
     }
 
-    return ustrndup(upattern, length);
+    return ustrndup(upattern, length);*/
+    fixed_pattern_t *p;
+
+    p = mem_new(*p);
+    p->pattern = ustring_dup_string_len(upattern, length);
+    p->case_insensitive = case_insensitive;
+
+    return p;
 }
 
-static void *engine_fixed_computeC(const char *pattern)
+static void *engine_fixed_compileC(const char *pattern, UBool case_insensitive)
 {
-    UChar *upattern;
+    //UChar *upattern;
     UConverter *ucnv;
     UErrorCode status;
-    int32_t ulen, len, allocated;
+    fixed_pattern_t *p;
+    int32_t /*ulen, */len/*, allocated*/;
 
     status = U_ZERO_ERROR;
     ucnv = ucnv_open(NULL, &status);
@@ -39,51 +52,87 @@ static void *engine_fixed_computeC(const char *pattern)
         return NULL;
     }
     len = strlen(pattern);
-    allocated = len * ucnv_getMaxCharSize(ucnv) + 1;
-    upattern = mem_new_n(*upattern, allocated);
-    ulen = ucnv_toUChars(ucnv, upattern, allocated, pattern, len, &status);
+    p = mem_new(*p);
+    p->case_insensitive = case_insensitive;
+    p->pattern = ustring_sized_new(len * ucnv_getMaxCharSize(ucnv) + 1);
+    //allocated = len * ucnv_getMaxCharSize(ucnv) + 1;
+    //upattern = mem_new_n(*upattern, allocated);
+    //ulen = ucnv_toUChars(ucnv, upattern, allocated, pattern, len, &status);
+    p->pattern->len = ucnv_toUChars(ucnv, p->pattern->ptr, p->pattern->allocated, pattern, len, &status);
+    p->pattern->ptr[p->pattern->len] = U_NUL;
     ucnv_close(ucnv);
     if (U_FAILURE(status)) {
-        free(upattern);
+        //free(upattern);
+        pattern_destroy(p);
         return NULL;
     }
+    if (case_insensitive) {
+        if (!ustring_tolower(p->pattern)) {
+            //free(upattern);
+            pattern_destroy(p);
+            return NULL;
+        }
+    }
 
-    return upattern;
+    //return upattern;
+    return p;
+}
+
+static void engine_fixed_pre_exec(void *data, UString *subject)
+{
+    FETCH_DATA(data, p, fixed_pattern_t);
+
+    if (p->case_insensitive) {
+        ustring_tolower(subject); // TODO
+    }
 }
 
 static UBool engine_fixed_match(void *data, const UString *subject)
 {
-    FETCH_DATA(data, upattern, UChar);
+    /*FETCH_DATA(data, upattern, UChar);
 
     if (iFlag) {
         // Case Insensitive version
         return FALSE; // TODO
     } else {
         return (NULL != u_strFindFirst(subject->ptr, subject->len, upattern, -1)); // TODO: find better, inappropriate for binary file
-    }
+    }*/
+    FETCH_DATA(data, p, fixed_pattern_t);
+
+    return (NULL != u_strFindFirst(subject->ptr, subject->len, p->pattern->ptr, p->pattern->len)); // TODO: find better, inappropriate for binary file
 }
 
 static UBool engine_fixed_whole_line_match(void *data, const UString *subject)
 {
-    FETCH_DATA(data, pattern, UChar);
+    /*FETCH_DATA(data, pattern, UChar);
 
     if (iFlag) {
         return (0 == u_strcasecmp(pattern, subject->ptr, 0));
     } else {
         return (0 == u_strcmp(pattern, subject->ptr));
+    }*/
+    FETCH_DATA(data, p, fixed_pattern_t);
+
+    if (p->case_insensitive) {
+        return (0 == u_strcasecmp(p->pattern->ptr, subject->ptr, 0));
+    } else {
+        return (0 == u_strcmp(p->pattern->ptr, subject->ptr));
     }
 }
 
-static void engine_fixed_reset(void *data)
+static void engine_fixed_reset(void *UNUSED(data))
 {
     /* NOP */
 }
 
 static void engine_fixed_destroy(void *data)
 {
-    FETCH_DATA(data, upattern, UChar);
+    /*FETCH_DATA(data, upattern, UChar);
 
-    free(upattern);
+    free(upattern);*/
+    FETCH_DATA(data, p, fixed_pattern_t);
+
+    pattern_destroy(p);
 }
 
 #if 0
@@ -109,8 +158,9 @@ static void engine_fixed_replace1(void *data, const UString *subject)
 #endif
 
 engine_t fixed_engine = {
-    engine_fixed_compute,
-    engine_fixed_computeC,
+    engine_fixed_compile,
+    engine_fixed_compileC,
+    engine_fixed_pre_exec,
     engine_fixed_match,
     engine_fixed_whole_line_match,
     engine_fixed_reset,

@@ -1,3 +1,5 @@
+#include <limits.h>
+
 #include "ugrep.h"
 
 #ifdef DEBUG
@@ -6,13 +8,38 @@
 # define USTRING_INITIAL_LENGTH 4096
 #endif /* DEBUG */
 
+#define SIZE_MAX_2 (SIZE_MAX << (sizeof(size_t) * CHAR_BIT - 1))
+
+#ifndef MAX
+# define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif /* !MAX */
+
+static inline size_t nearest_power(size_t requested_length)
+{
+    if (requested_length > SIZE_MAX_2) {
+        return SIZE_MAX;
+    } else {
+        int i = 1;
+        requested_length = MAX(requested_length, USTRING_INITIAL_LENGTH);
+        while ((1UL << i) < requested_length) {
+            i++;
+        }
+        return (1UL << i);
+    }
+}
+
 UString *ustring_new()
+{
+    return ustring_sized_new(USTRING_INITIAL_LENGTH);
+}
+
+UString *ustring_sized_new(size_t requested)
 {
     UString *ustr;
 
     ustr = mem_new(*ustr);
     ustr->len = 0;
-    ustr->allocated = USTRING_INITIAL_LENGTH;
+    ustr->allocated = nearest_power(requested);
     ustr->ptr = mem_new_n(UChar, ustr->allocated + 1);
     *ustr->ptr = U_NUL;
 
@@ -123,4 +150,59 @@ void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t l
     }
     ustr->len += length;
     ustr->ptr[ustr->len] = U_NUL;
+}
+
+UString *ustring_dup_string_len(const UChar *from, int32_t length)
+{
+    UString *ustr;
+
+    ustr = mem_new(*ustr);
+    ustr->len = length;
+    ustr->allocated = nearest_power(ustr->len);
+    ustr->ptr = mem_new_n(UChar, ustr->allocated + 1);
+    u_memcpy(ustr->ptr, from, ustr->len);
+    ustr->ptr[ustr->len] = U_NUL;
+
+    return ustr;
+}
+
+UString *ustring_dup_string(const UChar *from)
+{
+    return ustring_dup_string_len(from, u_strlen(from));
+}
+
+UString *ustring_adopt_string_len(UChar *from, int32_t len)
+{
+    UString *ustr;
+
+    ustr = mem_new(*ustr);
+    ustr->len = len;
+    ustr->allocated = len + 1;
+    ustr->ptr = from;
+
+    return ustr;
+}
+
+UString *ustring_adopt_string(UChar *from)
+{
+    return ustring_adopt_string_len(from, u_strlen(from));
+}
+
+UBool ustring_tolower(UString *ustr)
+{
+    UErrorCode status;
+    int32_t result_len;
+
+    status = U_ZERO_ERROR;
+    result_len = u_strFoldCase(ustr->ptr, ustr->len, ustr->ptr, ustr->len, 0, &status);
+    if (U_FAILURE(status)) {
+        icu(status, "u_strFoldCase");
+        return FALSE;
+    }
+    if (result_len != ustr->len) {
+        //
+        return FALSE;
+    }
+
+    return TRUE;
 }

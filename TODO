@@ -2,8 +2,6 @@ TODO :
 
 * mmap already used internaly by icu?
 
-* add eof callback to reader_t
-
 * implement recursive option (-r) with FTS
 
 * fixed string > word match : look UChars before (^ or !is_alpha([c-1])?) and after ($ or !is_alpha([c-1])?)

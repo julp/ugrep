@@ -13,8 +13,8 @@
 
 #define EXIT_USAGE 2
 
-#define RED(str) "\e[1;31m" str "\e[0m"
-#define GREEN(str) "\e[1;32m" str "\e[0m"
+#define RED(str) "\x1b[1;31m" str "\x1b[0m"
+#define GREEN(str) "\x1b[1;32m" str "\x1b[0m"
 
 enum {
     BIN_FILE_BIN,
@@ -65,12 +65,24 @@ int binbehave = BIN_FILE_SKIP;
 UBool nFlag = FALSE;
 UBool vFlag = FALSE;
 UBool wFlag = FALSE;
-UBool iFlag = FALSE;
 
 UBool print_file = TRUE; // -H/h
 UBool colorize = TRUE;
 
 /* ========== general helper functions ========== */
+
+#ifdef DEBUG
+const char *ubasename(const char *filename)
+{
+    const char *c;
+
+    if (NULL == (c = strrchr(filename, '/'))) {
+        return filename;
+    } else {
+        return c+1;
+    }
+}
+#endif /* DEBUG */
 
 static UBool stdout_is_tty()
 {
@@ -280,13 +292,21 @@ static struct option long_options[] =
 
 static void usage()
 {
-    fprintf(stderr, "usage: ME [pattern] [file]\n");
+    extern char *__progname;
+
+    fprintf(
+        stderr,
+        "usage: %s [-EFHVchinqsvwx]\n"
+        "\t[-e pattern] [-f file] [--binary-files=value]\n"
+        "\t[pattern] [file ...]\n",
+        __progname
+    );
     exit(EXIT_USAGE);
 }
 
 /* ========== adding patterns ========== */
 
-void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_type)
+void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_type, UBool case_insensitive)
 {
     void *data;
     pattern_data_t *pdata;
@@ -295,7 +315,7 @@ void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_t
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compute(pattern, length))) {
+    if (NULL == (data = engines[!!pattern_type]->compile(pattern, length, case_insensitive))) {
         // TODO
         exit(EXIT_FAILURE);
     }
@@ -305,7 +325,7 @@ void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_t
     slist_append(l, pdata);
 }
 
-void add_patternC(slist_t *l, const char *pattern, int pattern_type)
+void add_patternC(slist_t *l, const char *pattern, int pattern_type, UBool case_insensitive)
 {
     void *data;
     pattern_data_t *pdata;
@@ -314,7 +334,7 @@ void add_patternC(slist_t *l, const char *pattern, int pattern_type)
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->computeC(pattern))) {
+    if (NULL == (data = engines[!!pattern_type]->compileC(pattern, case_insensitive))) {
         // TODO
         exit(EXIT_FAILURE);
     }
@@ -324,7 +344,7 @@ void add_patternC(slist_t *l, const char *pattern, int pattern_type)
     slist_append(l, pdata);
 }
 
-void source_patterns(const char *filename, slist_t *l, int pattern_type)
+void source_patterns(const char *filename, slist_t *l, int pattern_type, UBool case_insensitive)
 {
     fd_t fd;
     UString *ustr;
@@ -338,11 +358,116 @@ void source_patterns(const char *filename, slist_t *l, int pattern_type)
     }
     while (fd_readline(&fd, ustr)) {
         ustring_chomp(ustr);
-        add_pattern(l, ustr->ptr, ustr->len, pattern_type);
+        add_pattern(l, ustr->ptr, ustr->len, pattern_type, case_insensitive);
     }
     fd_close(&fd);
     ustring_destroy(ustr);
 }
+
+#ifdef INTERVAL_TEST
+typedef struct {
+    int32_t lower_limit;
+    int32_t upper_limit;
+} interval_t;
+
+interval_t *interval_new(int32_t lower_limit, int32_t upper_limit)
+{
+    interval_t *i;
+
+    i = mem_new(*i);
+    i->lower_limit = lower_limit;
+    i->upper_limit = upper_limit;
+
+    return i;
+}
+
+void interval_add_after(slist_t *intervals, slist_element_t *ref, int32_t lower_limit, int32_t upper_limit)
+{
+    interval_t *i;
+    slist_element_t *newel, *next;
+
+    newel = mem_new(*newel);
+    newel->data = interval_new(lower_limit, upper_limit);
+    /*next = ref->next;
+    ref->next = newel;
+    newel->next = next;*/
+    newel->next = ref->next;
+    ref->next = newel;
+}
+
+void interval_append(slist_t *intervals, int32_t lower_limit, int32_t upper_limit)
+{
+    slist_append(intervals, interval_new(lower_limit, upper_limit));
+}
+
+#define BETWEEN(value, lower, upper) \
+    ((lower < value) && (value < upper))
+
+void interval_add(slist_t *intervals, int32_t lower_limit, int32_t upper_limit)
+{
+    int count;
+    interval_t *i;
+    slist_element_t *cur, *prev, *from, *to;
+
+    printf("\nNOW [%d;%d]\n", lower_limit, upper_limit);
+    if (!intervals->head) {
+        interval_append(intervals, lower_limit, upper_limit);
+    } else {
+        count = 0;
+        from = prev = NULL;
+        for (cur = intervals->head; cur; cur = cur->next) {
+            FETCH_DATA(cur->data, i, interval_t);
+            printf("FOR 1 [%d;%d]\n", i->lower_limit, i->upper_limit);
+            //if (i->lower_limit > lower_limit || lower_limit > i->upper_limit) {
+            //if (!BETWEEN(lower_limit, i->lower_limit, i->upper_limit)) {
+            if (BETWEEN(lower_limit, i->lower_limit, i->upper_limit) || BETWEEN(upper_limit, i->lower_limit, i->upper_limit)) {
+                break;
+            }
+            if (lower_limit > i->lower_limit) {
+                break;
+            }
+            prev = cur;
+        }
+        if (!prev) {
+            if (!cur) {
+                from = intervals->head;
+            } else {
+                from = prev = cur;
+            }
+        } else {
+            from = prev;
+            for (/*cur = from,*/ prev = NULL; cur; cur = cur->next) {
+                FETCH_DATA(cur->data, i, interval_t);
+                printf("FOR 2 [%d;%d]\n", i->lower_limit, i->upper_limit);
+                //if (upper_limit < i->upper_limit || upper_limit < i->lower_limit) {
+                //if (!BETWEEN(upper_limit, i->lower_limit, i->upper_limit)/* || !(upper_limit > i->upper_limit)*/) {
+                if (BETWEEN(lower_limit, i->lower_limit, i->upper_limit) || BETWEEN(upper_limit, i->lower_limit, i->upper_limit)) {
+                    break;
+                }
+                prev = cur;
+                count++;
+            }
+            if (from) {
+                FETCH_DATA(from->data, i, interval_t);
+                printf("FROM = [%d;%d]\n", i->lower_limit, i->upper_limit);
+            }
+            if (prev) {
+                FETCH_DATA(prev->data, i, interval_t);
+                printf("TO = [%d;%d]\n", i->lower_limit, i->upper_limit);
+            }
+            if (from != prev) {
+                if (1 == count) {
+                    printf("merge = 1\n");
+                } else if (count > 1) {
+                    printf("merge > 1\n");
+                }
+            }
+        }
+        printf("insertion\n");
+        interval_add_after(intervals, from, lower_limit, upper_limit);
+    }
+}
+#endif /* INTERVAL_TEST */
 
 /* ========== main ========== */
 
@@ -363,12 +488,12 @@ int main(int argc, char **argv)
     slist_t *patterns;
     slist_element_t *p;
 
-    UBool xFlag;
+    UBool xFlag, iFlag;
     int pattern_type; // -E/F
 
     fd.reader = &mm_reader;
 
-    xFlag = FALSE;
+    iFlag = xFlag = FALSE;
     color = COLOR_AUTO;
     status = U_ZERO_ERROR;
     patterns = slist_new(NULL);
@@ -394,11 +519,10 @@ int main(int argc, char **argv)
                 exit(EXIT_SUCCESS);
                 break;
             case 'e':
-                // TODO
-                add_patternC(patterns, optarg, pattern_type);
+                add_patternC(patterns, optarg, pattern_type, iFlag); // return value? (errors)
                 break;
             case 'f':
-                source_patterns(optarg, patterns, pattern_type);
+                source_patterns(optarg, patterns, pattern_type, iFlag); // return value? (errors)
                 break;
             case 'h':
                 print_file = FALSE;
@@ -473,7 +597,7 @@ int main(int argc, char **argv)
         if (argc < 2) {
             usage();
         } else {
-            add_patternC(patterns, *argv++, pattern_type);
+            add_patternC(patterns, *argv++, pattern_type, iFlag);
             argc--;
         }
     }
@@ -496,24 +620,32 @@ int main(int argc, char **argv)
                 ustring_chomp(ustr);
                 for (p = patterns->head; NULL != p; p = p->next) {
                     FETCH_DATA(p->data, pdata, pattern_data_t);
+                    // <very bad: drop this ASAP!>
+/*
+For fixed string, make a lowered copy of ustr which on working
+*/
+                    if (!xFlag) {
+                        pdata->engine->pre_exec(pdata->pattern, ustr);
+                    }
+                    // </very bad: drop this ASAP!>
                     if (xFlag ? pdata->engine->whole_line_match(pdata->pattern, ustr) : pdata->engine->match(pdata->pattern, ustr)) {
                         fd.matches++; // increment just once per line
                         if (!vFlag) {
                             if (print_file) {
-                                u_fprintf(ustdout, "\e[35m%s\e[0m:", fd.filename);
+                                u_fprintf(ustdout, "\x1b[35m%s\x1b[0m:", fd.filename);
                             }
                             if (nFlag) {
-                                u_fprintf(ustdout, "\e[32m%d\e[0m:", fd.lineno);
+                                u_fprintf(ustdout, "\x1b[32m%d\x1b[0m:", fd.lineno);
                             }
                             u_fputs(ustr->ptr, ustdout);
                         }
                     } else {
                         if (vFlag) {
                             if (print_file) {
-                                u_fprintf(ustdout, "\e[35m%s\e[0m:", fd.filename);
+                                u_fprintf(ustdout, "\x1b[35m%s\x1b[0m:", fd.filename);
                             }
                             if (nFlag) {
-                                u_fprintf(ustdout, "\e[32m%d\e[0m:", fd.lineno);
+                                u_fprintf(ustdout, "\x1b[32m%d\x1b[0m:", fd.lineno);
                             }
                             u_fputs(ustr->ptr, ustdout);
                         }
@@ -535,6 +667,34 @@ endloop:
 
     slist_destroy(patterns);
 
+#ifdef INTERVAL_TEST
+    {
+        slist_t *intervals;
+
+        intervals = slist_new(NULL);
+
+//         interval_add(intervals, 0, 4);
+//         interval_add(intervals, 8, 12);
+//         interval_add(intervals, 3, 9);
+
+        interval_add(intervals, 0, 1);
+        interval_add(intervals, 2, 3);
+        interval_add(intervals, 5, 6);
+        interval_add(intervals, 8, 9);
+        interval_add(intervals, 3, 1000);
+
+        {
+            slist_element_t *el;
+
+            for (el = intervals->head; el; el = el->next) {
+                FETCH_DATA(el->data, i, interval_t);
+                printf("[%d;%d]\n", i->lower_limit, i->upper_limit);
+            }
+        }
+
+        slist_destroy(intervals);
+    }
+#endif /* INTERVAL_TEST */
 
 #if 0
     if (argc != 2) {

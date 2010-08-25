@@ -19,6 +19,12 @@
 #  define GCC_VERSION 0
 # endif /* __GNUC__ */
 
+# ifdef __GNUC__
+#  define UNUSED(x) UNUSED_ ## x __attribute__((unused))
+# else
+#  define UNUSED
+# endif /* UNUSED */
+
 # if GCC_VERSION >= 2000
 #  define EXPECTED(condition) __builtin_expect(!!(condition), 1)
 #  define UNEXPECTED(condition) __builtin_expect(!!(condition), 0)
@@ -37,13 +43,13 @@
     } while (0);
 
 #ifdef DEBUG
-# include <libgen.h> /* for (unsafe) basename */
+const char *ubasename(const char *);
 # define msg(format, ...) \
-    fprintf(stderr, "[ERROR] %s:%d:" format " in %s()\n", basename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
+    fprintf(stderr, "[ERROR] %s:%d:" format " in %s()\n", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
     //fprintf(stderr, "[ERROR] " __FILE__ ":%d:" format " in %s()\n", __LINE__, ## __VA_ARGS__, __func__)
 
 #define debug(format, ...) \
-    fprintf(stderr, "[DEBUG] %s:%d:" format " in %s()\n", basename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
+    fprintf(stderr, "[DEBUG] %s:%d:" format " in %s()\n", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
     //fprintf(stderr, "[DEBUG] " __FILE__ ":%d:" format " in %s()\n", __LINE__, ## __VA_ARGS__, __func__)
 
 # define u_printf(...)                                \
@@ -90,18 +96,17 @@ typedef struct {
 } reader_t;
 
 typedef struct {
-    void *(*compute)(const UChar *, int32_t);
-    void *(*computeC)(const char *);
+    void *(*compile)(const UChar *, int32_t, UBool case_insensitive);
+    void *(*compileC)(const char *, UBool case_insensitive);
+    void (*pre_exec)(void *, UString *);
     UBool (*match)(void *, const UString *);
     UBool (*whole_line_match)(void *, const UString *);
-    //Range **(*get_match)(void *);
-    void (*reset)(void *); // remove it?
+    void (*reset)(void *);
     void (*destroy)(void *);
 } engine_t;
 
 typedef struct {
     void *pattern;
-    /*UBool case_insensitive;*/
     engine_t *engine;
 } pattern_data_t;
 
