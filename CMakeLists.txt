@@ -38,10 +38,9 @@ if(DEBUG)
     set(CMAKE_REQUIRED_FLAGS ${CMAKE_C_FLAGS})
     add_definitions(${CMAKE_C_FLAGS})
 
-    add_definitions(-DDEBUG)
-    set(DEBUG_C_FLAGS -g)
+    add_definitions(-g -DDEBUG)
 else(DEBUG)
-    set(DEBUG_C_FLAGS -O2 -Wuninitialized)
+    add_definitions(-O2 -Wuninitialized)
 endif(DEBUG)
 
 if(ZLIB_FOUND)
