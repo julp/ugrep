@@ -176,12 +176,18 @@ static UBool mmfd_eof(void *data)
     return mmfd->ptr >= mmfd->end;
 }
 
+static UBool mmfd_seekable(void *UNUSED(data))
+{
+    return TRUE;
+}
+
 reader_t mm_reader =
 {
     "mmap",
     mmfd_open,
     mmfd_close,
     mmfd_eof,
+    mmfd_seekable,
     mmfd_readline,
     mmfd_readbytes,
     mmfd_readuchars,

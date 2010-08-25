@@ -1,5 +1,7 @@
 #include "ugrep.h"
 
+#include <unistd.h>
+#include <stdio.h>
 #include <unicode/ustdio.h>
 
 /*#include <sys/types.h>
@@ -114,12 +116,20 @@ static UBool stdiofd_eof(void *data)
     return u_feof(stdiofd->ufp);
 }
 
+static UBool stdiofd_seekable(void *data)
+{
+    FETCH_DATA(data, stdiofd, stdiofd_t);
+
+    return STDIN_FILENO != fileno(stdiofd->fp);
+}
+
 reader_t stdio_reader =
 {
     "stdio",
     stdiofd_open,
     stdiofd_close,
     stdiofd_eof,
+    stdiofd_seekable,
     stdiofd_readline,
     stdiofd_readbytes,
     stdiofd_readuchars,

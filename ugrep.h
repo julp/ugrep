@@ -80,13 +80,14 @@ const char *ubasename(const char *);
 # include "ustring.h"
 
 # define FETCH_DATA(from, to, type) \
-    type *to = (type *) from
+    type *to = (type *) (from)
 
 typedef struct {
     const char *name;
-    void *(*open)(const char *);
+    void *(*open)(const char *); // => void *(*open)(int fd);
     void (*close)(void *);
     UBool (*eof)(void *);
+    UBool (*seekable)(void *);
     UBool (*readline)(void *, UString *); // add boolean to copy or not (\r)\n ?
     size_t (*readbytes)(void *, char *, size_t);
     size_t (*readuchars)(void *, UChar32 *, size_t);

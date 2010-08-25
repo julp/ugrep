@@ -12,7 +12,7 @@ typedef struct slist_element_t {
 typedef struct {
     size_t len;
     slist_element_t *head;
-    slist_element_t *queue;
+    slist_element_t *tail;
     func_dtor_t dtor_func;
 } slist_t;
 

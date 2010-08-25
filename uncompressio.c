@@ -251,6 +251,11 @@ static UBool compressedfd_eof(void *data)
     return compressedfd->ptr >= compressedfd->end;
 }
 
+static UBool compressedfd_seekable(void *UNUSED(data))
+{
+    return TRUE;
+}
+
 #ifdef HAVE_ZLIB
 reader_t gz_reader =
 {
@@ -258,6 +263,7 @@ reader_t gz_reader =
     compressedfdgz_open,
     compressedfd_close,
     compressedfd_eof,
+    compressedfd_seekable,
     compressedfd_readline,
     compressedfd_readbytes,
     compressedfd_readuchars,
@@ -274,6 +280,7 @@ reader_t bz2_reader =
     compressedfdbz2_open,
     compressedfd_close,
     compressedfd_eof,
+    compressedfd_seekable,
     compressedfd_readline,
     compressedfd_readbytes,
     compressedfd_readuchars,

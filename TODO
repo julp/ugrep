@@ -1,5 +1,7 @@
 TODO :
 
+* rewrite reader_t open callback in void *(*open)(int fd);
+
 * mmap already used internaly by icu?
 
 * implement recursive option (-r) with FTS

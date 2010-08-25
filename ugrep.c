@@ -84,9 +84,13 @@ const char *ubasename(const char *filename)
 }
 #endif /* DEBUG */
 
-static UBool stdout_is_tty()
+static UBool stdout_is_tty(void)
 {
     return (1 == isatty(STDOUT_FILENO));
+}
+
+static UBool stdin_is_tty(void) {
+    return (1 == isatty(STDIN_FILENO));
 }
 
 static UBool is_binary_uchar(UChar32 c)
@@ -156,6 +160,22 @@ UBool fd_open(fd_t *fd, const char *filename)
         return FALSE;
     }*/
 
+    fd->reader_data = NULL;
+
+    /*if (!strcmp("-", filename)) {
+        if (!stdin_is_tty()) {
+            err("Sorry: cannot work with redirected and/or piped stdin (not seekable)");
+            goto failed;
+        }
+        fd->reader = &stdio_reader;
+        fd = STDIN_FILENO;
+    } else {
+        if (-1 == (mmfd->fd = open(filename, O_RDONLY))) {
+            msg("can't open %s: %s", filename, strerror(errno));
+            goto failed;
+        }
+    }*/
+
     if (NULL == (fd->reader_data = fd->reader->open(filename))) {
         goto failed;
     }
@@ -169,47 +189,49 @@ UBool fd_open(fd_t *fd, const char *filename)
     fd->matches = 0;
     fd->binary = FALSE;
 
-    if (0 == (buffer_len = fd->reader->readbytes(fd->reader_data, buffer, MAX_ENC_REL_LEN))) {
-        goto failed;
-    }
-    buffer[buffer_len] = '\0';
-    encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &signature_length, &status);
-    if (U_SUCCESS(status)) {
-        if (NULL == encoding) {
-            UCharsetDetector *csd;
-            const UCharsetMatch *ucm;
-
-            csd = ucsdet_open(&status);
-            if (U_FAILURE(status)) {
-                icu(status, "ucsdet_open");
-                goto failed;
-            }
-            ucsdet_setText(csd, buffer, buffer_len, &status);
-            if (U_FAILURE(status)) {
-                icu(status, "ucsdet_setText");
-                goto failed;
-            }
-            ucm = ucsdet_detect(csd, &status);
-            if (U_FAILURE(status)) {
-                icu(status, "ucsdet_detect");
-                goto failed;
-            }
-            encoding = ucsdet_getName(ucm, &status);
-            if (U_FAILURE(status)) {
-                icu(status, "ucsdet_getName");
-                goto failed;
-            }
-            ucsdet_close(csd);
-        } else {
-            fd->reader->set_signature_length(fd->reader_data, signature_length);
+    if (fd->reader->seekable(fd->reader_data)) {
+        if (0 == (buffer_len = fd->reader->readbytes(fd->reader_data, buffer, MAX_ENC_REL_LEN))) {
+            goto failed;
         }
-        debug("%s, file encoding = %s", filename, encoding);
-        fd->encoding = encoding;
-        fd->reader->set_encoding(fd->reader_data, encoding); // a tester ?
-        fd->reader->rewind(fd->reader_data);
-    } else {
-        icu(status, "ucnv_detectUnicodeSignature");
-        goto failed;
+        buffer[buffer_len] = '\0';
+        encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &signature_length, &status);
+        if (U_SUCCESS(status)) {
+            if (NULL == encoding) {
+                UCharsetDetector *csd;
+                const UCharsetMatch *ucm;
+
+                csd = ucsdet_open(&status);
+                if (U_FAILURE(status)) {
+                    icu(status, "ucsdet_open");
+                    goto failed;
+                }
+                ucsdet_setText(csd, buffer, buffer_len, &status);
+                if (U_FAILURE(status)) {
+                    icu(status, "ucsdet_setText");
+                    goto failed;
+                }
+                ucm = ucsdet_detect(csd, &status);
+                if (U_FAILURE(status)) {
+                    icu(status, "ucsdet_detect");
+                    goto failed;
+                }
+                encoding = ucsdet_getName(ucm, &status);
+                if (U_FAILURE(status)) {
+                    icu(status, "ucsdet_getName");
+                    goto failed;
+                }
+                ucsdet_close(csd);
+            } else {
+                fd->reader->set_signature_length(fd->reader_data, signature_length);
+            }
+            debug("%s, file encoding = %s", filename, encoding);
+            fd->encoding = encoding;
+            fd->reader->set_encoding(fd->reader_data, encoding); // a tester ?
+            fd->reader->rewind(fd->reader_data);
+        } else {
+            icu(status, "ucnv_detectUnicodeSignature");
+            goto failed;
+        }
     }
 
     return TRUE;
@@ -226,16 +248,20 @@ int fd_is_binary(fd_t *fd)
     size_t buffer_len;
     UChar32 buffer[MAX_BIN_REL_LEN + 1];
 
-    buffer_len = fd->reader->readuchars(fd->reader_data, buffer, MAX_BIN_REL_LEN);
-    buffer[buffer_len] = U_NUL;
-    // controler buffer_len
-    for (p = buffer; U_NUL != *p; p++) {
-        if (is_binary_uchar(*p)) {
-            return TRUE;
+    if (fd->reader->seekable(fd->reader_data)) {
+        buffer_len = fd->reader->readuchars(fd->reader_data, buffer, MAX_BIN_REL_LEN);
+        buffer[buffer_len] = U_NUL;
+        // controler buffer_len
+        for (p = buffer; U_NUL != *p; p++) {
+            if (is_binary_uchar(*p)) {
+                return TRUE;
+            }
         }
-    }
 
-    return (p - buffer) < buffer_len;
+        return (p - buffer) < buffer_len;
+    } else {
+        return FALSE; // In stdin we trust
+    }
 }
 
 void fd_close(fd_t *fd)
@@ -246,7 +272,9 @@ void fd_close(fd_t *fd)
 
 void fd_rewind(fd_t *fd)
 {
-    fd->reader->rewind(fd->reader_data);
+    if (fd->reader->seekable(fd->reader_data)) {
+        fd->reader->rewind(fd->reader_data);
+    }
 }
 
 int fd_readline(fd_t *fd, UString *ustr)
@@ -290,7 +318,7 @@ static struct option long_options[] =
     {NULL,              no_argument,       NULL, 0}
 };
 
-static void usage()
+static void usage(void)
 {
     extern char *__progname;
 
@@ -381,16 +409,12 @@ interval_t *interval_new(int32_t lower_limit, int32_t upper_limit)
     return i;
 }
 
-void interval_add_after(slist_t *intervals, slist_element_t *ref, int32_t lower_limit, int32_t upper_limit)
+void interval_add_after(slist_t *UNUSED(intervals), slist_element_t *ref, int32_t lower_limit, int32_t upper_limit)
 {
-    interval_t *i;
-    slist_element_t *newel, *next;
+    slist_element_t *newel;
 
     newel = mem_new(*newel);
     newel->data = interval_new(lower_limit, upper_limit);
-    /*next = ref->next;
-    ref->next = newel;
-    newel->next = next;*/
     newel->next = ref->next;
     ref->next = newel;
 }
@@ -400,71 +424,98 @@ void interval_append(slist_t *intervals, int32_t lower_limit, int32_t upper_limi
     slist_append(intervals, interval_new(lower_limit, upper_limit));
 }
 
+#ifndef MAX
+# define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif /* !MAX */
+
+#ifndef MIN
+# define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif /* !MIN */
+
 #define BETWEEN(value, lower, upper) \
-    ((lower < value) && (value < upper))
+    ((lower <= value) && (value <= upper))
+
+#define IN(value, interval) \
+    (((value) >= (interval)->lower_limit) && ((value) <= (interval)->upper_limit))
 
 void interval_add(slist_t *intervals, int32_t lower_limit, int32_t upper_limit)
 {
-    int count;
-    interval_t *i;
-    slist_element_t *cur, *prev, *from, *to;
+    slist_element_t *prev, *from, *to;
 
-    printf("\nNOW [%d;%d]\n", lower_limit, upper_limit);
-    if (!intervals->head) {
+    printf("\nSEARCH [%d;%d]\n", lower_limit, upper_limit);
+    if (slist_empty(intervals)) {
         interval_append(intervals, lower_limit, upper_limit);
     } else {
-        count = 0;
-        from = prev = NULL;
-        for (cur = intervals->head; cur; cur = cur->next) {
-            FETCH_DATA(cur->data, i, interval_t);
-            printf("FOR 1 [%d;%d]\n", i->lower_limit, i->upper_limit);
-            //if (i->lower_limit > lower_limit || lower_limit > i->upper_limit) {
-            //if (!BETWEEN(lower_limit, i->lower_limit, i->upper_limit)) {
-            if (BETWEEN(lower_limit, i->lower_limit, i->upper_limit) || BETWEEN(upper_limit, i->lower_limit, i->upper_limit)) {
+        for (from = intervals->head, prev = NULL; from; from = from->next) {
+            FETCH_DATA(from->data, i, interval_t);
+
+            printf("FOR1 [%d;%d]\n", i->lower_limit, i->upper_limit);
+            if (IN(lower_limit, i) || IN(upper_limit, i)) {
+                printf("FOR1, COND1\n");
                 break;
             }
-            if (lower_limit > i->lower_limit) {
+            if (lower_limit < i->lower_limit) {
+                printf("FOR1, COND2\n");
+                //from = prev;
                 break;
             }
-            prev = cur;
+            prev = from;
         }
-        if (!prev) {
-            if (!cur) {
-                from = intervals->head;
-            } else {
-                from = prev = cur;
-            }
+        if (!from) {
+            printf("from = null\n");
+            interval_append(intervals, lower_limit, upper_limit);
         } else {
-            from = prev;
-            for (/*cur = from,*/ prev = NULL; cur; cur = cur->next) {
-                FETCH_DATA(cur->data, i, interval_t);
-                printf("FOR 2 [%d;%d]\n", i->lower_limit, i->upper_limit);
-                //if (upper_limit < i->upper_limit || upper_limit < i->lower_limit) {
-                //if (!BETWEEN(upper_limit, i->lower_limit, i->upper_limit)/* || !(upper_limit > i->upper_limit)*/) {
-                if (BETWEEN(lower_limit, i->lower_limit, i->upper_limit) || BETWEEN(upper_limit, i->lower_limit, i->upper_limit)) {
+            for (to = from->next, prev = NULL; to; to = to->next) {
+                FETCH_DATA(to->data, i, interval_t);
+
+                printf("FOR2 [%d;%d]\n", i->lower_limit, i->upper_limit);
+                //if (!IN(lower_limit, i) && !IN(upper_limit, i)) {
+                /*if (!BETWEEN(i->lower_limit, lower_limit, upper_limit) && !BETWEEN(i->upper_limit, lower_limit, upper_limit)) {
+                    printf("FOR2, COND1\n");
                     break;
                 }
-                prev = cur;
-                count++;
-            }
-            if (from) {
-                FETCH_DATA(from->data, i, interval_t);
-                printf("FROM = [%d;%d]\n", i->lower_limit, i->upper_limit);
+                if (i->upper_limit > upper_limit) {*/
+                if (i->upper_limit >= upper_limit && !BETWEEN(i->lower_limit, lower_limit, upper_limit) && !BETWEEN(i->upper_limit, lower_limit, upper_limit)) {
+                    printf("FOR2, COND2\n");
+                    to = prev;
+                    break;
+                }
+                prev = to;
             }
             if (prev) {
-                FETCH_DATA(prev->data, i, interval_t);
-                printf("TO = [%d;%d]\n", i->lower_limit, i->upper_limit);
-            }
-            if (from != prev) {
-                if (1 == count) {
-                    printf("merge = 1\n");
-                } else if (count > 1) {
-                    printf("merge > 1\n");
+                if (!to) {
+                    to = prev;
                 }
+                {
+                    slist_element_t *el;
+                    FETCH_DATA(to->data, t, interval_t);
+                    FETCH_DATA(from->data, f, interval_t);
+
+                    printf("FROM [%d;%d]\n", f->lower_limit, f->upper_limit);
+                    printf("TO [%d;%d]\n", t->lower_limit, t->upper_limit);
+                    f->lower_limit = MIN(f->lower_limit, lower_limit);
+                    f->upper_limit = MAX(t->upper_limit, upper_limit);
+                    for (el = from->next, prev = from; el; ) {
+                        slist_element_t *tmp = el;
+                        el = el->next;
+                        if (NULL != intervals->dtor_func) {
+                            intervals->dtor_func(tmp->data);
+                        }
+                        prev->next = tmp->next;
+                        if (tmp == to) {
+                            free(tmp);
+                            break;
+                        }
+                        free(tmp);
+                    }
+                }
+            } else {
+                FETCH_DATA(from->data, i, interval_t);
+                printf("(prev = null) merge = 1\n");
+                i->lower_limit = MIN(i->lower_limit, lower_limit);
+                i->upper_limit = MAX(i->upper_limit, upper_limit);
             }
         }
-        printf("insertion\n");
-        interval_add_after(intervals, from, lower_limit, upper_limit);
     }
 }
 #endif /* INTERVAL_TEST */
@@ -487,17 +538,17 @@ int main(int argc, char **argv)
     UErrorCode status;
     slist_t *patterns;
     slist_element_t *p;
+    reader_t *default_reader;
 
     UBool xFlag, iFlag;
     int pattern_type; // -E/F
-
-    fd.reader = &mm_reader;
 
     iFlag = xFlag = FALSE;
     color = COLOR_AUTO;
     status = U_ZERO_ERROR;
     patterns = slist_new(NULL);
     pattern_type = PATTERN_AUTO;
+    default_reader = &mm_reader;
     ustdout = u_finit(stdout, NULL, NULL);
 
     debug("system locale = %s", u_fgetlocale(ustdout));
@@ -570,13 +621,13 @@ int main(int argc, char **argv)
                 {
                     reader_t **r;
 
-                    for (r = available_readers, fd.reader = NULL; *r; r++) {
+                    for (r = available_readers, default_reader = NULL; *r; r++) {
                         if (!strcmp((*r)->name, optarg)) {
                             fd.reader = *r;
                             break;
                         }
                     }
-                    if (NULL == fd.reader) {
+                    if (NULL == default_reader) {
                         fprintf(stderr, "Unknown reader\n");
                         return EXIT_USAGE;
                     }
@@ -594,7 +645,7 @@ int main(int argc, char **argv)
     colorize = (COLOR_ALWAYS == color) || (COLOR_AUTO == color && stdout_is_tty());
 
     if (slist_empty(patterns)) {
-        if (argc < 2) {
+        if (argc < 1) {
             usage();
         } else {
             add_patternC(patterns, *argv++, pattern_type, iFlag);
@@ -604,6 +655,7 @@ int main(int argc, char **argv)
 
     ustr = ustring_new();
     for ( ; argc--; ++argv) {
+        fd.reader = default_reader;
         if (fd_open(&fd, *argv)) {
             if (BIN_FILE_TEXT != binbehave) {
                 fd.binary = fd_is_binary(&fd);
@@ -677,11 +729,19 @@ endloop:
 //         interval_add(intervals, 8, 12);
 //         interval_add(intervals, 3, 9);
 
-        interval_add(intervals, 0, 1);
-        interval_add(intervals, 2, 3);
-        interval_add(intervals, 5, 6);
-        interval_add(intervals, 8, 9);
-        interval_add(intervals, 3, 1000);
+//         interval_add(intervals, 0, 1);
+//         interval_add(intervals, 2, 3);
+//         interval_add(intervals, 5, 6);
+//         interval_add(intervals, 8, 9);
+//         interval_add(intervals, 3, 1000);
+
+        interval_add(intervals,  0,  2);
+        interval_add(intervals,  4,  6);
+        interval_add(intervals,  8, 10);
+        interval_add(intervals, 12, 14);
+        interval_add(intervals, 16, 18);
+        interval_add(intervals, 20, 22);
+        interval_add(intervals, 13, 1000);
 
         {
             slist_element_t *el;
@@ -695,86 +755,6 @@ endloop:
         slist_destroy(intervals);
     }
 #endif /* INTERVAL_TEST */
-
-#if 0
-    if (argc != 2) {
-        usage();
-    } else {
-        URegularExpression *uregex;
-
-        {
-            UParseError pe;
-
-            uregex = uregex_openC(argv[0], reflags, &pe, &status);
-            if (U_FAILURE(status)) {
-                if (U_REGEX_RULE_SYNTAX == status) {
-                    //u_fprintf(ustderr, "Error at offset %d %S %S\n", pe.offset, pe.preContext, pe.postContext);
-                    fprintf(stderr, "Invalid pattern: error at offset %d\n", pe.offset);
-                    fprintf(stderr, "\t%s\n", argv[1]);
-                    fprintf(stderr, "\t%*c\n", pe.offset, '^');
-                } else {
-                    icu(status, "uregex_openC");
-                }
-                return EXIT_FAILURE;
-            }
-        }
-
-        if (fd_open(&fd, argv[1])) {
-            printf("Binaire : %s\n", fd_is_binary(&fd) ? "oui" : "non");
-            {
-                UChar replText[80], buf[80];
-                UBool found;
-                UString *ustr;
-
-                u_uastrncpy(replText, "\e[1;31m$0\e[0m", sizeof(replText)/2);
-
-                fd_rewind(&fd);
-
-                ustr = ustring_new();
-                while (fd_readline(&fd, ustr)) {
-                    fd.lineno++;
-                    ustring_chomp(ustr);
-                    uregex_setText(uregex, ustr->ptr, ustr->len, &status);
-                    if (U_FAILURE(status)) {
-                        icu(status, "uregex_setText");
-                        break; // TODO: gerer l'erreur
-                    }
-                    found = uregex_find(uregex, 0, &status);
-                    if (U_FAILURE(status)) {
-                        icu(status, "uregex_find");
-                        break; // TODO: gerer l'erreur
-                    }
-                    if (found) {
-                        fd.matches++;
-                        if (!vflag) {
-                            uregex_replaceAll(uregex, replText, -1, buf, sizeof(buf)/2, &status);
-                            if (print_file) {
-                                u_fprintf(ustdout, "\e[35m%s\e[0m:", fd.filename);
-                            }
-                            if (nflag) {
-                                u_fprintf(ustdout, "\e[32m%d\e[0m:", fd.lineno);
-                            }
-                            u_fputs(buf, ustdout);
-                        }
-                    } else {
-                        if (vflag) {
-                            if (print_file) {
-                                u_fprintf(ustdout, "\e[35m%s\e[0m:", fd.filename);
-                            }
-                            if (nflag) {
-                                u_fprintf(ustdout, "\e[32m%d\e[0m:", fd.lineno);
-                            }
-                            u_fputs(ustr->ptr, ustdout);
-                        }
-                    }
-                }
-                ustring_destroy(ustr);
-            }
-            fd_close(&fd);
-        }
-        uregex_close(uregex);
-    }
-#endif
 
     return EXIT_SUCCESS;
 }

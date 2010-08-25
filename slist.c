@@ -5,7 +5,7 @@ slist_t *slist_new(func_dtor_t dtor_func)
     slist_t *l;
 
     l = mem_new(*l);
-    l->queue = l->head = NULL;
+    l->tail = l->head = NULL;
     l->len = 0;
     l->dtor_func = dtor_func;
 
@@ -29,13 +29,12 @@ void slist_append(slist_t *l, void *data)
     n = mem_new(*n);
     n->next = NULL;
     n->data = data;
-    if (NULL != l->queue) {
-        l->queue->next = n;
-
+    if (NULL == l->tail) {
+        l->head = l->tail = n;
     } else {
-        l->head = n;
+        l->tail->next = n;
+        l->tail = n;
     }
-    l->queue = n;
 }
 
 void slist_destroy(slist_t *l)
