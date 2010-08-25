@@ -1,6 +1,10 @@
 #include "ugrep.h"
 
-#define USTRING_INITIAL_LENGTH 32 /*4096 */
+#ifdef DEBUG
+# define USTRING_INITIAL_LENGTH 16
+#else
+# define USTRING_INITIAL_LENGTH 4096
+#endif /* DEBUG */
 
 UString *ustring_new()
 {
@@ -32,26 +36,22 @@ void ustring_destroy(UString *ustr)
 
 void ustring_append_char(UString *ustr, UChar c)
 {
-    /*if (ustr->len >= ustr->allocated) {
-        _ustring_expand(ustr);
-    }
-    ustr->ptr[ustr->len++] = c;
-    ustr->ptr[ustr->len] = U_NUL;*/
-    ustring_append_string_len(ustr, &c, 1);
+    ustring_insert_len(ustr, ustr->len, &c, 1);
 }
 
 void ustring_append_string(UString *ustr, const UChar *str)
 {
-    ustring_append_string_len(ustr, str, u_strlen(str));
+    ustring_insert_len(ustr, ustr->len, str, u_strlen(str));
 }
 
-/* WARNING: overlap are not managed ! */
-void ustring_append_string_len(UString *ustr, const UChar *str, int32_t length)
+void ustring_prepend_char(UString *ustr, UChar c)
 {
-    _ustring_maybe_expand(ustr, length);
-    u_memcpy(ustr->ptr + ustr->len, str, length);
-    ustr->len += length;
-    ustr->ptr[ustr->len] = U_NUL;
+    ustring_insert_len(ustr, 0, &c, 1);
+}
+
+void ustring_prepend_string(UString *ustr, const UChar *str)
+{
+    ustring_insert_len(ustr, 0, str, u_strlen(str));
 }
 
 UChar *ustring_chomp(UString *ustr)
@@ -87,20 +87,11 @@ void ustring_truncate(UString *ustr)
     ustr->len = 0;
 }
 
-UChar ustring_last_char(const UString *ustr)
-{
-    if (ustr->len) {
-        return ustr->ptr[ustr->len - 1];
-    } else {
-        return U_NUL;
-    }
-}
-
 #ifndef MIN
 # define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif /* !MIN */
 
-void ustring_insert_len(UString *ustr, size_t position, UChar *c, size_t length)
+void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t length)
 {
     if (c >= ustr->ptr && c <= ustr->ptr + ustr->len) {
         size_t offset = c - ustr->ptr;
@@ -132,6 +123,4 @@ void ustring_insert_len(UString *ustr, size_t position, UChar *c, size_t length)
     }
     ustr->len += length;
     ustr->ptr[ustr->len] = U_NUL;
-
-    //return ustr;
 }

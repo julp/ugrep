@@ -10,13 +10,13 @@ typedef struct {
 
 void ustring_append_char(UString *, UChar);
 void ustring_append_string(UString *, const UChar *);
-void ustring_append_string_len(UString *, const UChar *, int32_t);
 UChar *ustring_chomp(UString *);
 void ustring_destroy(UString *);
 UBool ustring_empty(const UString *);
-void ustring_insert_len(UString *, size_t, UChar *, size_t);
-UChar ustring_last_char(const UString *);
+void ustring_insert_len(UString *, size_t, const UChar *, size_t);
 UString *ustring_new(void);
+void ustring_prepend_char(UString *, UChar);
+void ustring_prepend_string(UString *, const UChar *);
 void ustring_sync(const UString *, UString *, double);
 void ustring_truncate(UString *);
 
