@@ -17,6 +17,7 @@ typedef struct {
 } slist_t;
 
 void slist_append(slist_t *, void *);
+void slist_clean(slist_t *);
 void slist_destroy(slist_t *);
 UBool slist_empty(slist_t *);
 size_t slist_length(slist_t *);

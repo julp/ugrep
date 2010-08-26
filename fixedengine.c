@@ -102,6 +102,12 @@ static UBool engine_fixed_match(void *data, const UString *subject)
     return (NULL != u_strFindFirst(subject->ptr, subject->len, p->pattern->ptr, p->pattern->len)); // TODO: find better, inappropriate for binary file
 }
 
+static UBool engine_fixed_match_all(void *data, const UString *subject, slist_t *intervals)
+{
+    // TODO
+    return FALSE;
+}
+
 static UBool engine_fixed_whole_line_match(void *data, const UString *subject)
 {
     /*FETCH_DATA(data, pattern, UChar);
@@ -162,6 +168,7 @@ engine_t fixed_engine = {
     engine_fixed_compileC,
     engine_fixed_pre_exec,
     engine_fixed_match,
+    engine_fixed_match_all,
     engine_fixed_whole_line_match,
     engine_fixed_reset,
     engine_fixed_destroy

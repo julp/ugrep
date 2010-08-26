@@ -72,7 +72,57 @@ static UBool engine_icure_match(void *data, const UString *subject)
         // TODO
     }
 
+    while (uregex_findNext(uregex, &status)) {
+        printf("Match : [%d;%d]\n", uregex_start(uregex, 0, &status), uregex_end(uregex, 0, &status));
+    }
+    uregex_reset(uregex, 0, &status);
+
     return ret;
+}
+
+static UBool engine_icure_match_all(void *data, const UString *subject, slist_t *intervals)
+{
+    int matches;
+    int32_t l, u;
+    UErrorCode status;
+    FETCH_DATA(data, uregex, URegularExpression);
+
+    u_printf("%S\n", subject->ptr);
+    matches = 0;
+    status = U_ZERO_ERROR;
+    uregex_setText(uregex, subject->ptr, subject->len, &status);
+    if (U_FAILURE(status)) {
+        icu(status, "uregex_setText");
+        return FALSE;
+    }
+    while (uregex_findNext(uregex, &status)) {
+        matches++;
+        l = uregex_start(uregex, 0, &status);
+        if (U_FAILURE(status)) {
+            icu(status, "uregex_start");
+            return FALSE;
+        }
+        u = uregex_end(uregex, 0, &status);
+        if (U_FAILURE(status)) {
+            icu(status, "uregex_end");
+            return FALSE;
+        }
+        if (interval_add(intervals, subject->len, l, u)) {
+            debug("whole line match"); //TODO: return significant value (UBool => int [-1: error, 0: normal, 1: whole line])
+            break; // we already have a whole line matching, don't search anymore any pattern
+        }
+    }
+    if (U_FAILURE(status)) {
+        icu(status, "uregex_findNext");
+        return FALSE;
+    }
+    uregex_reset(uregex, 0, &status);
+    if (U_FAILURE(status)) {
+        icu(status, "uregex_reset");
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 static UBool engine_icure_whole_line_match(void *data, const UString *subject)
@@ -117,6 +167,7 @@ engine_t icure_engine = {
     engine_icure_compileC,
     engine_icure_pre_exec,
     engine_icure_match,
+    engine_icure_match_all,
     engine_icure_whole_line_match,
     engine_icure_reset,
     engine_icure_destroy

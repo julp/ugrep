@@ -37,7 +37,7 @@ void slist_append(slist_t *l, void *data)
     }
 }
 
-void slist_destroy(slist_t *l)
+void slist_clean(slist_t *l)
 {
     slist_element_t *el;
 
@@ -50,6 +50,13 @@ void slist_destroy(slist_t *l)
             }
             free(tmp);
         }
+        l->len = 0;
+        l->tail = l->head = NULL;
     }
+}
+
+void slist_destroy(slist_t *l)
+{
+    slist_clean(l);
     free(l);
 }

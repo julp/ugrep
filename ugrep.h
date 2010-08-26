@@ -78,6 +78,15 @@ const char *ubasename(const char *);
 # include "alloc.h"
 # include "slist.h"
 # include "ustring.h"
+# include "intervals.h"
+
+#ifndef MAX
+# define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif /* !MAX */
+
+#ifndef MIN
+# define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif /* !MIN */
 
 # define FETCH_DATA(from, to, type) \
     type *to = (type *) (from)
@@ -101,6 +110,7 @@ typedef struct {
     void *(*compileC)(const char *, UBool case_insensitive);
     void (*pre_exec)(void *, UString *);
     UBool (*match)(void *, const UString *);
+    UBool (*match_all)(void *, const UString *, slist_t *);
     UBool (*whole_line_match)(void *, const UString *);
     void (*reset)(void *);
     void (*destroy)(void *);

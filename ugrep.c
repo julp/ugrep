@@ -13,8 +13,8 @@
 
 #define EXIT_USAGE 2
 
-#define RED(str) "\x1b[1;31m" str "\x1b[0m"
-#define GREEN(str) "\x1b[1;32m" str "\x1b[0m"
+#define RED(str) "\33[1;31m" str "\33[0m"
+#define GREEN(str) "\33[1;32m" str "\33[0m"
 
 enum {
     BIN_FILE_BIN,
@@ -394,133 +394,11 @@ void source_patterns(const char *filename, slist_t *l, int pattern_type, UBool c
     ustring_destroy(ustr);
 }
 
-#ifdef INTERVAL_TEST
-typedef struct {
-    int32_t lower_limit;
-    int32_t upper_limit;
-} interval_t;
-
-interval_t *interval_new(int32_t lower_limit, int32_t upper_limit)
+static void pattern_destroy(void *data)
 {
-    interval_t *i;
-
-    i = mem_new(*i);
-    i->lower_limit = lower_limit;
-    i->upper_limit = upper_limit;
-
-    return i;
+    FETCH_DATA(data, p, pattern_data_t);
+    p->engine->destroy(p->pattern);
 }
-
-void interval_add_after(slist_t *UNUSED(intervals), slist_element_t *ref, int32_t lower_limit, int32_t upper_limit)
-{
-    slist_element_t *newel;
-
-    newel = mem_new(*newel);
-    newel->data = interval_new(lower_limit, upper_limit);
-    newel->next = ref->next;
-    ref->next = newel;
-}
-
-void interval_append(slist_t *intervals, int32_t lower_limit, int32_t upper_limit)
-{
-    slist_append(intervals, interval_new(lower_limit, upper_limit));
-}
-
-#ifndef MAX
-# define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif /* !MAX */
-
-#ifndef MIN
-# define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif /* !MIN */
-
-#define BETWEEN(value, lower, upper) \
-    ((lower <= value) && (value <= upper))
-
-#define IN(value, interval) \
-    (((value) >= (interval)->lower_limit) && ((value) <= (interval)->upper_limit))
-
-void interval_add(slist_t *intervals, int32_t lower_limit, int32_t upper_limit)
-{
-    slist_element_t *prev, *from, *to;
-
-    printf("\nSEARCH [%d;%d]\n", lower_limit, upper_limit);
-    if (slist_empty(intervals)) {
-        interval_append(intervals, lower_limit, upper_limit);
-    } else {
-        for (from = intervals->head, prev = NULL; from; from = from->next) {
-            FETCH_DATA(from->data, i, interval_t);
-
-            printf("FOR1 [%d;%d]\n", i->lower_limit, i->upper_limit);
-            if (IN(lower_limit, i) || IN(upper_limit, i)) {
-                printf("FOR1, COND1\n");
-                break;
-            }
-            if (lower_limit < i->lower_limit) {
-                printf("FOR1, COND2\n");
-                //from = prev;
-                break;
-            }
-            prev = from;
-        }
-        if (!from) {
-            printf("from = null\n");
-            interval_append(intervals, lower_limit, upper_limit);
-        } else {
-            for (to = from->next, prev = NULL; to; to = to->next) {
-                FETCH_DATA(to->data, i, interval_t);
-
-                printf("FOR2 [%d;%d]\n", i->lower_limit, i->upper_limit);
-                //if (!IN(lower_limit, i) && !IN(upper_limit, i)) {
-                /*if (!BETWEEN(i->lower_limit, lower_limit, upper_limit) && !BETWEEN(i->upper_limit, lower_limit, upper_limit)) {
-                    printf("FOR2, COND1\n");
-                    break;
-                }
-                if (i->upper_limit > upper_limit) {*/
-                if (i->upper_limit >= upper_limit && !BETWEEN(i->lower_limit, lower_limit, upper_limit) && !BETWEEN(i->upper_limit, lower_limit, upper_limit)) {
-                    printf("FOR2, COND2\n");
-                    to = prev;
-                    break;
-                }
-                prev = to;
-            }
-            if (prev) {
-                if (!to) {
-                    to = prev;
-                }
-                {
-                    slist_element_t *el;
-                    FETCH_DATA(to->data, t, interval_t);
-                    FETCH_DATA(from->data, f, interval_t);
-
-                    printf("FROM [%d;%d]\n", f->lower_limit, f->upper_limit);
-                    printf("TO [%d;%d]\n", t->lower_limit, t->upper_limit);
-                    f->lower_limit = MIN(f->lower_limit, lower_limit);
-                    f->upper_limit = MAX(t->upper_limit, upper_limit);
-                    for (el = from->next, prev = from; el; ) {
-                        slist_element_t *tmp = el;
-                        el = el->next;
-                        if (NULL != intervals->dtor_func) {
-                            intervals->dtor_func(tmp->data);
-                        }
-                        prev->next = tmp->next;
-                        if (tmp == to) {
-                            free(tmp);
-                            break;
-                        }
-                        free(tmp);
-                    }
-                }
-            } else {
-                FETCH_DATA(from->data, i, interval_t);
-                printf("(prev = null) merge = 1\n");
-                i->lower_limit = MIN(i->lower_limit, lower_limit);
-                i->upper_limit = MAX(i->upper_limit, upper_limit);
-            }
-        }
-    }
-}
-#endif /* INTERVAL_TEST */
 
 /* ========== main ========== */
 
@@ -542,13 +420,15 @@ int main(int argc, char **argv)
     slist_element_t *p;
     reader_t *default_reader;
 
+    slist_t *intervals = intervals_new();
+
     UBool xFlag, iFlag;
     int pattern_type; // -E/F
 
     iFlag = xFlag = FALSE;
     color = COLOR_AUTO;
     status = U_ZERO_ERROR;
-    patterns = slist_new(NULL);
+    patterns = slist_new(pattern_destroy);
     pattern_type = PATTERN_AUTO;
     default_reader = &mm_reader;
     ustdout = u_finit(stdout, NULL, NULL);
@@ -653,6 +533,11 @@ int main(int argc, char **argv)
             add_patternC(patterns, *argv++, pattern_type, iFlag);
             argc--;
         }
+        if (0 == argc) {
+            char *fakeargv[] = { "-", NULL };
+            argv = fakeargv;
+            argc = 1;
+        }
     }
 
     ustr = ustring_new();
@@ -670,8 +555,12 @@ int main(int argc, char **argv)
                 fd_rewind(&fd);
             }
             while (fd_readline(&fd, ustr)) {
+                int matches;
+
+                matches = 0;
                 fd.lineno++;
                 ustring_chomp(ustr);
+                slist_clean(intervals);
                 for (p = patterns->head; NULL != p; p = p->next) {
                     FETCH_DATA(p->data, pdata, pattern_data_t);
                     // <very bad: drop this ASAP!>
@@ -682,27 +571,55 @@ For fixed string, make a lowered copy of ustr which on working
                         pdata->engine->pre_exec(pdata->pattern, ustr);
                     }
                     // </very bad: drop this ASAP!>
-                    if (xFlag ? pdata->engine->whole_line_match(pdata->pattern, ustr) : pdata->engine->match(pdata->pattern, ustr)) {
-                        fd.matches++; // increment just once per line
-                        if (!vFlag) {
-                            if (print_file) {
-                                u_fprintf(ustdout, "\x1b[35m%s\x1b[0m:", fd.filename);
-                            }
-                            if (nFlag) {
-                                u_fprintf(ustdout, "\x1b[32m%d\x1b[0m:", fd.lineno);
-                            }
-                            u_fputs(ustr->ptr, ustdout);
-                        }
+                    if (xFlag) {
+                        matches += pdata->engine->whole_line_match(pdata->pattern, ustr); // TODO: handle error
+                        break; // no need to continue
                     } else {
-                        if (vFlag) {
-                            if (print_file) {
-                                u_fprintf(ustdout, "\x1b[35m%s\x1b[0m:", fd.filename);
-                            }
-                            if (nFlag) {
-                                u_fprintf(ustdout, "\x1b[32m%d\x1b[0m:", fd.lineno);
-                            }
-                            u_fputs(ustr->ptr, ustdout);
+                        if (colorize) {
+                            matches += pdata->engine->match_all(pdata->pattern, ustr, intervals); // TODO: handle error
+                        } else {
+                            matches += pdata->engine->match(pdata->pattern, ustr); // TODO: handle error
+                            break; // no need to continue
                         }
+                    }
+                }
+                fd.matches += (matches > 0);
+                if (matches > 0) {
+                    if (!vFlag) {
+                        if (print_file) {
+                            u_fprintf(ustdout, "\33[35m%s\33[0m:", fd.filename);
+                        }
+                        if (nFlag) {
+                            u_fprintf(ustdout, "\33[32m%d\33[0m:", fd.lineno);
+                        }
+                        if (!xFlag && colorize) {
+                            int32_t decalage;
+                            slist_element_t *el;
+                            UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
+                            UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL};
+                            int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
+
+                            decalage = 0;
+                            for (el = intervals->head; el; el = el->next) {
+                                FETCH_DATA(el->data, i, interval_t);
+
+                                //printf("[%d;%d] %d\n", i->lower_limit, i->upper_limit, decalage);
+                                ustring_insert_len(ustr, i->lower_limit + decalage, before, before_len);
+                                ustring_insert_len(ustr, i->upper_limit + decalage + before_len, after, after_len);
+                                decalage += before_len + after_len;
+                            }
+                        }
+                        u_fputs(ustr->ptr, ustdout);
+                    }
+                } else {
+                    if (vFlag) {
+                        if (print_file) {
+                            u_fprintf(ustdout, "\33[35m%s\33[0m:", fd.filename);
+                        }
+                        if (nFlag) {
+                            u_fprintf(ustdout, "\33[32m%d\33[0m:", fd.lineno);
+                        }
+                        u_fputs(ustr->ptr, ustdout);
                     }
                 }
             }
@@ -712,51 +629,8 @@ endloop:
     }
 
     ustring_destroy(ustr);
-
-    // put this in a destructor function
-    for (p = patterns->head; NULL != p; p = p->next) {
-        FETCH_DATA(p->data, pdata, pattern_data_t);
-        pdata->engine->destroy(pdata->pattern);
-    }
-
     slist_destroy(patterns);
-
-#ifdef INTERVAL_TEST
-    {
-        slist_t *intervals;
-
-        intervals = slist_new(NULL);
-
-//         interval_add(intervals, 0, 4);
-//         interval_add(intervals, 8, 12);
-//         interval_add(intervals, 3, 9);
-
-//         interval_add(intervals, 0, 1);
-//         interval_add(intervals, 2, 3);
-//         interval_add(intervals, 5, 6);
-//         interval_add(intervals, 8, 9);
-//         interval_add(intervals, 3, 1000);
-
-        interval_add(intervals,  0,  2);
-        interval_add(intervals,  4,  6);
-        interval_add(intervals,  8, 10);
-        interval_add(intervals, 12, 14);
-        interval_add(intervals, 16, 18);
-        interval_add(intervals, 20, 22);
-        interval_add(intervals, 13, 1000);
-
-        {
-            slist_element_t *el;
-
-            for (el = intervals->head; el; el = el->next) {
-                FETCH_DATA(el->data, i, interval_t);
-                printf("[%d;%d]\n", i->lower_limit, i->upper_limit);
-            }
-        }
-
-        slist_destroy(intervals);
-    }
-#endif /* INTERVAL_TEST */
+    slist_destroy(intervals);
 
     return EXIT_SUCCESS;
 }

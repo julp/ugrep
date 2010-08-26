@@ -10,10 +10,6 @@
 
 #define SIZE_MAX_2 (SIZE_MAX << (sizeof(size_t) * CHAR_BIT - 1))
 
-#ifndef MAX
-# define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif /* !MAX */
-
 static inline size_t nearest_power(size_t requested_length)
 {
     if (requested_length > SIZE_MAX_2) {
@@ -113,10 +109,6 @@ void ustring_truncate(UString *ustr)
     *ustr->ptr = U_NUL;
     ustr->len = 0;
 }
-
-#ifndef MIN
-# define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif /* !MIN */
 
 void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t length)
 {
