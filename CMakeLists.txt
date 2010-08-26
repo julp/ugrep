@@ -28,7 +28,7 @@ set(EXTRA_LIBS)
 
 option(DEBUG "debug" OFF)
 if(DEBUG)
-    foreach(cflag -Wall -Wextra -std=c99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wunreachable-code -Wno-comment -Wnonnull ${DEBUG_C_FLAGS})
+    foreach(cflag -Wall -Wextra -std=gnu99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wunreachable-code -Wno-comment -Wnonnull ${DEBUG_C_FLAGS})
         check_c_compiler_flag(${cflag} SUPPORT_C_FLAG)
         if(SUPPORT_C_FLAG)
             set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${cflag}")

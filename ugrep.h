@@ -84,7 +84,7 @@ const char *ubasename(const char *);
 
 typedef struct {
     const char *name;
-    void *(*open)(const char *); // => void *(*open)(int fd);
+    void *(*open)(const char *, int);
     void (*close)(void *);
     UBool (*eof)(void *);
     UBool (*seekable)(void *);

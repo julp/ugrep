@@ -16,13 +16,18 @@ typedef struct {
     size_t signature_length;
 } stdiofd_t;
 
-static void *stdiofd_open(const char *filename)
+static void *stdiofd_open(const char *filename, int fd)
 {
     stdiofd_t *stdiofd;
 
     stdiofd = mem_new(*stdiofd);
     //if (NULL == (stdiofd->fp = fopen(filename, "r"))) {
-    if (NULL == (stdiofd->ufp = u_fopen(filename, "r", NULL, NULL))) {
+    //if (NULL == (stdiofd->ufp = u_fopen(filename, "r", NULL, NULL))) {
+    if (NULL == (stdiofd->fp = fdopen(fd, "r"))) {
+        msg("can't open %s: %s", filename, strerror(errno));
+        goto failed;
+    }
+    if (NULL == (stdiofd->ufp = u_fadopt(stdiofd->fp, NULL, NULL))) {
         goto failed;
     }
     stdiofd->signature_length = 0;

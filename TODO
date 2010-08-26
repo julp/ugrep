@@ -1,14 +1,10 @@
 TODO :
 
-* rewrite reader_t open callback in void *(*open)(int fd);
-
 * mmap already used internaly by icu?
 
 * implement recursive option (-r) with FTS
 
 * fixed string > word match : look UChars before (^ or !is_alpha([c-1])?) and after ($ or !is_alpha([c-1])?)
-
-* handle stdin (not seekable)
 
 * write ucat, a cat replacement ?
 

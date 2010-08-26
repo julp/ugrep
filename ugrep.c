@@ -148,6 +148,7 @@ typedef struct {
 
 UBool fd_open(fd_t *fd, const char *filename)
 {
+    int fsfd;
     /*struct stat st;*/
     UErrorCode status;
     const char *encoding;
@@ -162,28 +163,29 @@ UBool fd_open(fd_t *fd, const char *filename)
 
     fd->reader_data = NULL;
 
-    /*if (!strcmp("-", filename)) {
+    if (!strcmp("-", filename)) {
         if (!stdin_is_tty()) {
-            err("Sorry: cannot work with redirected and/or piped stdin (not seekable)");
+            msg("Sorry: cannot work with redirected and/or piped stdin (not seekable)");
             goto failed;
         }
+        fd->filename = "(standard input)";
         fd->reader = &stdio_reader;
-        fd = STDIN_FILENO;
+        fsfd = STDIN_FILENO;
     } else {
-        if (-1 == (mmfd->fd = open(filename, O_RDONLY))) {
+        fd->filename = filename;
+        if (-1 == (fsfd = open(filename, O_RDONLY))) {
             msg("can't open %s: %s", filename, strerror(errno));
             goto failed;
         }
-    }*/
+    }
 
-    if (NULL == (fd->reader_data = fd->reader->open(filename))) {
+    if (NULL == (fd->reader_data = fd->reader->open(filename, fsfd))) {
         goto failed;
     }
 
     encoding = NULL;
     signature_length = 0;
     status = U_ZERO_ERROR;
-    fd->filename = filename;
     fd->lineno = 0;
     /*fd->filesize = st.st_size;*/
     fd->matches = 0;
@@ -623,7 +625,7 @@ int main(int argc, char **argv)
 
                     for (r = available_readers, default_reader = NULL; *r; r++) {
                         if (!strcmp((*r)->name, optarg)) {
-                            fd.reader = *r;
+                            default_reader = *r;
                             break;
                         }
                     }

@@ -30,20 +30,16 @@ typedef struct {
         }                                                                        \
     } while(0);
 
-static void *compressedfdgz_open(const char *filename)
+static void *compressedfdgz_open(const char *filename, int fd)
 {
+    int ret;
     gzFile zfp;
     char *dst;
-    int fd, ret;
     size_t dst_len;
     struct stat st;
     compressedfd_t *compressedfd;
 
     compressedfd = mem_new(*compressedfd);
-    if (-1 == (fd = open(filename, O_RDONLY))) {
-        msg("can't open %s: %s", filename, strerror(errno));
-        goto free;
-    }
     if (-1 == (fstat(fd, &st))) {
         msg("can't stat %s: %s", filename, strerror(errno));
         goto close;
@@ -87,20 +83,16 @@ free:
 # define bzip2(jfp, errnum, function) \
     msg("bzip2 internal error from " function "(): %s", BZ2_bzerror(jfp, errnum))
 
-static void *compressedfdbz2_open(const char *filename)
+static void *compressedfdbz2_open(const char *filename, int fd)
 {
-    BZFILE *jfp;
     char *dst;
-    int fd, ret, bzerror;
+    BZFILE *jfp;
     size_t dst_len;
     struct stat st;
+    int ret, bzerror;
     compressedfd_t *compressedfd;
 
     compressedfd = mem_new(*compressedfd);
-    if (-1 == (fd = open(filename, O_RDONLY))) {
-        msg("can't open %s: %s", filename, strerror(errno));
-        goto free;
-    }
     if (-1 == (fstat(fd, &st))) {
         msg("can't stat %s: %s", filename, strerror(errno));
         goto close;

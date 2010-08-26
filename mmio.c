@@ -19,16 +19,13 @@ typedef struct {
     UConverter *ucnv;
 } mmfd_t;
 
-static void *mmfd_open(const char *filename)
+static void *mmfd_open(const char *filename, int fd)
 {
     mmfd_t *mmfd;
     struct stat st;
 
     mmfd = mem_new(*mmfd);
-    if (-1 == (mmfd->fd = open(filename, O_RDONLY))) {
-        msg("can't open %s: %s", filename, strerror(errno));
-        goto free;
-    }
+    mmfd->fd = fd;
     if (-1 == (fstat(mmfd->fd, &st))) {
         msg("can't stat %s: %s", filename, strerror(errno));
         goto close;
