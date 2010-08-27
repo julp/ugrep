@@ -7,6 +7,6 @@ typedef struct {
 } interval_t;
 
 UBool interval_add(slist_t *, int32_t, int32_t, int32_t);
-slist_t *intervals_new();
+slist_t *intervals_new(void);
 
 #endif /* INTERVALS_H */

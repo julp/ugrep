@@ -105,13 +105,20 @@ typedef struct {
     void (*rewind)(void *);
 } reader_t;
 
+typedef enum {
+    ENGINE_FAILURE     = -1,
+    ENGINE_NO_MATCH    =  0,
+    ENGINE_MATCH_FOUND =  1,
+    ENGINE_WHOLE_LINE_MATCH
+} engine_return_t;
+
 typedef struct {
     void *(*compile)(const UChar *, int32_t, UBool case_insensitive);
     void *(*compileC)(const char *, UBool case_insensitive);
     void (*pre_exec)(void *, UString *);
-    UBool (*match)(void *, const UString *);
-    UBool (*match_all)(void *, const UString *, slist_t *);
-    UBool (*whole_line_match)(void *, const UString *);
+    engine_return_t (*match)(void *, const UString *);
+    engine_return_t (*match_all)(void *, const UString *, slist_t *);
+    engine_return_t (*whole_line_match)(void *, const UString *);
     void (*reset)(void *);
     void (*destroy)(void *);
 } engine_t;

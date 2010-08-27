@@ -3,7 +3,7 @@
 #include "ugrep.h"
 
 #ifdef DEBUG
-# define USTRING_INITIAL_LENGTH 16
+# define USTRING_INITIAL_LENGTH 16 /* Voluntarily small for development/test */
 #else
 # define USTRING_INITIAL_LENGTH 4096
 #endif /* DEBUG */
@@ -67,6 +67,11 @@ void ustring_append_string(UString *ustr, const UChar *str)
     ustring_insert_len(ustr, ustr->len, str, u_strlen(str));
 }
 
+void ustring_append_string_len(UString *ustr, const UChar *str, int32_t len)
+{
+    ustring_insert_len(ustr, ustr->len, str, len);
+}
+
 void ustring_prepend_char(UString *ustr, UChar c)
 {
     ustring_insert_len(ustr, 0, &c, 1);
@@ -75,6 +80,11 @@ void ustring_prepend_char(UString *ustr, UChar c)
 void ustring_prepend_string(UString *ustr, const UChar *str)
 {
     ustring_insert_len(ustr, 0, str, u_strlen(str));
+}
+
+void ustring_prepend_string_len(UString *ustr, const UChar *str, int32_t len)
+{
+    ustring_insert_len(ustr, 0, str, len);
 }
 
 UChar *ustring_chomp(UString *ustr)

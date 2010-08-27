@@ -54,7 +54,7 @@ static void engine_icure_pre_exec(void *UNUSED(data), UString *UNUSED(subject))
     /* NOP */
 }
 
-static UBool engine_icure_match(void *data, const UString *subject)
+static engine_return_t engine_icure_match(void *data, const UString *subject)
 {
     UBool ret;
     UErrorCode status;
@@ -64,23 +64,18 @@ static UBool engine_icure_match(void *data, const UString *subject)
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
         icu(status, "uregex_setText");
-        // TODO
+        return ENGINE_FAILURE;
     }
     ret = uregex_find(uregex, 0, &status);
     if (U_FAILURE(status)) {
         icu(status, "uregex_find");
-        // TODO
+        return ENGINE_FAILURE;
     }
 
-    while (uregex_findNext(uregex, &status)) {
-        printf("Match : [%d;%d]\n", uregex_start(uregex, 0, &status), uregex_end(uregex, 0, &status));
-    }
-    uregex_reset(uregex, 0, &status);
-
-    return ret;
+    return (ret ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
 
-static UBool engine_icure_match_all(void *data, const UString *subject, slist_t *intervals)
+static engine_return_t engine_icure_match_all(void *data, const UString *subject, slist_t *intervals)
 {
     int matches;
     int32_t l, u;
@@ -92,39 +87,38 @@ static UBool engine_icure_match_all(void *data, const UString *subject, slist_t 
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
         icu(status, "uregex_setText");
-        return FALSE;
+        return ENGINE_FAILURE;
     }
     while (uregex_findNext(uregex, &status)) {
         matches++;
         l = uregex_start(uregex, 0, &status);
         if (U_FAILURE(status)) {
             icu(status, "uregex_start");
-            return FALSE;
+            return ENGINE_FAILURE;
         }
         u = uregex_end(uregex, 0, &status);
         if (U_FAILURE(status)) {
             icu(status, "uregex_end");
-            return FALSE;
+            return ENGINE_FAILURE;
         }
         if (interval_add(intervals, subject->len, l, u)) {
-            debug("whole line match"); //TODO: return significant value (UBool => int [-1: error, 0: normal, 1: whole line])
-            break; // we already have a whole line matching, don't search anymore any pattern
+            return ENGINE_WHOLE_LINE_MATCH;
         }
     }
     if (U_FAILURE(status)) {
         icu(status, "uregex_findNext");
-        return FALSE;
+        return ENGINE_FAILURE;
     }
     /*uregex_reset(uregex, 0, &status);
     if (U_FAILURE(status)) {
         icu(status, "uregex_reset");
-        return FALSE;
+        return ENGINE_FAILURE;
     }*/
 
-    return TRUE;
+    return (matches ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
 
-static UBool engine_icure_whole_line_match(void *data, const UString *subject)
+static engine_return_t engine_icure_whole_line_match(void *data, const UString *subject)
 {
     UBool ret;
     UErrorCode status;
@@ -134,15 +128,15 @@ static UBool engine_icure_whole_line_match(void *data, const UString *subject)
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
         icu(status, "uregex_setText");
-        // TODO
+        return ENGINE_FAILURE;
     }
     ret = uregex_matches(uregex, -1, &status);
     if (U_FAILURE(status)) {
         icu(status, "uregex_matches");
-        // TODO
+        return ENGINE_FAILURE;
     }
 
-    return ret;
+    return (ret ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
 }
 
 static void engine_icure_reset(void *data)

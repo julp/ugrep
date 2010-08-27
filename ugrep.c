@@ -519,7 +519,6 @@ int main(int argc, char **argv)
                 usage();
                 break;
         }
-        // XXX
     }
     argc -= optind;
     argv += optind;
@@ -556,6 +555,7 @@ int main(int argc, char **argv)
             }
             while (fd_readline(&fd, ustr)) {
                 int matches;
+                engine_return_t ret;
 
                 matches = 0;
                 fd.lineno++;
@@ -572,15 +572,21 @@ For fixed string, make a lowered copy of ustr which on working
                     }
                     // </very bad: drop this ASAP!>
                     if (xFlag) {
-                        matches += pdata->engine->whole_line_match(pdata->pattern, ustr); // TODO: handle error
-                        break; // no need to continue
+                        ret = pdata->engine->whole_line_match(pdata->pattern, ustr);
                     } else {
                         if (colorize) {
-                            matches += pdata->engine->match_all(pdata->pattern, ustr, intervals); // TODO: handle error
+                            ret = pdata->engine->match_all(pdata->pattern, ustr, intervals);
                         } else {
-                            matches += pdata->engine->match(pdata->pattern, ustr); // TODO: handle error
-                            break; // no need to continue
+                            ret = pdata->engine->match(pdata->pattern, ustr);
                         }
+                    }
+                    if (ENGINE_FAILURE == ret) {
+                        // TODO: handle error
+                    } else if (ENGINE_WHOLE_LINE_MATCH == ret) {
+                        matches++;
+                        break; // no need to continue
+                    } else {
+                        matches += ret;
                     }
                 }
                 fd.matches += (matches > 0);
@@ -592,21 +598,29 @@ For fixed string, make a lowered copy of ustr which on working
                         if (nFlag) {
                             u_fprintf(ustdout, "\33[32m%d\33[0m:", fd.lineno);
                         }
-                        if (!xFlag && colorize) {
-                            int32_t decalage;
-                            slist_element_t *el;
-                            UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
-                            UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL};
-                            int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
+                        if (colorize) {
+                            if (ENGINE_WHOLE_LINE_MATCH == ret) {
+                                UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
+                                UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0033, 0x006d, U_NUL};
+                                int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
 
-                            decalage = 0;
-                            for (el = intervals->head; el; el = el->next) {
-                                FETCH_DATA(el->data, i, interval_t);
+                                ustring_prepend_string_len(ustr, before, before_len);
+                                ustring_append_string_len(ustr, after, after_len);
+                            } else {
+                                int32_t decalage;
+                                slist_element_t *el;
+                                UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
+                                UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL};
+                                int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
 
-                                //printf("[%d;%d] %d\n", i->lower_limit, i->upper_limit, decalage);
-                                ustring_insert_len(ustr, i->lower_limit + decalage, before, before_len);
-                                ustring_insert_len(ustr, i->upper_limit + decalage + before_len, after, after_len);
-                                decalage += before_len + after_len;
+                                decalage = 0;
+                                for (el = intervals->head; el; el = el->next) {
+                                    FETCH_DATA(el->data, i, interval_t);
+
+                                    ustring_insert_len(ustr, i->lower_limit + decalage, before, before_len);
+                                    ustring_insert_len(ustr, i->upper_limit + decalage + before_len, after, after_len);
+                                    decalage += before_len + after_len;
+                                }
                             }
                         }
                         u_fputs(ustr->ptr, ustdout);
