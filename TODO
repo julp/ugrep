@@ -2,14 +2,11 @@ TODO :
 
 * mmap already used internaly by icu?
 
-* implement recursive option (-r) with FTS
+* implement recursive option (-r) with FTS (and exclude options)
 
 * fixed string > word match : look UChars before (^ or !is_alpha([c-1])?) and after ($ or !is_alpha([c-1])?)
 
 * write ucat, a cat replacement ?
-
-* implement a smart colorizer for all matches (based on ranges?)
-
 
 
 Known bugs :
