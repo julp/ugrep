@@ -104,8 +104,22 @@ static UBool engine_fixed_match(void *data, const UString *subject)
 
 static UBool engine_fixed_match_all(void *data, const UString *subject, slist_t *intervals)
 {
-    // TODO
-    return FALSE;
+    UChar *m, *s;
+    int32_t matches, pos;
+    FETCH_DATA(data, p, fixed_pattern_t);
+
+    matches = pos = 0;
+    while (NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, p->pattern->ptr, p->pattern->len))) {
+        pos = m - subject->ptr;
+        if (interval_add(intervals, subject->len, pos, pos + p->pattern->len)) {
+            debug("whole line match"); //TODO: return significant value (UBool => int [-1: error, 0: normal, 1: whole line])
+            break; // we already have a whole line matching, don't search anymore any pattern
+        }
+        //pos++;
+        pos += p->pattern->len;
+    }
+
+    return TRUE;
 }
 
 static UBool engine_fixed_whole_line_match(void *data, const UString *subject)
