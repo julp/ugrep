@@ -87,7 +87,6 @@ static UBool engine_icure_match_all(void *data, const UString *subject, slist_t 
     UErrorCode status;
     FETCH_DATA(data, uregex, URegularExpression);
 
-    u_printf("%S\n", subject->ptr);
     matches = 0;
     status = U_ZERO_ERROR;
     uregex_setText(uregex, subject->ptr, subject->len, &status);
@@ -116,11 +115,11 @@ static UBool engine_icure_match_all(void *data, const UString *subject, slist_t 
         icu(status, "uregex_findNext");
         return FALSE;
     }
-    uregex_reset(uregex, 0, &status);
+    /*uregex_reset(uregex, 0, &status);
     if (U_FAILURE(status)) {
         icu(status, "uregex_reset");
         return FALSE;
-    }
+    }*/
 
     return TRUE;
 }
