@@ -42,7 +42,6 @@ UBool interval_add(slist_t *intervals, int32_t max_upper_limit, int32_t lower_li
 {
     slist_element_t *prev, *from, *to;
 
-    printf("\nSEARCH [%d;%d]\n", lower_limit, upper_limit);
     if (lower_limit == 0 && upper_limit == max_upper_limit) {
         return TRUE;
     }
@@ -52,34 +51,26 @@ UBool interval_add(slist_t *intervals, int32_t max_upper_limit, int32_t lower_li
         for (from = intervals->head, prev = NULL; from; from = from->next) {
             FETCH_DATA(from->data, i, interval_t);
 
-            printf("FOR1 [%d;%d]\n", i->lower_limit, i->upper_limit);
             if (IN(lower_limit, i) || IN(upper_limit, i)) {
-                printf("FOR1, COND1\n");
                 break;
             }
             if (lower_limit < i->lower_limit) {
-                printf("FOR1, COND2\n");
-                //from = prev;
                 break;
             }
             prev = from;
         }
         if (!from) {
-            printf("from = null\n");
             interval_append(intervals, lower_limit, upper_limit);
         } else {
             for (to = from->next, prev = NULL; to; to = to->next) {
                 FETCH_DATA(to->data, i, interval_t);
 
-                printf("FOR2 [%d;%d]\n", i->lower_limit, i->upper_limit);
                 //if (!IN(lower_limit, i) && !IN(upper_limit, i)) {
                 /*if (!BETWEEN(i->lower_limit, lower_limit, upper_limit) && !BETWEEN(i->upper_limit, lower_limit, upper_limit)) {
-                    printf("FOR2, COND1\n");
                     break;
                 }
                 if (i->upper_limit > upper_limit) {*/
                 if (i->upper_limit >= upper_limit && !BETWEEN(i->lower_limit, lower_limit, upper_limit) && !BETWEEN(i->upper_limit, lower_limit, upper_limit)) {
-                    printf("FOR2, COND2\n");
                     to = prev;
                     break;
                 }
@@ -94,8 +85,6 @@ UBool interval_add(slist_t *intervals, int32_t max_upper_limit, int32_t lower_li
                     FETCH_DATA(to->data, t, interval_t);
                     FETCH_DATA(from->data, f, interval_t);
 
-                    printf("FROM [%d;%d]\n", f->lower_limit, f->upper_limit);
-                    printf("TO [%d;%d]\n", t->lower_limit, t->upper_limit);
                     f->lower_limit = MIN(f->lower_limit, lower_limit);
                     f->upper_limit = MAX(t->upper_limit, upper_limit);
                     if (f->lower_limit == 0 && f->upper_limit == max_upper_limit) {
@@ -117,7 +106,6 @@ UBool interval_add(slist_t *intervals, int32_t max_upper_limit, int32_t lower_li
                 }
             } else {
                 FETCH_DATA(from->data, i, interval_t);
-                printf("(prev = null) merge = 1 ([%d;%d] with [%d;%d] = [%d;%d])\n", i->lower_limit, i->upper_limit, lower_limit, upper_limit, MIN(i->lower_limit, lower_limit), MAX(i->upper_limit, upper_limit));
                 i->lower_limit = MIN(i->lower_limit, lower_limit);
                 i->upper_limit = MAX(i->upper_limit, upper_limit);
                 if (i->lower_limit == 0 && i->upper_limit == max_upper_limit) {
