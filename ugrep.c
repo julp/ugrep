@@ -73,8 +73,8 @@ slist_t *intervals = NULL;
 
 // TODO: regroup all options like:
 // UBool options[CHAR_MAX] = { FALSE };
-// SET_FLAG(name, value) options[(unsigned char) name] = value
-// GET_FLAG(name) options[(unsigned char) name]
+// SET_FLAG(name, value) options[(unsigned char) *(#name)] = value
+// GET_FLAG(name) options[(unsigned char) *(#name)]
 // ?
 UBool rFlag = FALSE;
 UBool xFlag = FALSE;
@@ -582,6 +582,19 @@ static void/*int*/ procdir(fd_t *fd, char **dirname)
 
 /* ========== main ========== */
 
+static void exit_cb(void)
+{
+    if (NULL != ustr) {
+        ustring_destroy(ustr);
+    }
+    if (NULL != patterns) {
+        slist_destroy(patterns);
+    }
+    if (NULL != intervals) {
+        slist_destroy(intervals);
+    }
+}
+
 int main(int argc, char **argv)
 {
     enum {
@@ -596,6 +609,11 @@ int main(int argc, char **argv)
     int pattern_type; // -E/F
 
     pattern_type = PATTERN_AUTO;
+
+    if (0 != atexit(exit_cb)) {
+        msg("can't register atexit callback");
+        return EXIT_FAILURE;
+    }
 
     patterns = slist_new(pattern_destroy);
     default_reader = &mm_reader;
@@ -740,11 +758,6 @@ int main(int argc, char **argv)
             procfile(&fd, *argv);
         }
     }
-
-    // move to an atexit callback?
-    ustring_destroy(ustr);
-    slist_destroy(patterns);
-    slist_destroy(intervals);
 
     return EXIT_SUCCESS;
 }
