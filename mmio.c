@@ -28,7 +28,7 @@ static void *mmfd_open(const char *filename, int fd)
     mmfd->fd = fd;
     if (-1 == (fstat(mmfd->fd, &st))) {
         msg("can't stat %s: %s", filename, strerror(errno));
-        goto close;
+        goto free;
     }
     if (st.st_size > SIZE_T_MAX) {
         msg("%s too big (size > %dz)", filename, SIZE_T_MAX);
