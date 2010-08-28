@@ -27,8 +27,14 @@ static void *stdiofd_open(const char *filename, int fd)
         msg("can't open %s: %s", filename, strerror(errno));
         goto failed;
     }
-    if (NULL == (stdiofd->ufp = u_fadopt(stdiofd->fp, NULL, NULL))) {
-        goto failed;
+    if (fd == STDIN_FILENO) {
+        if (NULL == (stdiofd->ufp = u_finit(stdiofd->fp, NULL, NULL))) {
+            goto failed;
+        }
+    } else {
+        if (NULL == (stdiofd->ufp = u_fadopt(stdiofd->fp, NULL, NULL))) {
+            goto failed;
+        }
     }
     stdiofd->signature_length = 0;
     //stdiofd->ufp = NULL;
