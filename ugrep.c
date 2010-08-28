@@ -67,9 +67,13 @@ int binbehave = BIN_FILE_SKIP;
 UBool nFlag = FALSE;
 UBool vFlag = FALSE;
 UBool wFlag = FALSE;
+UBool cFlag = FALSE;
+UBool lFlag = FALSE;
+UBool LFlag = FALSE;
 
 UBool print_file = TRUE; // -H/h
 UBool colorize = TRUE;
+UBool line_print = TRUE;
 
 /* ========== general helper functions ========== */
 
@@ -255,7 +259,6 @@ int fd_is_binary(fd_t *fd)
     if (fd->reader->seekable(fd->reader_data)) {
         buffer_len = fd->reader->readuchars(fd->reader_data, buffer, MAX_BIN_REL_LEN);
         buffer[buffer_len] = U_NUL;
-        // controler buffer_len
         for (p = buffer; U_NUL != *p; p++) {
             if (is_binary_uchar(*p)) {
                 return TRUE;
@@ -295,38 +298,40 @@ enum {
     READER_OPT
 };
 
-static char optstr[] = "EFHVce:f:hinqsvwx";
+static char optstr[] = "EFHLVce:f:hilnqsvwx";
 
 static struct option long_options[] =
 {
-    {"color",           required_argument, NULL, COLOR_OPT},
-    {"colour",          required_argument, NULL, COLOR_OPT},
-    {"binary-files",    required_argument, NULL, BINARY_OPT},
-    {"reader",          required_argument, NULL, READER_OPT},
-    {"extended-regexp", no_argument,       NULL, 'E'}, // POSIX
-    {"fixed-string",    no_argument,       NULL, 'F'}, // POSIX
-    {"with-filename",   no_argument,       NULL, 'H'},
-    {"version",         no_argument,       NULL, 'V'},
-    {"count",           no_argument,       NULL, 'c'}, // POSIX
-    {"regexp",          required_argument, NULL, 'e'}, // POSIX
-    {"file",            required_argument, NULL, 'f'}, // POSIX
-    {"no-filename",     no_argument,       NULL, 'h'},
-    {"ignore-case",     no_argument,       NULL, 'i'}, // POSIX
-    {"line-number",     no_argument,       NULL, 'n'}, // POSIX
-    {"quiet",           no_argument,       NULL, 'q'}, // POSIX
-    {"silent",          no_argument,       NULL, 'q'}, // POSIX
-    {"no-messages",     no_argument,       NULL, 's'}, // POSIX
-    {"revert-match",    no_argument,       NULL, 'v'}, // POSIX
-    {"word-regexp",     no_argument,       NULL, 'w'},
-    {"line-regexp",     no_argument,       NULL, 'x'}, // POSIX
-    {NULL,              no_argument,       NULL, 0}
+    {"color",               required_argument, NULL, COLOR_OPT},
+    {"colour",              required_argument, NULL, COLOR_OPT},
+    {"binary-files",        required_argument, NULL, BINARY_OPT},
+    {"reader",              required_argument, NULL, READER_OPT},
+    {"extended-regexp",     no_argument,       NULL, 'E'}, // POSIX
+    {"fixed-string",        no_argument,       NULL, 'F'}, // POSIX
+    {"with-filename",       no_argument,       NULL, 'H'},
+    {"files-without-match", no_argument,       NULL, 'L'},
+    {"version",             no_argument,       NULL, 'V'},
+    {"count",               no_argument,       NULL, 'c'}, // POSIX
+    {"regexp",              required_argument, NULL, 'e'}, // POSIX
+    {"file",                required_argument, NULL, 'f'}, // POSIX
+    {"no-filename",         no_argument,       NULL, 'h'},
+    {"ignore-case",         no_argument,       NULL, 'i'}, // POSIX
+    {"files-with-matches",  no_argument,       NULL, 'l'},
+    {"line-number",         no_argument,       NULL, 'n'}, // POSIX
+    {"quiet",               no_argument,       NULL, 'q'}, // POSIX
+    {"silent",              no_argument,       NULL, 'q'}, // POSIX
+    {"no-messages",         no_argument,       NULL, 's'}, // POSIX
+    {"revert-match",        no_argument,       NULL, 'v'}, // POSIX
+    {"word-regexp",         no_argument,       NULL, 'w'},
+    {"line-regexp",         no_argument,       NULL, 'x'}, // POSIX
+    {NULL,                  no_argument,       NULL, 0}
 };
 
 static void usage(void)
 {
     fprintf(
         stderr,
-        "usage: %s [-EFHVchinqsvwx]\n"
+        "usage: %s [-EFHLVchilnqsvwx]\n"
         "\t[-e pattern] [-f file] [--binary-files=value]\n"
         "\t[pattern] [file ...]\n",
         __progname
@@ -457,9 +462,17 @@ int main(int argc, char **argv)
             case 'H':
                 print_file = TRUE;
                 break;
+            case 'L':
+                LFlag = TRUE;
+                line_print = FALSE;
+                break;
             case 'V':
                 fprintf(stderr, "ugrep version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
+                break;
+            case 'c':
+                cFlag = TRUE;
+                line_print = FALSE;
                 break;
             case 'e':
                 add_patternC(patterns, optarg, pattern_type, iFlag); // return value? (errors)
@@ -472,6 +485,10 @@ int main(int argc, char **argv)
                 break;
             case 'i':
                 iFlag = TRUE;
+                break;
+            case 'l':
+                lFlag = TRUE;
+                line_print = FALSE;
                 break;
             case 'n':
                 nFlag = TRUE;
@@ -584,7 +601,7 @@ For fixed string, make a lowered copy of ustr which on working
                     if (xFlag) {
                         ret = pdata->engine->whole_line_match(pdata->pattern, ustr);
                     } else {
-                        if (colorize) {
+                        if (colorize && line_print) {
                             ret = pdata->engine->match_all(pdata->pattern, ustr, intervals);
                         } else {
                             ret = pdata->engine->match(pdata->pattern, ustr);
@@ -600,51 +617,65 @@ For fixed string, make a lowered copy of ustr which on working
                     }
                 }
                 fd.matches += (matches > 0);
-                if (matches > 0) {
-                    if (!vFlag) {
-                        if (print_file) {
-                            u_fprintf(ustdout, "\33[35m%s\33[0m:", fd.filename);
-                        }
-                        if (nFlag) {
-                            u_fprintf(ustdout, "\33[32m%d\33[0m:", fd.lineno);
-                        }
-                        if (colorize) {
-                            if (ENGINE_WHOLE_LINE_MATCH == ret) {
-                                UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
-                                UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0033, 0x006d, U_NUL};
-                                int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
+                if (line_print) {
+                    if (matches > 0) {
+                        if (!vFlag) {
+                            if (print_file) {
+                                u_fprintf(ustdout, "\33[35m%s\33[0m:", fd.filename);
+                            }
+                            if (nFlag) {
+                                u_fprintf(ustdout, "\33[32m%d\33[0m:", fd.lineno);
+                            }
+                            if (colorize) {
+                                if (ENGINE_WHOLE_LINE_MATCH == ret) {
+                                    UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
+                                    UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0033, 0x006d, U_NUL};
+                                    int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
 
-                                ustring_prepend_string_len(ustr, before, before_len);
-                                ustring_append_string_len(ustr, after, after_len);
-                            } else {
-                                int32_t decalage;
-                                slist_element_t *el;
-                                UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
-                                UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL};
-                                int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
+                                    ustring_prepend_string_len(ustr, before, before_len);
+                                    ustring_append_string_len(ustr, after, after_len);
+                                } else {
+                                    int32_t decalage;
+                                    slist_element_t *el;
+                                    UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
+                                    UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL};
+                                    int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
 
-                                decalage = 0;
-                                for (el = intervals->head; el; el = el->next) {
-                                    FETCH_DATA(el->data, i, interval_t);
+                                    decalage = 0;
+                                    for (el = intervals->head; el; el = el->next) {
+                                        FETCH_DATA(el->data, i, interval_t);
 
-                                    ustring_insert_len(ustr, i->lower_limit + decalage, before, before_len);
-                                    ustring_insert_len(ustr, i->upper_limit + decalage + before_len, after, after_len);
-                                    decalage += before_len + after_len;
+                                        ustring_insert_len(ustr, i->lower_limit + decalage, before, before_len);
+                                        ustring_insert_len(ustr, i->upper_limit + decalage + before_len, after, after_len);
+                                        decalage += before_len + after_len;
+                                    }
                                 }
                             }
+                            u_fputs(ustr->ptr, ustdout);
                         }
-                        u_fputs(ustr->ptr, ustdout);
+                    } else {
+                        if (vFlag) {
+                            if (print_file) {
+                                u_fprintf(ustdout, "\33[35m%s\33[0m:", fd.filename);
+                            }
+                            if (nFlag) {
+                                u_fprintf(ustdout, "\33[32m%d\33[0m:", fd.lineno);
+                            }
+                            u_fputs(ustr->ptr, ustdout);
+                        }
                     }
-                } else {
-                    if (vFlag) {
-                        if (print_file) {
-                            u_fprintf(ustdout, "\33[35m%s\33[0m:", fd.filename);
-                        }
-                        if (nFlag) {
-                            u_fprintf(ustdout, "\33[32m%d\33[0m:", fd.lineno);
-                        }
-                        u_fputs(ustr->ptr, ustdout);
+                }
+            }
+            if (!line_print) {
+                if (cFlag) {
+                    if (print_file) {
+                        u_fprintf(ustdout, "\33[35m%s\33[0m:", fd.filename);
                     }
+                    u_fprintf(ustdout, "%d\n", fd.matches);
+                } else if (lFlag && fd.matches) {
+                    u_fprintf(ustdout, "\33[35m%s\33[0m\n", fd.filename);
+                } else if (LFlag && !fd.matches) {
+                    u_fprintf(ustdout, "\33[35m%s\33[0m\n", fd.filename);
                 }
             }
 endloop:

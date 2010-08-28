@@ -3,7 +3,6 @@ TODO:
     * find a (proper) way to get insitive case matching with fixed strings (+ 0.1)
     * implement recursive option (-r) with FTS (and exclude options) (+ >=0.1)
     * implement -q and -s options
-    * implement -c option
     * implement -w option
 
   - Normal:
