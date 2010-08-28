@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 2.6)
 include(CheckCCompilerFlag)
 
 set(UGREP_VERSION_MAJOR 0)
-set(UGREP_VERSION_MINOR 2)
+set(UGREP_VERSION_MINOR 3)
 
 configure_file(
     "config.h.in"
