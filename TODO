@@ -1,16 +1,29 @@
-TODO :
+TODO:
+  - High:
+    * find a (proper) way to get insitive case matching with fixed strings (+ 0.1)
+    * implement recursive option (-r) with FTS (and exclude options) (+ >=0.1)
+    * implement -q and -s options
+    * implement -c option
+    * implement -w option
 
-* mmap already used internaly by icu?
+  - Normal:
+    * write a man page
 
-* implement recursive option (-r) with FTS (and exclude options)
+  - Low:
+    * find/write a convenient way to have custom highlight colours
 
-* fixed string > word match : look UChars before (^ or !is_alpha([c-1])?) and after ($ or !is_alpha([c-1])?)
+  - Other:
+    * [HIGH] rewrite Windows specfic pieces to have a Windows build (both: statically and dynamically linked to ICU libraries)
+    * [HIGH] create distro package source (Debian) / port (*BSD)?
+    * [CHECK] mmap already used internaly by icu?
+    * fixed string u_str* => u_mem*?
 
-* write ucat, a cat replacement ?
+Notes:
+  - fixed string > word match : look UChars before (^ or !is_alpha([c-1])?) and after ($ or !is_alpha([c-1])?)
 
+Ideas :
+  - write ucat, a cat replacement ?
 
-Known bugs :
-
-* ICU is unable to guess default codepage when it doesn't appear in LANG environment variable
-  eg: with LANG=fr_FR, codepage becomes UTF-8 instead of ISO-8859-1. So explicit it (LANG=fr_FR.ISO-8859-1 in this case).
-
+Known bugs:
+  - ICU is unable to guess default codepage when it doesn't appear in LANG environment variable
+    eg: with LANG=fr_FR, codepage becomes UTF-8 instead of ISO-8859-1. So explicit it (LANG=fr_FR.ISO-8859-1 in this case).

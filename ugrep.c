@@ -30,6 +30,8 @@ enum {
 
 /* ========== global variables ========== */
 
+extern char *__progname;
+
 extern reader_t mm_reader;
 extern reader_t stdio_reader;
 #ifdef HAVE_ZLIB
@@ -79,7 +81,7 @@ const char *ubasename(const char *filename)
     if (NULL == (c = strrchr(filename, '/'))) {
         return filename;
     } else {
-        return c+1;
+        return c + 1;
     }
 }
 #endif /* DEBUG */
@@ -322,8 +324,6 @@ static struct option long_options[] =
 
 static void usage(void)
 {
-    extern char *__progname;
-
     fprintf(
         stderr,
         "usage: %s [-EFHVchinqsvwx]\n"
@@ -435,6 +435,16 @@ int main(int argc, char **argv)
 
     debug("system locale = %s", u_fgetlocale(ustdout));
     debug("system codepage = %s", u_fgetcodepage(ustdout));
+
+    // TODO: __progname (platform specific) => basename(argv[0])
+    switch (__progname[1]) {
+        case 'e':
+            pattern_type = PATTERN_REGEXP;
+            break;
+        case 'f':
+            pattern_type = PATTERN_LITERAL;
+            break;
+    }
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
