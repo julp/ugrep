@@ -59,6 +59,8 @@ endif(BZIP2_FOUND)
 
 list(REMOVE_DUPLICATES EXTRA_SOURCES)
 
+include_directories(${CMAKE_BINARY_DIR})
+
 add_executable(ugrep ${BASE_SOURCES} ${EXTRA_SOURCES})
 target_link_libraries(ugrep icudata icui18n icuio icule iculx icutu ${EXTRA_LIBS})
 
