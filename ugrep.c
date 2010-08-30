@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -6,6 +7,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fts.h>
+#include <pwd.h>
+#include <ctype.h>
 
 #include "ugrep.h"
 
@@ -78,7 +81,7 @@ slist_t *intervals = NULL;
 // ?
 UBool rFlag = FALSE;
 UBool xFlag = FALSE;
-UBool iFlag = FALSE;
+UBool iFlag = FALSE; // TODO: not needed out of main?
 UBool nFlag = FALSE;
 UBool vFlag = FALSE;
 UBool wFlag = FALSE;
@@ -86,7 +89,7 @@ UBool cFlag = FALSE;
 UBool lFlag = FALSE;
 UBool LFlag = FALSE;
 
-UBool print_file = TRUE; // -H/h
+UBool file_print = TRUE; // -H/h
 UBool colorize = TRUE;
 UBool line_print = TRUE;
 
@@ -424,6 +427,220 @@ static void pattern_destroy(void *data)
 
 /* ========== process on file and/or directory helper ========== */
 
+typedef struct {
+    const char *name;
+    int fg;
+    int bg;
+} attr_t;
+
+static const UChar reset[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
+static int32_t reset_len = ARRAY_SIZE(reset) - 1;
+
+attr_t attrs[] = {
+    //{"normal",    0,  0},
+    {"none",      -1, -1},
+    {"bright",     1,  1},
+    {"bold",       1,  1},
+    {"faint",      2,  2},
+    {"italic",     3,  3},
+    {"underline",  4,  4},
+    {"blink",      5,  5},
+    {"overline",   6,  6},
+    {"reverse",    7,  7},
+    {"invisible",  8,  8},
+    {"black",     30, 40},
+    {"red",       31, 41},
+    {"green",     32, 42},
+    {"yellow",    33, 43},
+    {"blue",      34, 44},
+    {"magenta",   35, 45},
+    {"cyan",      36, 46},
+    {"white",     37, 47},
+    {"default",   39, 49},
+    {NULL,        -1, -1}
+};
+
+typedef enum {
+    SINGLE_MATCH,
+    LINE_MATCH,
+    FILE_MATCH,
+    FILE_NO_MATCH,
+    LINE_NUMBER
+} color_type_t;
+
+typedef struct {
+    const char *name;
+    UChar *user_defined;
+    const UChar prog_default[16];
+} color_t;
+
+color_t colors[] = {
+    {"single-match",  NULL, {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL}},
+    {"line-match",    NULL, {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0033, 0x006d, U_NUL}},
+    {"file-match",    NULL, {0x001b, 0x005b, 0x0033, 0x0035, 0x006d, U_NUL}},
+    {"file-no-match", NULL, {0x001b, 0x005b, 0x0033, 0x0035, 0x006d, U_NUL}},
+    {"line-number",   NULL, {0x001b, 0x005b, 0x0033, 0x0032, 0x006d, U_NUL}},
+    {NULL,            NULL, {U_NUL}}
+};
+
+#define MAX_ATTRS 8
+
+#define GET_COLOR(type) \
+    (NULL == colors[type].user_defined ? colors[type].prog_default : colors[type].user_defined)
+
+static UChar *u_stpcpy(UChar *dest, const UChar *src)
+{
+    register UChar *d = dest;
+    register const UChar *s = src;
+
+    do {
+        *d++ = *s;
+    } while (*s++);
+
+    return (d - 1);
+}
+
+static UChar *u_stpncpy(UChar *dest, const UChar *src, int32_t length)
+{
+    int32_t n = u_strlen(src);
+
+    if (n > length) {
+        n = length;
+    }
+
+    return u_strncpy(dest, src, length) + n;
+}
+
+static void parse_userpref(void)
+{
+    char *home;
+
+    if (NULL == (home = getenv("HOME"))) {
+        struct passwd *pwd;
+
+        if (NULL != (pwd = getpwuid(getuid()))) {
+            home = pwd->pw_dir;
+        }
+    }
+
+    if (NULL != home) {
+        char preffile[MAXPATHLEN];
+
+        if (snprintf(preffile, sizeof(preffile), "%s%c%s", home, '/', ".ugrep") < sizeof(preffile)) {
+            struct stat st;
+
+            if ((-1 != (stat(preffile, &st))) && S_ISREG(st.st_mode)) {
+                FILE *fp;
+
+                if (NULL != (fp = fopen(preffile, "r"))) {
+                    char line[4096];
+
+                    while (NULL != fgets(line, sizeof(line), fp)) {
+                        color_t *c;
+
+                        if ('\n' == *line || '#' == *line) {
+                            continue;
+                        }
+                        for (c = colors; c->name; c++) {
+                            if (!strncmp(c->name, line, strlen(c->name))) {
+                                char *s, *t;
+                                int attrs_count, user_attrs[MAX_ATTRS], colors_count;
+
+                                s = line + strlen(c->name);
+
+                                attrs_count = colors_count = 0;
+                                do {
+                                    while (isblank(*s) || ispunct(*s)) {
+                                        s++;
+                                    }
+                                    t = s;
+                                    if (isdigit(*s)) {
+                                        while (isdigit(*++s))
+                                            ;
+                                        // TODO: search integer (>= 0 and <= 255?)
+                                    } else if (islower(*s)) {
+                                        while (islower(*++s))
+                                            ;
+                                        if (s > t) {
+                                            attr_t *a;
+
+                                            *s++ = 0; // TODO: is it safe?
+                                            // TODO: catch "none" => "set" c->user_defined to {U_NUL} and break
+                                            for (a = attrs; a->name; a++) {
+                                                if (!strcmp(a->name, t)) {
+                                                    // TODO: check attrs_count; colors_count
+                                                    if (a->bg != a->fg || colors_count < 2) {
+                                                        user_attrs[attrs_count++] = colors_count++ ? a->bg : a->fg;
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                } while (*s && '\n' != *s);
+                                if (attrs_count > 0) {
+                                    UChar prefix[] = {0x001b, 0x005b, U_NUL}, suffix[] = {0x006d, U_NUL}, sep[] = {0x003b, U_NUL};
+                                    UChar *ptr;
+                                    int i, len;
+
+                                    c->user_defined = mem_new_n(*c->user_defined, 64); // TODO: dynamic sized
+                                    ptr = u_stpcpy(c->user_defined, prefix);
+                                    for (i = 0; i < attrs_count; i++) {
+                                        UChar buf[32];
+                                        UFILE *ufp;
+
+                                        if (NULL != (ufp = u_fstropen(buf, sizeof(buf), NULL))) { // TODO: handle error
+                                            len = u_fprintf(ufp, "%d", user_attrs[i]);
+                                            ptr = u_stpcpy(ptr, sep);
+                                            ptr = u_stpncpy(ptr, buf, len);
+                                            u_fclose(ufp);
+                                        }
+                                    }
+                                    ptr = u_stpcpy(ptr, suffix);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void print_file(const char *filename, UBool sep, UBool eol)
+{
+    if (colorize) {
+        u_file_write(GET_COLOR(FILE_MATCH), -1, ustdout);
+    }
+    u_fprintf(ustdout, "%s", filename);
+    if (colorize) {
+        u_file_write(reset, reset_len, ustdout);
+    }
+    if (sep) {
+        u_fputc(0x003a, ustdout); // TODO: color
+    }
+    if (eol) {
+        u_fputc(U_LF, ustdout);
+    }
+}
+
+static void print_line(int lineno, UBool sep, UBool eol)
+{
+    if (colorize) {
+        u_file_write(GET_COLOR(LINE_NUMBER), -1, ustdout);
+    }
+    u_fprintf(ustdout, "%d", lineno);
+    if (colorize) {
+        u_file_write(reset, reset_len, ustdout);
+    }
+    if (sep) {
+        u_fputc(0x003a, ustdout); // TODO: color
+    }
+    if (eol) {
+        u_fputc(U_LF, ustdout);
+    }
+}
+
 static void/*int*/ procfile(fd_t *fd, const char *filename)
 {
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
@@ -479,34 +696,42 @@ For fixed string, make a lowered copy of ustr which on working
             if (line_print) {
                 if (matches > 0) {
                     if (!vFlag) {
-                        if (print_file) {
-                            u_fprintf(ustdout, "\33[35m%s\33[0m:", fd->filename);
+                        if (file_print) {
+                            //u_fprintf(ustdout, "\33[35m%s\33[0m:", fd->filename);
+                            print_file(fd->filename, TRUE, FALSE);
                         }
                         if (nFlag) {
-                            u_fprintf(ustdout, "\33[32m%d\33[0m:", fd->lineno);
+                            //u_fprintf(ustdout, "\33[32m%d\33[0m:", fd->lineno);
+                            print_line(fd->lineno, TRUE, FALSE);
                         }
                         if (colorize) {
                             if (ENGINE_WHOLE_LINE_MATCH == ret) {
-                                UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
-                                UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0033, 0x006d, U_NUL};
-                                int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
-
-                                ustring_prepend_string_len(ustr, before, before_len);
-                                ustring_append_string_len(ustr, after, after_len);
+                                if (U_NUL == *GET_COLOR(LINE_MATCH)) {
+                                    debug("LINE_MATCH set to \"\"");
+                                }
+                                ustring_prepend_string(ustr, GET_COLOR(LINE_MATCH));
+                                ustring_append_string_len(ustr, reset, reset_len);
                             } else {
                                 int32_t decalage;
                                 slist_element_t *el;
-                                UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
-                                UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL};
-                                int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
+                                //UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL};
+                                //int32_t before_len = ARRAY_SIZE(before) - 1;
+                                UChar *before;
+                                int32_t before_len;
+
+                                if (U_NUL == *GET_COLOR(SINGLE_MATCH)) {
+                                    debug("SINGLE_MATCH set to \"\"");
+                                }
 
                                 decalage = 0;
+                                before = GET_COLOR(SINGLE_MATCH);
+                                before_len = u_strlen(before);
                                 for (el = intervals->head; el; el = el->next) {
                                     FETCH_DATA(el->data, i, interval_t);
 
                                     ustring_insert_len(ustr, i->lower_limit + decalage, before, before_len);
-                                    ustring_insert_len(ustr, i->upper_limit + decalage + before_len, after, after_len);
-                                    decalage += before_len + after_len;
+                                    ustring_insert_len(ustr, i->upper_limit + decalage + before_len, reset, reset_len);
+                                    decalage += before_len + reset_len;
                                 }
                             }
                         }
@@ -514,11 +739,13 @@ For fixed string, make a lowered copy of ustr which on working
                     }
                 } else {
                     if (vFlag) {
-                        if (print_file) {
-                            u_fprintf(ustdout, "\33[35m%s\33[0m:", fd->filename);
+                        if (file_print) {
+                            //u_fprintf(ustdout, "\33[35m%s\33[0m:", fd->filename);
+                            print_file(fd->filename, TRUE, FALSE);
                         }
                         if (nFlag) {
-                            u_fprintf(ustdout, "\33[32m%d\33[0m:", fd->lineno);
+                            //u_fprintf(ustdout, "\33[32m%d\33[0m:", fd->lineno);
+                            print_line(fd->lineno, TRUE, FALSE);
                         }
                         u_fputs(ustr->ptr, ustdout);
                     }
@@ -527,14 +754,17 @@ For fixed string, make a lowered copy of ustr which on working
         }
         if (!line_print) {
             if (cFlag) {
-                if (print_file) {
-                    u_fprintf(ustdout, "\33[35m%s\33[0m:", fd->filename);
+                if (file_print) {
+                    //u_fprintf(ustdout, "\33[35m%s\33[0m:", fd->filename);
+                    print_file(fd->filename, TRUE, FALSE);
                 }
                 u_fprintf(ustdout, "%d\n", fd->matches);
             } else if (lFlag && fd->matches) {
-                u_fprintf(ustdout, "\33[35m%s\33[0m\n", fd->filename);
+                //u_fprintf(ustdout, "\33[35m%s\33[0m\n", fd->filename);
+                print_file(fd->filename, FALSE, TRUE);
             } else if (LFlag && !fd->matches) {
-                u_fprintf(ustdout, "\33[35m%s\33[0m\n", fd->filename);
+                //u_fprintf(ustdout, "\33[35m%s\33[0m\n", fd->filename);
+                print_file(fd->filename, FALSE, TRUE);
             }
         }
 endloop:
@@ -584,6 +814,7 @@ static void/*int*/ procdir(fd_t *fd, char **dirname)
 
 static void exit_cb(void)
 {
+    // TODO: free user defined colors
     if (NULL != ustr) {
         ustring_destroy(ustr);
     }
@@ -609,6 +840,8 @@ int main(int argc, char **argv)
     int pattern_type; // -E/F
 
     pattern_type = PATTERN_AUTO;
+
+    parse_userpref();
 
     if (0 != atexit(exit_cb)) {
         msg("can't register atexit callback");
@@ -641,7 +874,7 @@ int main(int argc, char **argv)
                 pattern_type = PATTERN_LITERAL;
                 break;
             case 'H':
-                print_file = TRUE;
+                file_print = TRUE;
                 break;
             case 'L':
                 LFlag = TRUE;
@@ -663,7 +896,7 @@ int main(int argc, char **argv)
                 source_patterns(optarg, patterns, pattern_type, iFlag); // return value? (errors)
                 break;
             case 'h':
-                print_file = FALSE;
+                file_print = FALSE;
                 break;
             case 'i':
                 iFlag = TRUE;
