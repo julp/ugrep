@@ -935,7 +935,7 @@ int main(int argc, char **argv)
                 vFlag = TRUE;
                 break;
             case 'w':
-                // TODO: word-regexp
+                wFlag = TRUE;
                 break;
             case 'x':
                 xFlag = TRUE;

@@ -1,5 +1,9 @@
 #include "ugrep.h"
 
+#include <unicode/ubrk.h>
+
+extern UBool wFlag; // for testing
+
 typedef struct {
     UString *pattern;
     UBool case_insensitive;
@@ -61,7 +65,7 @@ static void engine_fixed_pre_exec(void *data, UString *subject)
     FETCH_DATA(data, p, fixed_pattern_t);
 
     if (p->case_insensitive) {
-        ustring_tolower(subject); // TODO
+        ustring_tolower(subject);
     }
 }
 
@@ -70,7 +74,43 @@ static engine_return_t engine_fixed_match(void *data, const UString *subject)
     FETCH_DATA(data, p, fixed_pattern_t);
 
     // TODO: find better, inappropriate for binary file
-    return (NULL != u_strFindFirst(subject->ptr, subject->len, p->pattern->ptr, p->pattern->len) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
+    if (wFlag) {
+        UChar *m;
+
+        m = u_strFindFirst(subject->ptr, subject->len, p->pattern->ptr, p->pattern->len);
+        if (NULL == m) {
+            return ENGINE_NO_MATCH;
+        } else {
+#if 0
+            UBool ret;
+            UErrorCode status;
+            UBreakIterator *bi;
+
+            status = U_ZERO_ERROR;
+            bi = ubrk_open(UBRK_WORD, "", &subject->ptr, subject->len, &status);
+            if (U_FAILURE(status)) {
+                icu(status, "ubrk_open");
+                return ENGINE_FAILURE;
+            }
+            u_printf("start = %d ; end = %d ; string = %S\n", ubrk_isBoundary(bi, m - subject->ptr - 1), ubrk_isBoundary(bi, m - subject->ptr + p->pattern->len), subject->ptr);
+            u_printf("start = %C ; end = %C\n", subject->ptr[m - subject->ptr], subject->ptr[m - subject->ptr + p->pattern->len])
+            ret = ubrk_isBoundary(bi, m - subject->ptr - 1) && ubrk_isBoundary(bi, m - subject->ptr + p->pattern->len);
+            ubrk_close(bi);
+
+            return (ret ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
+#endif
+#define WORD_BOUNDARY(c) \
+    (!u_isalnum(c) && 0x005f != c)
+
+            return (
+                ((m - subject->ptr == 0) || (WORD_BOUNDARY(subject->ptr[m - subject->ptr - 1])))
+                &&
+                ((m - subject->ptr + p->pattern->len == subject->len) || (WORD_BOUNDARY(subject->ptr[m - subject->ptr + p->pattern->len])))
+            );
+        }
+    } else {
+        return (NULL != u_strFindFirst(subject->ptr, subject->len, p->pattern->ptr, p->pattern->len) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
+    }
 }
 
 static engine_return_t engine_fixed_match_all(void *data, const UString *subject, slist_t *intervals)
@@ -87,6 +127,7 @@ static engine_return_t engine_fixed_match_all(void *data, const UString *subject
         }
         pos += p->pattern->len;
     }
+
     return (matches ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
 
