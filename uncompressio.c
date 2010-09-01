@@ -19,15 +19,15 @@ typedef struct {
 
 # include <zlib.h>
 
-#define zlib(zfp, function)                                                      \
-    do {                                                                         \
-        int errnum;                                                              \
-        const char *zerrstr = gzerror((zfp), &errnum);                           \
-        if (Z_ERRNO == errnum) {                                                 \
-            msg("zlib external error from " function "(): %s", strerror(errno)); \
-        } else {                                                                 \
-            msg("zlib internal error from " function "(): %s", zerrstr);         \
-        }                                                                        \
+#define zlib(zfp, function)                                                            \
+    do {                                                                               \
+        int errnum;                                                                    \
+        const char *zerrstr = gzerror((zfp), &errnum);                                 \
+        if (Z_ERRNO == errnum) {                                                       \
+            msg(WARN, "zlib external error from " function "(): %s", strerror(errno)); \
+        } else {                                                                       \
+            msg(WARN, "zlib internal error from " function "(): %s", zerrstr);         \
+        }                                                                              \
     } while(0);
 
 static void *compressedfdgz_open(const char *filename, int fd)
@@ -41,15 +41,15 @@ static void *compressedfdgz_open(const char *filename, int fd)
 
     compressedfd = mem_new(*compressedfd);
     if (-1 == (fstat(fd, &st))) {
-        msg("can't stat %s: %s", filename, strerror(errno));
+        msg(WARN, "can't stat %s: %s", filename, strerror(errno));
         goto close;
     }
     if (!S_ISREG(st.st_mode)) {
-        msg("%s is not a regular file", filename);
+        msg(WARN, "%s is not a regular file", filename);
         goto close;
     }
     if (NULL == (zfp = gzdopen(fd, "rb"))) {
-        msg("gzdopen failed");
+        msg(WARN, "gzdopen failed");
         goto close;
     }
     dst_len = 2 * st.st_size;
@@ -81,7 +81,7 @@ free:
 # include <bzlib.h>
 
 # define bzip2(jfp, errnum, function) \
-    msg("bzip2 internal error from " function "(): %s", BZ2_bzerror(jfp, errnum))
+    msg(WARN, "bzip2 internal error from " function "(): %s", BZ2_bzerror(jfp, errnum))
 
 static void *compressedfdbz2_open(const char *filename, int fd)
 {
@@ -94,15 +94,15 @@ static void *compressedfdbz2_open(const char *filename, int fd)
 
     compressedfd = mem_new(*compressedfd);
     if (-1 == (fstat(fd, &st))) {
-        msg("can't stat %s: %s", filename, strerror(errno));
+        msg(WARN, "can't stat %s: %s", filename, strerror(errno));
         goto close;
     }
     if (!S_ISREG(st.st_mode)) {
-        msg("%s is not a regular file", filename);
+        msg(WARN, "%s is not a regular file", filename);
         goto close;
     }
     if (NULL == (jfp = BZ2_bzdopen(fd, "rb"))) {
-        msg("bzdopen failed");
+        msg(WARN, "bzdopen failed");
         goto close;
     }
     dst_len = 2 * st.st_size;

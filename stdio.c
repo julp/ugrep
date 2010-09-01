@@ -24,7 +24,7 @@ static void *stdiofd_open(const char *filename, int fd)
     //if (NULL == (stdiofd->fp = fopen(filename, "r"))) {
     //if (NULL == (stdiofd->ufp = u_fopen(filename, "r", NULL, NULL))) {
     if (NULL == (stdiofd->fp = fdopen(fd, "r"))) {
-        msg("can't open %s: %s", filename, strerror(errno));
+        msg(WARN, "can't open %s: %s", filename, strerror(errno));
         goto failed;
     }
     if (fd == STDIN_FILENO) {

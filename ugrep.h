@@ -5,6 +5,7 @@
 # include <stdlib.h>
 # include <stdio.h>
 # include <string.h>
+# include <stdarg.h>
 
 # include <unicode/utypes.h>
 # include <unicode/ucnv.h>
@@ -42,15 +43,27 @@
         }                                                                                                       \
     } while (0);
 
+enum {
+    INFO,
+    WARN,
+    FATAL
+};
+
+enum {
+    UGREP_EXIT_MATCH = 0,
+    UGREP_EXIT_NO_MATCH = 1,
+    UGREP_EXIT_USAGE = 2,
+    UGREP_EXIT_FAILURE = -1
+};
+
 #ifdef DEBUG
 const char *ubasename(const char *);
-# define msg(format, ...) \
-    fprintf(stderr, "[ERROR] %s:%d:" format " in %s()\n", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
-    //fprintf(stderr, "[ERROR] " __FILE__ ":%d:" format " in %s()\n", __LINE__, ## __VA_ARGS__, __func__)
 
-#define debug(format, ...) \
-    fprintf(stderr, "[DEBUG] %s:%d:" format " in %s()\n", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
-    //fprintf(stderr, "[DEBUG] " __FILE__ ":%d:" format " in %s()\n", __LINE__, ## __VA_ARGS__, __func__)
+# define msg(type, format, ...) \
+    report(type, "%s:%d:" format " in %s()\n", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
+
+# define debug(format, ...) \
+    msg(INFO, format, ## __VA_ARGS__)
 
 # define u_printf(...)                                \
     do {                                              \
@@ -58,14 +71,14 @@ const char *ubasename(const char *);
         u_fprintf(ustdout, ## __VA_ARGS__);           \
     } while (0);
 #else
-# define msg(format, ...) \
-    fprintf(stderr, "[ERROR] " format "\n", ## __VA_ARGS__)
+# define msg(type, format, ...) \
+    report(type, format "\n", ## __VA_ARGS__)
 
 # define debug(format, ...) /* NOP */
 #endif /* DEBUG */
 
 # define icu(status, function) \
-    msg("ICU Error \"%s\" from " function "()", u_errorName(status))
+    msg(FATAL, "ICU Error \"%s\" from " function "()", u_errorName(status))
 
 # define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
@@ -97,7 +110,7 @@ typedef struct {
     void (*close)(void *);
     UBool (*eof)(void *);
     UBool (*seekable)(void *);
-    UBool (*readline)(void *, UString *); // add boolean to copy or not (\r)\n ?
+    UBool (*readline)(void *, UString *);
     size_t (*readbytes)(void *, char *, size_t);
     size_t (*readuchars)(void *, UChar32 *, size_t);
     void (*set_signature_length)(void *, size_t);
@@ -127,5 +140,7 @@ typedef struct {
     void *pattern;
     engine_t *engine;
 } pattern_data_t;
+
+void report(int type, const char *format, ...);
 
 #endif /* !UGREP_H */

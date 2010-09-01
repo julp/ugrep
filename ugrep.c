@@ -19,6 +19,7 @@
 
 #define RED(str) "\33[1;31m" str "\33[0m"
 #define GREEN(str) "\33[1;32m" str "\33[0m"
+#define YELLOW(str) "\33[1;33m" str "\33[0m"
 
 enum {
     BIN_FILE_BIN,
@@ -108,6 +109,37 @@ const char *ubasename(const char *filename)
 }
 #endif /* DEBUG */
 
+#ifdef DEBUG
+int verbosity = INFO;
+#else
+int verbosity = WARN;
+#endif /* DEBUG */
+
+void report(int type, const char *format, ...)
+{
+    if (type >= verbosity) {
+        va_list args;
+
+        switch (type) {
+            case INFO:
+                fprintf(stderr, "[ " GREEN("INFO") " ] ");
+                break;
+            case WARN:
+                fprintf(stderr, "[ " YELLOW("WARN") " ] ");
+                break;
+            case FATAL:
+                fprintf(stderr, "[ " RED("ERROR") " ] ");
+                break;
+        }
+        va_start(args, format);
+        vfprintf(stderr, format, args);
+        va_end(args);
+        if (type == FATAL) {
+            exit(UGREP_EXIT_FAILURE);
+        }
+    }
+}
+
 static UBool stdout_is_tty(void)
 {
     return (1 == isatty(STDOUT_FILENO));
@@ -181,7 +213,7 @@ UBool fd_open(fd_t *fd, const char *filename)
     size_t buffer_len;
 
     /*if (-1 == (stat(filename, &st))) {
-        msg("can't stat %s: %s", filename, strerror(errno));
+        msg(WARN, "can't stat %s: %s", filename, strerror(errno));
         return FALSE;
     }*/
 
@@ -189,7 +221,7 @@ UBool fd_open(fd_t *fd, const char *filename)
 
     if (!strcmp("-", filename)) {
         if (!stdin_is_tty()) {
-            msg("Sorry: cannot work with redirected and/or piped stdin (not seekable)");
+            msg(WARN, "Sorry: cannot work with redirected and/or piped stdin (not seekable)");
             goto failed;
         }
         fd->filename = "(standard input)";
@@ -198,7 +230,7 @@ UBool fd_open(fd_t *fd, const char *filename)
     } else {
         fd->filename = filename;
         if (-1 == (fsfd = open(filename, O_RDONLY))) {
-            msg("can't open %s: %s", filename, strerror(errno));
+            msg(WARN, "can't open %s: %s", filename, strerror(errno));
             goto failed;
         }
     }
@@ -356,7 +388,7 @@ static void usage(void)
         "\t[pattern] [file ...]\n",
         __progname
     );
-    exit(EXIT_USAGE);
+    exit(UGREP_EXIT_USAGE);
 }
 
 /* ========== adding patterns ========== */
@@ -372,7 +404,7 @@ void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_t
     }
     if (NULL == (data = engines[!!pattern_type]->compile(pattern, length, case_insensitive))) {
         // TODO
-        exit(EXIT_FAILURE);
+        exit(UGREP_EXIT_FAILURE);
     }
     pdata->pattern = data;
     pdata->engine = engines[!!pattern_type];
@@ -391,7 +423,7 @@ void add_patternC(slist_t *l, const char *pattern, int pattern_type, UBool case_
     }
     if (NULL == (data = engines[!!pattern_type]->compileC(pattern, case_insensitive))) {
         // TODO
-        exit(EXIT_FAILURE);
+        exit(UGREP_EXIT_FAILURE);
     }
     pdata->pattern = data;
     pdata->engine = engines[!!pattern_type];
@@ -409,7 +441,7 @@ void source_patterns(const char *filename, slist_t *l, int pattern_type, UBool c
     ustr = ustring_new();
     if (!fd_open(&fd, filename)) {
         // TODO
-        exit(EXIT_FAILURE);
+        exit(UGREP_EXIT_FAILURE);
     }
     while (fd_readline(&fd, ustr)) {
         ustring_chomp(ustr);
@@ -809,16 +841,16 @@ static int procdir(fd_t *fd, char **dirname)
 
     if (NULL == (fts = fts_open(dirname, ftsflags, NULL))) {
         // TODO
-        msg("can't fts_open %s: %s", *dirname, strerror(errno));
-        exit(EXIT_FAILURE);
+        msg(FATAL, "can't fts_open %s: %s", *dirname, strerror(errno));
+        exit(UGREP_EXIT_FAILURE);
     }
     while (NULL != (p = fts_read(fts))) {
         switch (p->fts_info) {
             case FTS_DNR:
             case FTS_ERR:
                 // TODO
-                msg("fts_read failed on %s: %s", p->fts_path, strerror(p->fts_errno));
-                exit(EXIT_FAILURE);
+                msg(FATAL, "fts_read failed on %s: %s", p->fts_path, strerror(p->fts_errno));
+                exit(UGREP_EXIT_FAILURE);
                 break;
             case FTS_D:
             case FTS_DP:
@@ -867,8 +899,8 @@ int main(int argc, char **argv)
     pattern_type = PATTERN_AUTO;
 
     if (0 != atexit(exit_cb)) {
-        msg("can't register atexit callback");
-        return EXIT_FAILURE;
+        msg(FATAL, "can't register atexit callback");
+        return UGREP_EXIT_FAILURE;
     }
 
     patterns = slist_new(pattern_destroy);
@@ -937,7 +969,7 @@ int main(int argc, char **argv)
                 rFlag = TRUE;
                 break;
             case 's':
-                // TODO
+                verbosity = FATAL;
                 break;
             case 'v':
                 vFlag = TRUE;
@@ -957,7 +989,7 @@ int main(int argc, char **argv)
                     color = COLOR_ALWAYS;
                 } else {
                     fprintf(stderr, "Unknown colo(u)r option\n");
-                    return EXIT_USAGE;
+                    return UGREP_EXIT_USAGE;
                 }
                 break;
             case BINARY_OPT:
@@ -969,7 +1001,7 @@ int main(int argc, char **argv)
                     binbehave = BIN_FILE_TEXT;
                 } else {
                     fprintf(stderr, "Unknown binary-files option\n");
-                    return EXIT_USAGE;
+                    return UGREP_EXIT_USAGE;
                 }
                 break;
             case READER_OPT:
@@ -984,7 +1016,7 @@ int main(int argc, char **argv)
                     }
                     if (NULL == default_reader) {
                         fprintf(stderr, "Unknown reader\n");
-                        return EXIT_USAGE;
+                        return UGREP_EXIT_USAGE;
                     }
                 }
                 break;
@@ -1025,5 +1057,5 @@ int main(int argc, char **argv)
         }
     }
 
-    return (matches > 0 ? 0 : 1);
+    return (matches > 0 ? UGREP_EXIT_MATCH : UGREP_EXIT_NO_MATCH);
 }

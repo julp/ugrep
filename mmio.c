@@ -27,21 +27,21 @@ static void *mmfd_open(const char *filename, int fd)
     mmfd = mem_new(*mmfd);
     mmfd->fd = fd;
     if (-1 == (fstat(mmfd->fd, &st))) {
-        msg("can't stat %s: %s", filename, strerror(errno));
+        msg(WARN, "can't stat %s: %s", filename, strerror(errno));
         goto free;
     }
     if (st.st_size > SIZE_T_MAX) {
-        msg("%s too big (size > %dz)", filename, SIZE_T_MAX);
+        msg(WARN, "%s too big (size > %dz)", filename, SIZE_T_MAX);
         goto close;
     }
     if (!S_ISREG(st.st_mode)) {
-        msg("%s is not a regular file", filename);
+        msg(WARN, "%s is not a regular file", filename);
         goto close;
     }
     mmfd->len = (size_t) st.st_size;
     mmfd->base = mmap(NULL, mmfd->len, PROT_READ, MAP_PRIVATE, mmfd->fd, (off_t) 0);
     if (MAP_FAILED == mmfd->base) {
-        msg("mmap failed on %s: %s", filename, strerror(errno));
+        msg(WARN, "mmap failed on %s: %s", filename, strerror(errno));
         goto close;
     }
     mmfd->ptr = mmfd->base;
