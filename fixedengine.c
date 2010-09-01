@@ -4,6 +4,16 @@
 
 extern UBool wFlag; // for testing
 
+#define WORD_BOUNDARY(c) \
+    (!u_isalnum(c) && 0x005f != c)
+
+#define IS_BOUNDARY_MATCH(pattern, subject, match) \
+    ( \
+        ((match - subject->ptr == 0) || (WORD_BOUNDARY(subject->ptr[match - subject->ptr - 1]))) \
+        && \
+        ((match - subject->ptr + pattern->len == subject->len) || (WORD_BOUNDARY(subject->ptr[match - subject->ptr + pattern->len]))) \
+    )
+
 typedef struct {
     UString *pattern;
     UBool case_insensitive;
@@ -99,14 +109,8 @@ static engine_return_t engine_fixed_match(void *data, const UString *subject)
 
             return (ret ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 #endif
-#define WORD_BOUNDARY(c) \
-    (!u_isalnum(c) && 0x005f != c)
 
-            return (
-                ((m - subject->ptr == 0) || (WORD_BOUNDARY(subject->ptr[m - subject->ptr - 1])))
-                &&
-                ((m - subject->ptr + p->pattern->len == subject->len) || (WORD_BOUNDARY(subject->ptr[m - subject->ptr + p->pattern->len])))
-            );
+            return IS_BOUNDARY_MATCH(p->pattern, subject, m) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH;
         }
     } else {
         return (NULL != u_strFindFirst(subject->ptr, subject->len, p->pattern->ptr, p->pattern->len) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
@@ -122,8 +126,11 @@ static engine_return_t engine_fixed_match_all(void *data, const UString *subject
     matches = pos = 0;
     while (NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, p->pattern->ptr, p->pattern->len))) {
         pos = m - subject->ptr;
-        if (interval_add(intervals, subject->len, pos, pos + p->pattern->len)) {
-            return ENGINE_WHOLE_LINE_MATCH;
+        if (!wFlag || (wFlag && IS_BOUNDARY_MATCH(p->pattern, subject, m))) {
+            matches++;
+            if (interval_add(intervals, subject->len, pos, pos + p->pattern->len)) {
+                return ENGINE_WHOLE_LINE_MATCH;
+            }
         }
         pos += p->pattern->len;
     }
