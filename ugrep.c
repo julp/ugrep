@@ -667,7 +667,7 @@ static void print_line(int lineno, UBool sep, UBool eol)
     }
 }
 
-static void/*int*/ procfile(fd_t *fd, const char *filename)
+static int procfile(fd_t *fd, const char *filename)
 {
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
 
@@ -792,15 +792,17 @@ endloop:
         fd_close(fd);
     }
 
-    /*return matches;*/
+    return fd->matches;
 }
 
-static void/*int*/ procdir(fd_t *fd, char **dirname)
+static int procdir(fd_t *fd, char **dirname)
 {
     FTS *fts;
     FTSENT *p;
+    int matches;
     int ftsflags;
 
+    matches = 0;
     ftsflags = 0;
     // TODO: options H/P/S
     ftsflags |= FTS_NOSTAT | FTS_NOCHDIR;
@@ -822,13 +824,13 @@ static void/*int*/ procdir(fd_t *fd, char **dirname)
             case FTS_DP:
                 break;
             default:
-                /*matches += */procfile(fd, p->fts_path);
+                matches += procfile(fd, p->fts_path);
                 break;
         }
     }
     fts_close(fts);
 
-    // return matches;
+    return matches;
 }
 
 /* ========== main ========== */
@@ -856,9 +858,12 @@ int main(int argc, char **argv)
 
     int c;
     fd_t fd;
-    int color = COLOR_AUTO;
+    int color;
+    int matches;
     int pattern_type; // -E/F
 
+    matches = 0;
+    color = COLOR_AUTO;
     pattern_type = PATTERN_AUTO;
 
     if (0 != atexit(exit_cb)) {
@@ -922,11 +927,17 @@ int main(int argc, char **argv)
             case 'l':
                 lFlag = TRUE;
                 break;
+            case 'q':
+                file_print = line_print = FALSE;
+                break;
             case 'n':
                 nFlag = TRUE;
                 break;
             case 'r':
                 rFlag = TRUE;
+                break;
+            case 's':
+                // TODO
                 break;
             case 'v':
                 vFlag = TRUE;
@@ -985,7 +996,7 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    line_print = !cFlag && !lFlag && !LFlag;
+    line_print = line_print && !cFlag && !lFlag && !LFlag;
     colorize = (COLOR_ALWAYS == color) || (COLOR_AUTO == color && stdout_is_tty());
 
     if (slist_empty(patterns)) {
@@ -1005,14 +1016,14 @@ int main(int argc, char **argv)
     intervals = intervals_new();
 
     if (0 == argc) {
-        procfile(&fd, "-");
+        matches = procfile(&fd, "-");
     } else if (rFlag) {
-        procdir(&fd, argv);
+        matches = procdir(&fd, argv);
     } else {
         for ( ; argc--; ++argv) {
-            procfile(&fd, *argv);
+            matches += procfile(&fd, *argv);
         }
     }
 
-    return EXIT_SUCCESS;
+    return (matches > 0 ? 0 : 1);
 }
