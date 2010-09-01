@@ -547,16 +547,13 @@ static void parse_userpref(void)
                                             errno = 0;
                                             val = strtol(t, &endptr, 10);
                                             if (0 != errno || endptr == t || *endptr != '\0') {
-                                                printf("incorrect number\n");
                                                 goto nextline;
                                             } else {
                                                 attr_t *a;
 
-                                                printf("got %d\n", val);
                                                 for (a = attrs; a->name; a++) {
                                                     if (val == a->bg || val == a->fg) {
                                                         if (a->bg == a->fg || (a->bg != a->fg && colors_count++ < 2)) {
-                                                            printf("set %d\n", val);
                                                             user_attrs[attrs_count++] = val;
                                                         }
                                                         break;
