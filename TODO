@@ -1,7 +1,7 @@
 TODO:
   - High:
-    * find a (proper) way to get insitive case matching with fixed strings (+ 0.1)
-    * implement recursive option (and exclude options) (+ 0.1)
+    * find a (proper) way to get insitive case matching with fixed strings
+    * implement recursive option (and exclude options: exclude, exclude-dir, include)
     * implement -q and -s options
     * implement -w option
 
@@ -9,16 +9,13 @@ TODO:
     * write a man page
 
   - Low:
-    * find/write a convenient way to have custom highlight colours
+    * garbage slist_element_t and its data
 
   - Other:
     * [HIGH] rewrite Windows specfic pieces to have a Windows build (both: statically and dynamically linked to ICU libraries)
     * [HIGH] create distro package source (Debian) / port (*BSD)?
     * [CHECK] mmap already used internaly by icu?
     * fixed string u_str* => u_mem*?
-
-Notes:
-  - fixed string > word match : look UChars before (^ or !is_alpha([c-1])?) and after ($ or !is_alpha([c-1])?)
 
 Ideas :
   - write ucat, a cat replacement ?
