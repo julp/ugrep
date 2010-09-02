@@ -3,7 +3,7 @@
 #include "ugrep.h"
 
 #ifdef DEBUG
-# define USTRING_INITIAL_LENGTH 16 /* Voluntarily small for development/test */
+# define USTRING_INITIAL_LENGTH 8 /* Voluntarily small for development/test */
 #else
 # define USTRING_INITIAL_LENGTH 4096
 #endif /* DEBUG */
@@ -45,7 +45,7 @@ UString *ustring_sized_new(size_t requested)
 static void _ustring_maybe_expand(UString *ustr, size_t length)
 {
     if (ustr->len + length >= ustr->allocated) {
-        debug("Expand from %d to %d effective UChar", ustr->allocated, ustr->allocated*2);
+        //debug("Expand from %d to %d effective UChar", ustr->allocated, ustr->allocated*2);
         ustr->allocated *= 2;
         ustr->ptr = mem_renew(ustr->ptr, UChar, ustr->allocated + 1);
     }
