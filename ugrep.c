@@ -28,8 +28,8 @@
 enum {
     UGREP_EXIT_MATCH = 0,
     UGREP_EXIT_NO_MATCH = 1,
-    UGREP_EXIT_USAGE = 2,
-    UGREP_EXIT_FAILURE = -1
+    UGREP_EXIT_FAILURE = 2,
+    UGREP_EXIT_USAGE
 };
 
 enum {
