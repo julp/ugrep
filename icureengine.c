@@ -2,7 +2,7 @@
 
 // const UChar b[] = {0x005c, 0x0062, U_NUL};
 
-static void *engine_icure_compile(const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
+static void *engine_icure_compile(error_t **error, const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
 {
     UFILE *ustderr;
     UParseError pe;
@@ -16,11 +16,13 @@ static void *engine_icure_compile(const UChar *upattern, int32_t length, UBool c
     if (U_FAILURE(status)) {
         if (U_REGEX_RULE_SYNTAX == status) {
             //u_fprintf(ustderr, "Error at offset %d %S %S\n", pe.offset, pe.preContext, pe.postContext);
-            u_fprintf(ustderr, "Invalid pattern: error at offset %d\n", pe.offset);
+            /*u_fprintf(ustderr, "Invalid pattern: error at offset %d\n", pe.offset);
             u_fprintf(ustderr, "\t%S\n", upattern);
-            u_fprintf(ustderr, "\t%*c\n", pe.offset, '^');
+            u_fprintf(ustderr, "\t%*c\n", pe.offset, '^');*/
+            error(error, FATAL, "Invalid pattern: error at offset %d\n\t%S\n\t%*c\n", pe.offset, upattern, pe.offset, '^');
         } else {
-            icu(status, "uregex_openC");
+            //icu(status, "uregex_open");
+            icu_error(error, FATAL, status, "uregex_open");
         }
         return NULL;
     }
@@ -28,7 +30,7 @@ static void *engine_icure_compile(const UChar *upattern, int32_t length, UBool c
     return uregex;
 }
 
-static void *engine_icure_compileC(const char *pattern, UBool case_insensitive, UBool word_bounded)
+static void *engine_icure_compileC(error_t **error, const char *pattern, UBool case_insensitive, UBool word_bounded)
 {
     UParseError pe;
     UErrorCode status;
@@ -39,11 +41,13 @@ static void *engine_icure_compileC(const char *pattern, UBool case_insensitive, 
     if (U_FAILURE(status)) {
         if (U_REGEX_RULE_SYNTAX == status) {
             //u_fprintf(ustderr, "Error at offset %d %S %S\n", pe.offset, pe.preContext, pe.postContext);
-            fprintf(stderr, "Invalid pattern: error at offset %d\n", pe.offset);
+            /*fprintf(stderr, "Invalid pattern: error at offset %d\n", pe.offset);
             fprintf(stderr, "\t%s\n", pattern);
-            fprintf(stderr, "\t%*c\n", pe.offset, '^');
+            fprintf(stderr, "\t%*c\n", pe.offset, '^');*/
+            error(error, FATAL, "Invalid pattern: error at offset %d\n\t%s\n\t%*c\n", pe.offset, pattern, pe.offset, '^');
         } else {
-            icu(status, "uregex_openC");
+            //icu(status, "uregex_openC");
+            icu_error(error, FATAL, status, "uregex_openC");
         }
         return NULL;
     }
@@ -56,7 +60,7 @@ static void engine_icure_pre_exec(void *UNUSED(data), UString *UNUSED(subject))
     /* NOP */
 }
 
-static engine_return_t engine_icure_match(void *data, const UString *subject)
+static engine_return_t engine_icure_match(error_t **error, void *data, const UString *subject)
 {
     UBool ret;
     UErrorCode status;
@@ -65,19 +69,19 @@ static engine_return_t engine_icure_match(void *data, const UString *subject)
     status = U_ZERO_ERROR;
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
-        icu(status, "uregex_setText");
+        icu_error(error, FATAL, status, "uregex_setText");
         return ENGINE_FAILURE;
     }
     ret = uregex_find(uregex, 0, &status);
     if (U_FAILURE(status)) {
-        icu(status, "uregex_find");
+        icu_error(error, FATAL, status, "uregex_find");
         return ENGINE_FAILURE;
     }
 
     return (ret ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
 
-static engine_return_t engine_icure_match_all(void *data, const UString *subject, slist_t *intervals)
+static engine_return_t engine_icure_match_all(error_t **error, void *data, const UString *subject, slist_t *intervals)
 {
     int matches;
     int32_t l, u;
@@ -88,19 +92,19 @@ static engine_return_t engine_icure_match_all(void *data, const UString *subject
     status = U_ZERO_ERROR;
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
-        icu(status, "uregex_setText");
+        icu_error(error, FATAL, status, "uregex_setText");
         return ENGINE_FAILURE;
     }
     while (uregex_findNext(uregex, &status)) {
         matches++;
         l = uregex_start(uregex, 0, &status);
         if (U_FAILURE(status)) {
-            icu(status, "uregex_start");
+            icu_error(error, FATAL, status, "uregex_start");
             return ENGINE_FAILURE;
         }
         u = uregex_end(uregex, 0, &status);
         if (U_FAILURE(status)) {
-            icu(status, "uregex_end");
+            icu_error(error, FATAL, status, "uregex_end");
             return ENGINE_FAILURE;
         }
         if (interval_add(intervals, subject->len, l, u)) {
@@ -108,7 +112,7 @@ static engine_return_t engine_icure_match_all(void *data, const UString *subject
         }
     }
     if (U_FAILURE(status)) {
-        icu(status, "uregex_findNext");
+        icu_error(error, FATAL, status, "uregex_findNext");
         return ENGINE_FAILURE;
     }
     /*uregex_reset(uregex, 0, &status);
@@ -120,7 +124,7 @@ static engine_return_t engine_icure_match_all(void *data, const UString *subject
     return (matches ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
 
-static engine_return_t engine_icure_whole_line_match(void *data, const UString *subject)
+static engine_return_t engine_icure_whole_line_match(error_t **error, void *data, const UString *subject)
 {
     UBool ret;
     UErrorCode status;
@@ -129,25 +133,16 @@ static engine_return_t engine_icure_whole_line_match(void *data, const UString *
     status = U_ZERO_ERROR;
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
-        icu(status, "uregex_setText");
+        icu_error(error, FATAL, status, "uregex_setText");
         return ENGINE_FAILURE;
     }
     ret = uregex_matches(uregex, -1, &status);
     if (U_FAILURE(status)) {
-        icu(status, "uregex_matches");
+        icu_error(error, FATAL, status, "uregex_matches");
         return ENGINE_FAILURE;
     }
 
     return (ret ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
-}
-
-static void engine_icure_reset(void *data)
-{
-    UErrorCode status;
-    FETCH_DATA(data, uregex, URegularExpression);
-
-    status = U_ZERO_ERROR;
-    uregex_setText(uregex, 0, 0, &status);
 }
 
 static void engine_icure_destroy(void *data)
@@ -164,6 +159,5 @@ engine_t icure_engine = {
     engine_icure_match,
     engine_icure_match_all,
     engine_icure_whole_line_match,
-    engine_icure_reset,
     engine_icure_destroy
 };

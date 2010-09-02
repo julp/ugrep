@@ -26,6 +26,13 @@
 #endif /* DEBUG */
 
 enum {
+    UGREP_EXIT_MATCH = 0,
+    UGREP_EXIT_NO_MATCH = 1,
+    UGREP_EXIT_USAGE = 2,
+    UGREP_EXIT_FAILURE = -1
+};
+
+enum {
     BIN_FILE_BIN,
     BIN_FILE_SKIP,
     BIN_FILE_TEXT
@@ -121,9 +128,9 @@ void print_error(error_t *error)
         type = error->type;
         ustderr = u_finit(stdout, NULL, NULL);
         switch (type) {
-            case INFO:
+            /*case INFO:
                 fprintf(stderr, "[ " GREEN("INFO") " ] ");
-                break;
+                break;*/
             case WARN:
                 fprintf(stderr, "[ " YELLOW("WARN") " ] ");
                 break;
@@ -420,15 +427,16 @@ static void usage(void)
 void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_type, UBool case_insensitive, UBool word_bounded)
 {
     void *data;
+    error_t *error;
     pattern_data_t *pdata;
 
+    error = NULL;
     pdata = mem_new(*pdata);
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compile(pattern, length, case_insensitive, word_bounded))) {
-        // TODO
-        exit(UGREP_EXIT_FAILURE);
+    if (NULL == (data = engines[!!pattern_type]->compile(&error, pattern, length, case_insensitive, word_bounded))) {
+        print_error(error);
     }
     pdata->pattern = data;
     pdata->engine = engines[!!pattern_type];
@@ -439,15 +447,16 @@ void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_t
 void add_patternC(slist_t *l, const char *pattern, int pattern_type, UBool case_insensitive, UBool word_bounded)
 {
     void *data;
+    error_t *error;
     pattern_data_t *pdata;
 
+    error = NULL;
     pdata = mem_new(*pdata);
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compileC(pattern, case_insensitive, word_bounded))) {
-        // TODO
-        exit(UGREP_EXIT_FAILURE);
+    if (NULL == (data = engines[!!pattern_type]->compileC(&error, pattern, case_insensitive, word_bounded))) {
+        print_error(error);
     }
     pdata->pattern = data;
     pdata->engine = engines[!!pattern_type];
@@ -481,7 +490,7 @@ static void pattern_destroy(void *data)
     p->engine->destroy(p->pattern);
 }
 
-/* ========== process on file and/or directory helper ========== */
+/* ========== highlighting ========== */
 
 typedef struct {
     const char *name;
@@ -689,6 +698,8 @@ nextline:
     }
 }
 
+/* ========== process on file and/or directory helper ========== */
+
 static void print_file(const char *filename, UBool no_match, UBool sep, UBool eol)
 {
     if (colorize && *colors[no_match ? FILE_NO_MATCH : FILE_MATCH].value) {
@@ -747,7 +758,10 @@ static int procfile(fd_t *fd, const char *filename)
             ustring_chomp(ustr);
             slist_clean(intervals);
             for (p = patterns->head; NULL != p; p = p->next) {
+                error_t *error;
                 FETCH_DATA(p->data, pdata, pattern_data_t);
+
+                error = NULL;
                 // <very bad: drop this ASAP!>
 /*
 For fixed string, make a lowered copy of ustr which on working
@@ -757,16 +771,16 @@ For fixed string, make a lowered copy of ustr which on working
                 }
                 // </very bad: drop this ASAP!>
                 if (xFlag) {
-                    ret = pdata->engine->whole_line_match(pdata->pattern, ustr);
+                    ret = pdata->engine->whole_line_match(&error, pdata->pattern, ustr);
                 } else {
                     if (colorize && line_print) {
-                        ret = pdata->engine->match_all(pdata->pattern, ustr, intervals);
+                        ret = pdata->engine->match_all(&error, pdata->pattern, ustr, intervals);
                     } else {
-                        ret = pdata->engine->match(pdata->pattern, ustr);
+                        ret = pdata->engine->match(&error, pdata->pattern, ustr);
                     }
                 }
                 if (ENGINE_FAILURE == ret) {
-                    // TODO: handle error
+                    print_error(error);
                 } else if (ENGINE_WHOLE_LINE_MATCH == ret) {
                     matches++;
                     break; // no need to continue

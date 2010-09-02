@@ -49,13 +49,6 @@ enum {
     FATAL
 };
 
-enum {
-    UGREP_EXIT_MATCH = 0,
-    UGREP_EXIT_NO_MATCH = 1,
-    UGREP_EXIT_USAGE = 2,
-    UGREP_EXIT_FAILURE = -1
-};
-
 #ifdef DEBUG
 const char *ubasename(const char *);
 
@@ -64,6 +57,9 @@ const char *ubasename(const char *);
 
 # define debug(format, ...) \
     msg(INFO, format, ## __VA_ARGS__)
+
+# define error(error, type, format, ...) \
+    error_set(error, type, "%s:%d:" format " in %s()\n", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
 
 # define u_printf(...)                                \
     do {                                              \
@@ -74,11 +70,18 @@ const char *ubasename(const char *);
 # define msg(type, format, ...) \
     report(type, format "\n", ## __VA_ARGS__)
 
+# define error(error, type, format, ...) \
+    error_set(error, type, format "\n", ## __VA_ARGS__)
+
 # define debug(format, ...) /* NOP */
 #endif /* DEBUG */
 
+/* TODO: drop icu(), replace it by icu_error() */
 # define icu(status, function) \
     msg(FATAL, "ICU Error \"%s\" from " function "()", u_errorName(status))
+
+# define icu_error(error, type, status, function) \
+    error(error, type, "ICU Error \"%s\" from " function "()", u_errorName(status))
 
 # define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
@@ -104,6 +107,18 @@ const char *ubasename(const char *);
 # define FETCH_DATA(from, to, type) \
     type *to = (type *) (from)
 
+/* <error.c> */
+typedef struct {
+    int type;
+    UChar *message;
+} error_t;
+
+void error_destroy(error_t *);
+error_t *error_new(int, const char *, ...);
+void error_set(error_t **error, int type, const char *format, ...);
+error_t *error_vnew(int, const char *, va_list);
+/* </error.c> */
+
 typedef struct {
     const char *name;
     void *(*open)(const char *, int);
@@ -126,13 +141,12 @@ typedef enum {
 } engine_return_t;
 
 typedef struct {
-    void *(*compile)(const UChar *, int32_t, UBool case_insensitive, UBool word_bounded);
-    void *(*compileC)(const char *, UBool case_insensitive, UBool word_bounded);
+    void *(*compile)(error_t **, const UChar *, int32_t, UBool, UBool);
+    void *(*compileC)(error_t **, const char *, UBool, UBool);
     void (*pre_exec)(void *, UString *);
-    engine_return_t (*match)(void *, const UString *);
-    engine_return_t (*match_all)(void *, const UString *, slist_t *);
-    engine_return_t (*whole_line_match)(void *, const UString *);
-    void (*reset)(void *);
+    engine_return_t (*match)(error_t **, void *, const UString *);
+    engine_return_t (*match_all)(error_t **, void *, const UString *, slist_t *);
+    engine_return_t (*whole_line_match)(error_t **, void *, const UString *);
     void (*destroy)(void *);
 } engine_t;
 
@@ -141,17 +155,8 @@ typedef struct {
     engine_t *engine;
 } pattern_data_t;
 
-/* ugrep.c */
+/* <ugrep.c> */
 void report(int type, const char *format, ...);
-
-/* error.c */
-typedef struct {
-    int type;
-    UChar *message;
-} error_t;
-
-void error_destroy(error_t *);
-error_t *error_new(int, const char *, ...);
-error_t *error_vnew(int, const char *, va_list);
+/* </ugrep.c> */
 
 #endif /* !UGREP_H */

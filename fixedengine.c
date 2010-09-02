@@ -22,7 +22,7 @@ static void pattern_destroy(fixed_pattern_t *p)
     free(p);
 }
 
-static void *engine_fixed_compile(const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
+static void *engine_fixed_compile(error_t **UNUSED(error), const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
 {
     fixed_pattern_t *p;
 
@@ -34,7 +34,7 @@ static void *engine_fixed_compile(const UChar *upattern, int32_t length, UBool c
     return p;
 }
 
-static void *engine_fixed_compileC(const char *pattern, UBool case_insensitive, UBool word_bounded)
+static void *engine_fixed_compileC(error_t **error, const char *pattern, UBool case_insensitive, UBool word_bounded)
 {
     int32_t len;
     UConverter *ucnv;
@@ -44,7 +44,7 @@ static void *engine_fixed_compileC(const char *pattern, UBool case_insensitive, 
     status = U_ZERO_ERROR;
     ucnv = ucnv_open(NULL, &status);
     if (U_FAILURE(status)) {
-        icu(status, "ucnv_open");
+        icu_error(error, FATAL, status, "ucnv_open");
         return NULL;
     }
     len = strlen(pattern);
@@ -56,11 +56,13 @@ static void *engine_fixed_compileC(const char *pattern, UBool case_insensitive, 
     p->pattern->ptr[p->pattern->len] = U_NUL;
     ucnv_close(ucnv);
     if (U_FAILURE(status)) {
+        icu_error(error, FATAL, status, "ucnv_toUChars");
         pattern_destroy(p);
         return NULL;
     }
     if (case_insensitive) {
         if (!ustring_tolower(p->pattern)) {
+            // TODO: error handling
             pattern_destroy(p);
             return NULL;
         }
@@ -78,7 +80,7 @@ static void engine_fixed_pre_exec(void *data, UString *subject)
     }
 }
 
-static engine_return_t engine_fixed_match(void *data, const UString *subject)
+static engine_return_t engine_fixed_match(error_t **UNUSED(error), void *data, const UString *subject)
 {
     FETCH_DATA(data, p, fixed_pattern_t);
 
@@ -97,7 +99,7 @@ static engine_return_t engine_fixed_match(void *data, const UString *subject)
     }
 }
 
-static engine_return_t engine_fixed_match_all(void *data, const UString *subject, slist_t *intervals)
+static engine_return_t engine_fixed_match_all(error_t **UNUSED(error), void *data, const UString *subject, slist_t *intervals)
 {
     UChar *m;
     int32_t matches, pos;
@@ -118,7 +120,7 @@ static engine_return_t engine_fixed_match_all(void *data, const UString *subject
     return (matches ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
 
-static engine_return_t engine_fixed_whole_line_match(void *data, const UString *subject)
+static engine_return_t engine_fixed_whole_line_match(error_t **UNUSED(error), void *data, const UString *subject)
 {
     FETCH_DATA(data, p, fixed_pattern_t);
 
@@ -127,11 +129,6 @@ static engine_return_t engine_fixed_whole_line_match(void *data, const UString *
     } else {
         return (0 == u_strcmp(p->pattern->ptr, subject->ptr) ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
     }
-}
-
-static void engine_fixed_reset(void *UNUSED(data))
-{
-    /* NOP */
 }
 
 static void engine_fixed_destroy(void *data)
@@ -148,6 +145,5 @@ engine_t fixed_engine = {
     engine_fixed_match,
     engine_fixed_match_all,
     engine_fixed_whole_line_match,
-    engine_fixed_reset,
     engine_fixed_destroy
 };
