@@ -141,6 +141,17 @@ typedef struct {
     engine_t *engine;
 } pattern_data_t;
 
+/* ugrep.c */
 void report(int type, const char *format, ...);
+
+/* error.c */
+typedef struct {
+    int type;
+    UChar *message;
+} error_t;
+
+void error_destroy(error_t *);
+error_t *error_new(int, const char *, ...);
+error_t *error_vnew(int, const char *, va_list);
 
 #endif /* !UGREP_H */

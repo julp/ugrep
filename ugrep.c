@@ -112,6 +112,33 @@ int verbosity = INFO;
 int verbosity = WARN;
 #endif /* DEBUG */
 
+void print_error(error_t *error)
+{
+    if (error && error->type >= verbosity) {
+        int type;
+        UFILE *ustderr;
+
+        type = error->type;
+        ustderr = u_finit(stdout, NULL, NULL);
+        switch (type) {
+            case INFO:
+                fprintf(stderr, "[ " GREEN("INFO") " ] ");
+                break;
+            case WARN:
+                fprintf(stderr, "[ " YELLOW("WARN") " ] ");
+                break;
+            case FATAL:
+                fprintf(stderr, "[ " RED("ERR ") " ] ");
+                break;
+        }
+        u_fputs(error->message, ustderr);
+        error_destroy(error);
+        if (type == FATAL) {
+            exit(UGREP_EXIT_FAILURE);
+        }
+    }
+}
+
 void report(int type, const char *format, ...)
 {
     if (type >= verbosity) {
