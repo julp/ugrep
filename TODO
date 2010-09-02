@@ -2,8 +2,8 @@ TODO:
   - High:
     * find a (proper) way to get insitive case matching with fixed strings
     * implement recursive option (and exclude options: exclude, exclude-dir, include)
-    * implement -q and -s options
     * implement -w option
+    * improve error handling (fd) and clean up msg or relative
 
   - Normal:
     * write a man page
