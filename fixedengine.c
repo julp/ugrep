@@ -1,11 +1,9 @@
 #include "ugrep.h"
 
-extern UBool wFlag; // for testing
-
 #define WORD_BOUNDARY(c) \
     (!u_isalnum(c) && 0x005f != c)
 
-#define IS_BOUNDARY_MATCH(pattern, subject, match) \
+#define IS_BOUNDED_MATCH(pattern, subject, match) \
     ( \
         ((match - subject->ptr == 0) || (WORD_BOUNDARY(subject->ptr[match - subject->ptr - 1]))) \
         && \
@@ -14,6 +12,7 @@ extern UBool wFlag; // for testing
 
 typedef struct {
     UString *pattern;
+    UBool word_bounded;
     UBool case_insensitive;
 } fixed_pattern_t;
 
@@ -23,18 +22,19 @@ static void pattern_destroy(fixed_pattern_t *p)
     free(p);
 }
 
-static void *engine_fixed_compile(const UChar *upattern, int32_t length, UBool case_insensitive)
+static void *engine_fixed_compile(const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
 {
     fixed_pattern_t *p;
 
     p = mem_new(*p);
     p->pattern = ustring_dup_string_len(upattern, length);
     p->case_insensitive = case_insensitive;
+    p->word_bounded = word_bounded;
 
     return p;
 }
 
-static void *engine_fixed_compileC(const char *pattern, UBool case_insensitive)
+static void *engine_fixed_compileC(const char *pattern, UBool case_insensitive, UBool word_bounded)
 {
     int32_t len;
     UConverter *ucnv;
@@ -49,6 +49,7 @@ static void *engine_fixed_compileC(const char *pattern, UBool case_insensitive)
     }
     len = strlen(pattern);
     p = mem_new(*p);
+    p->word_bounded = word_bounded;
     p->case_insensitive = case_insensitive;
     p->pattern = ustring_sized_new(len * ucnv_getMaxCharSize(ucnv) + 1);
     p->pattern->len = ucnv_toUChars(ucnv, p->pattern->ptr, p->pattern->allocated, pattern, len, &status);
@@ -82,14 +83,14 @@ static engine_return_t engine_fixed_match(void *data, const UString *subject)
     FETCH_DATA(data, p, fixed_pattern_t);
 
     // TODO: find better, inappropriate for binary file
-    if (wFlag) {
+    if (p->word_bounded) {
         UChar *m;
 
         m = u_strFindFirst(subject->ptr, subject->len, p->pattern->ptr, p->pattern->len);
         if (NULL == m) {
             return ENGINE_NO_MATCH;
         } else {
-            return IS_BOUNDARY_MATCH(p->pattern, subject, m) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH;
+            return IS_BOUNDED_MATCH(p->pattern, subject, m) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH;
         }
     } else {
         return (NULL != u_strFindFirst(subject->ptr, subject->len, p->pattern->ptr, p->pattern->len) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
@@ -105,7 +106,7 @@ static engine_return_t engine_fixed_match_all(void *data, const UString *subject
     matches = pos = 0;
     while (NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, p->pattern->ptr, p->pattern->len))) {
         pos = m - subject->ptr;
-        if (!wFlag || (wFlag && IS_BOUNDARY_MATCH(p->pattern, subject, m))) {
+        if (!p->word_bounded || (p->word_bounded && IS_BOUNDED_MATCH(p->pattern, subject, m))) {
             matches++;
             if (interval_add(intervals, subject->len, pos, pos + p->pattern->len)) {
                 return ENGINE_WHOLE_LINE_MATCH;

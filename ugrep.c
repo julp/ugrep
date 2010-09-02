@@ -83,7 +83,6 @@ UBool rFlag = FALSE;
 UBool xFlag = FALSE;
 UBool nFlag = FALSE;
 UBool vFlag = FALSE;
-UBool wFlag = FALSE;
 UBool cFlag = FALSE;
 UBool lFlag = FALSE;
 UBool LFlag = FALSE;
@@ -391,7 +390,7 @@ static void usage(void)
 
 /* ========== adding patterns ========== */
 
-void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_type, UBool case_insensitive)
+void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_type, UBool case_insensitive, UBool word_bounded)
 {
     void *data;
     pattern_data_t *pdata;
@@ -400,7 +399,7 @@ void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_t
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compile(pattern, length, case_insensitive))) {
+    if (NULL == (data = engines[!!pattern_type]->compile(pattern, length, case_insensitive, word_bounded))) {
         // TODO
         exit(UGREP_EXIT_FAILURE);
     }
@@ -410,7 +409,7 @@ void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_t
     slist_append(l, pdata);
 }
 
-void add_patternC(slist_t *l, const char *pattern, int pattern_type, UBool case_insensitive)
+void add_patternC(slist_t *l, const char *pattern, int pattern_type, UBool case_insensitive, UBool word_bounded)
 {
     void *data;
     pattern_data_t *pdata;
@@ -419,7 +418,7 @@ void add_patternC(slist_t *l, const char *pattern, int pattern_type, UBool case_
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compileC(pattern, case_insensitive))) {
+    if (NULL == (data = engines[!!pattern_type]->compileC(pattern, case_insensitive, word_bounded))) {
         // TODO
         exit(UGREP_EXIT_FAILURE);
     }
@@ -429,7 +428,7 @@ void add_patternC(slist_t *l, const char *pattern, int pattern_type, UBool case_
     slist_append(l, pdata);
 }
 
-void source_patterns(const char *filename, slist_t *l, int pattern_type, UBool case_insensitive)
+void source_patterns(const char *filename, slist_t *l, int pattern_type, UBool case_insensitive, UBool word_bounded)
 {
     fd_t fd;
     UString *ustr;
@@ -443,7 +442,7 @@ void source_patterns(const char *filename, slist_t *l, int pattern_type, UBool c
     }
     while (fd_readline(&fd, ustr)) {
         ustring_chomp(ustr);
-        add_pattern(l, ustr->ptr, ustr->len, pattern_type, case_insensitive);
+        add_pattern(l, ustr->ptr, ustr->len, pattern_type, case_insensitive, word_bounded);
     }
     fd_close(&fd);
     ustring_destroy(ustr);
@@ -880,10 +879,12 @@ int main(int argc, char **argv)
     int color;
     int matches;
     UBool iFlag;
+    UBool wFlag;
     int pattern_type; // -E/F
 
-    iFlag = FALSE;
     matches = 0;
+    wFlag = FALSE;
+    iFlag = FALSE;
     color = COLOR_AUTO;
     pattern_type = PATTERN_AUTO;
 
@@ -934,10 +935,10 @@ int main(int argc, char **argv)
                 cFlag = TRUE;
                 break;
             case 'e':
-                add_patternC(patterns, optarg, pattern_type, iFlag); // return value? (errors)
+                add_patternC(patterns, optarg, pattern_type, iFlag, wFlag); // return value? (errors)
                 break;
             case 'f':
-                source_patterns(optarg, patterns, pattern_type, iFlag); // return value? (errors)
+                source_patterns(optarg, patterns, pattern_type, iFlag, wFlag); // return value? (errors)
                 break;
             case 'h':
                 file_print = FALSE;
@@ -1024,7 +1025,7 @@ int main(int argc, char **argv)
         if (argc < 1) {
             usage();
         } else {
-            add_patternC(patterns, *argv++, pattern_type, iFlag);
+            add_patternC(patterns, *argv++, pattern_type, iFlag, wFlag);
             argc--;
         }
     }

@@ -126,8 +126,8 @@ typedef enum {
 } engine_return_t;
 
 typedef struct {
-    void *(*compile)(const UChar *, int32_t, UBool case_insensitive);
-    void *(*compileC)(const char *, UBool case_insensitive);
+    void *(*compile)(const UChar *, int32_t, UBool case_insensitive, UBool word_bounded);
+    void *(*compileC)(const char *, UBool case_insensitive, UBool word_bounded);
     void (*pre_exec)(void *, UString *);
     engine_return_t (*match)(void *, const UString *);
     engine_return_t (*match_all)(void *, const UString *, slist_t *);

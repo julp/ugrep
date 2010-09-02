@@ -1,6 +1,8 @@
 #include "ugrep.h"
 
-static void *engine_icure_compile(const UChar *upattern, int32_t length, UBool case_insensitive)
+// const UChar b[] = {0x005c, 0x0062, U_NUL};
+
+static void *engine_icure_compile(const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
 {
     UFILE *ustderr;
     UParseError pe;
@@ -26,7 +28,7 @@ static void *engine_icure_compile(const UChar *upattern, int32_t length, UBool c
     return uregex;
 }
 
-static void *engine_icure_compileC(const char *pattern, UBool case_insensitive)
+static void *engine_icure_compileC(const char *pattern, UBool case_insensitive, UBool word_bounded)
 {
     UParseError pe;
     UErrorCode status;
