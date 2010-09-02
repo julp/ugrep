@@ -1,7 +1,5 @@
 #include "ugrep.h"
 
-#include <unicode/ubrk.h>
-
 extern UBool wFlag; // for testing
 
 #define WORD_BOUNDARY(c) \
@@ -91,25 +89,6 @@ static engine_return_t engine_fixed_match(void *data, const UString *subject)
         if (NULL == m) {
             return ENGINE_NO_MATCH;
         } else {
-#if 0
-            UBool ret;
-            UErrorCode status;
-            UBreakIterator *bi;
-
-            status = U_ZERO_ERROR;
-            bi = ubrk_open(UBRK_WORD, "", &subject->ptr, subject->len, &status);
-            if (U_FAILURE(status)) {
-                icu(status, "ubrk_open");
-                return ENGINE_FAILURE;
-            }
-            u_printf("start = %d ; end = %d ; string = %S\n", ubrk_isBoundary(bi, m - subject->ptr - 1), ubrk_isBoundary(bi, m - subject->ptr + p->pattern->len), subject->ptr);
-            u_printf("start = %C ; end = %C\n", subject->ptr[m - subject->ptr], subject->ptr[m - subject->ptr + p->pattern->len])
-            ret = ubrk_isBoundary(bi, m - subject->ptr - 1) && ubrk_isBoundary(bi, m - subject->ptr + p->pattern->len);
-            ubrk_close(bi);
-
-            return (ret ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
-#endif
-
             return IS_BOUNDARY_MATCH(p->pattern, subject, m) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH;
         }
     } else {
@@ -160,28 +139,6 @@ static void engine_fixed_destroy(void *data)
 
     pattern_destroy(p);
 }
-
-#if 0
-static void engine_fixed_replace1(void *data, const UString *subject)
-{
-    UChar *m;
-    int32_t pos, upattern_len;
-    FETCH_DATA(data, upattern, UChar);
-    UChar after[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
-    UChar before[] = {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL};
-    int32_t before_len = ARRAY_SIZE(before) - 1, after_len = ARRAY_SIZE(after) - 1;
-
-    pos = 0;
-    upattern_len = u_strlen(upattern);
-    // TODO: found a case insensitive way
-    while (NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, upattern, upattern_len))) {
-        pos = m - subject->ptr;
-        ustring_insert_len(subject, pos, before, before_len);
-        ustring_insert_len(subject, pos + before_len + upattern_len, after, after_len);
-        pos += before_len + upattern_len + after_len;
-    }
-}
-#endif
 
 engine_t fixed_engine = {
     engine_fixed_compile,

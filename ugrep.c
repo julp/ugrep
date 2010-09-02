@@ -15,11 +15,15 @@
 #define MAX_ENC_REL_LEN 4096 // Maximum relevant length for encoding analyse (in bytes)
 #define MAX_BIN_REL_LEN 4096 // Maximum relevant length for binary analyse
 
-#define EXIT_USAGE 2
-
-#define RED(str) "\33[1;31m" str "\33[0m"
-#define GREEN(str) "\33[1;32m" str "\33[0m"
-#define YELLOW(str) "\33[1;33m" str "\33[0m"
+#ifdef DEBUG
+# define RED(str)    "\33[1;31m" str "\33[0m"
+# define GREEN(str)  "\33[1;32m" str "\33[0m"
+# define YELLOW(str) "\33[1;33m" str "\33[0m"
+#else
+# define RED(str)    str
+# define GREEN(str)  str
+# define YELLOW(str) str
+#endif /* DEBUG */
 
 enum {
     BIN_FILE_BIN,
@@ -75,14 +79,8 @@ slist_element_t *p = NULL;
 reader_t *default_reader = NULL;
 slist_t *intervals = NULL;
 
-// TODO: regroup all options like:
-// UBool options[CHAR_MAX] = { FALSE };
-// SET_FLAG(name, value) options[(unsigned char) *(#name)] = value
-// GET_FLAG(name) options[(unsigned char) *(#name)]
-// ?
 UBool rFlag = FALSE;
 UBool xFlag = FALSE;
-UBool iFlag = FALSE; // TODO: not needed out of main?
 UBool nFlag = FALSE;
 UBool vFlag = FALSE;
 UBool wFlag = FALSE;
@@ -128,7 +126,7 @@ void report(int type, const char *format, ...)
                 fprintf(stderr, "[ " YELLOW("WARN") " ] ");
                 break;
             case FATAL:
-                fprintf(stderr, "[ " RED("ERROR") " ] ");
+                fprintf(stderr, "[ " RED("ERR ") " ] ");
                 break;
         }
         va_start(args, format);
@@ -507,11 +505,11 @@ typedef struct {
 } color_t;
 
 color_t colors[] = {
-    {"single-match",  {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0031, 0x006d, U_NUL}},
-    {"line-match",    {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0033, 0x006d, U_NUL}},
-    {"file-match",    {0x001b, 0x005b, 0x0033, 0x0035, 0x006d, U_NUL}},
-    {"file-no-match", {0x001b, 0x005b, 0x0033, 0x0035, 0x006d, U_NUL}},
-    {"line-number",   {0x001b, 0x005b, 0x0033, 0x0032, 0x006d, U_NUL}},
+    {"single-match",  {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0034, 0x006d, U_NUL}},
+    {"line-match",    {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0036, 0x006d, U_NUL}},
+    {"file-match",    {0x001b, 0x005b, 0x0033, 0x0032, 0x006d, U_NUL}},
+    {"file-no-match", {0x001b, 0x005b, 0x0033, 0x0031, 0x006d, U_NUL}},
+    {"line-number",   {0x001b, 0x005b, 0x0033, 0x0035, 0x006d, U_NUL}},
     {NULL,            {U_NUL}}
 };
 
@@ -665,13 +663,13 @@ nextline:
     }
 }
 
-static void print_file(const char *filename, UBool sep, UBool eol)
+static void print_file(const char *filename, UBool no_match, UBool sep, UBool eol)
 {
-    if (colorize && *colors[FILE_MATCH].value) {
-        u_file_write(colors[FILE_MATCH].value, -1, ustdout);
+    if (colorize && *colors[no_match ? FILE_NO_MATCH : FILE_MATCH].value) {
+        u_file_write(colors[no_match ? FILE_NO_MATCH : FILE_MATCH].value, -1, ustdout);
     }
     u_fprintf(ustdout, "%s", filename);
-    if (colorize && *colors[FILE_MATCH].value) {
+    if (colorize && *colors[no_match ? FILE_NO_MATCH : FILE_MATCH].value) {
         u_file_write(reset, reset_len, ustdout);
     }
     if (sep) {
@@ -755,11 +753,9 @@ For fixed string, make a lowered copy of ustr which on working
                 if (matches > 0) {
                     if (!vFlag) {
                         if (file_print) {
-                            //u_fprintf(ustdout, "\33[35m%s\33[0m:", fd->filename);
-                            print_file(fd->filename, TRUE, FALSE);
+                            print_file(fd->filename, FALSE, TRUE, FALSE);
                         }
                         if (nFlag) {
-                            //u_fprintf(ustdout, "\33[32m%d\33[0m:", fd->lineno);
                             print_line(fd->lineno, TRUE, FALSE);
                         }
                         if (colorize) {
@@ -793,11 +789,9 @@ For fixed string, make a lowered copy of ustr which on working
                 } else {
                     if (vFlag) {
                         if (file_print) {
-                            //u_fprintf(ustdout, "\33[35m%s\33[0m:", fd->filename);
-                            print_file(fd->filename, TRUE, FALSE);
+                            print_file(fd->filename, FALSE, TRUE, FALSE);
                         }
                         if (nFlag) {
-                            //u_fprintf(ustdout, "\33[32m%d\33[0m:", fd->lineno);
                             print_line(fd->lineno, TRUE, FALSE);
                         }
                         u_fputs(ustr->ptr, ustdout);
@@ -808,16 +802,13 @@ For fixed string, make a lowered copy of ustr which on working
         if (!line_print) {
             if (cFlag) {
                 if (file_print) {
-                    //u_fprintf(ustdout, "\33[35m%s\33[0m:", fd->filename);
-                    print_file(fd->filename, TRUE, FALSE);
+                    print_file(fd->filename, fd->matches == 0, TRUE, FALSE);
                 }
                 u_fprintf(ustdout, "%d\n", fd->matches);
             } else if (lFlag && fd->matches) {
-                //u_fprintf(ustdout, "\33[35m%s\33[0m\n", fd->filename);
-                print_file(fd->filename, FALSE, TRUE);
+                print_file(fd->filename, FALSE, FALSE, TRUE);
             } else if (LFlag && !fd->matches) {
-                //u_fprintf(ustdout, "\33[35m%s\33[0m\n", fd->filename);
-                print_file(fd->filename, FALSE, TRUE);
+                print_file(fd->filename, TRUE, FALSE, TRUE);
             }
         }
 endloop:
@@ -840,17 +831,13 @@ static int procdir(fd_t *fd, char **dirname)
     ftsflags |= FTS_NOSTAT | FTS_NOCHDIR;
 
     if (NULL == (fts = fts_open(dirname, ftsflags, NULL))) {
-        // TODO
         msg(FATAL, "can't fts_open %s: %s", *dirname, strerror(errno));
-        exit(UGREP_EXIT_FAILURE);
     }
     while (NULL != (p = fts_read(fts))) {
         switch (p->fts_info) {
             case FTS_DNR:
             case FTS_ERR:
-                // TODO
                 msg(FATAL, "fts_read failed on %s: %s", p->fts_path, strerror(p->fts_errno));
-                exit(UGREP_EXIT_FAILURE);
                 break;
             case FTS_D:
             case FTS_DP:
@@ -892,8 +879,10 @@ int main(int argc, char **argv)
     fd_t fd;
     int color;
     int matches;
+    UBool iFlag;
     int pattern_type; // -E/F
 
+    iFlag = FALSE;
     matches = 0;
     color = COLOR_AUTO;
     pattern_type = PATTERN_AUTO;
