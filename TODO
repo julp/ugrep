@@ -24,3 +24,5 @@ Ideas :
 Known bugs:
   - ICU is unable to guess default codepage when it doesn't appear in LANG environment variable
     eg: with LANG=fr_FR, codepage becomes UTF-8 instead of ISO-8859-1. So explicit it (LANG=fr_FR.ISO-8859-1 in this case).
+
+  - bzlib read 0 byte of an uncompressed/normal file (so no error, file skipped)
