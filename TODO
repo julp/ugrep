@@ -4,6 +4,7 @@ TODO:
     * implement recursive option (and exclude options: exclude, exclude-dir, include)
     * implement -w option
     * improve error handling (fd) and clean up msg or relative
+    * implement context options (-A, -B, -C, -\d+)
 
   - Normal:
     * write a man page
