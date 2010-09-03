@@ -11,7 +11,7 @@ error_t *error_vnew(int type, const char *format, va_list args)
     error = mem_new(*error);
     length = u_vsnprintf(buffer, ERROR_MAX_LEN, format, args);
     error->type = type;
-    error->message = mem_new_n(*error->message, length);
+    error->message = mem_new_n(*error->message, length + 1);
     u_strcpy(error->message, buffer);
 
     return error;
