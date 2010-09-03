@@ -115,21 +115,22 @@ typedef struct {
 
 void error_destroy(error_t *);
 error_t *error_new(int, const char *, ...);
-void error_set(error_t **error, int type, const char *format, ...);
+void error_propagate(error_t **, error_t *);
+void error_set(error_t **, int, const char *, ...);
 error_t *error_vnew(int, const char *, va_list);
 /* </error.c> */
 
 typedef struct {
     const char *name;
-    void *(*open)(const char *, int);
+    void *(*open)(const char *, int); // can throw error
     void (*close)(void *);
     UBool (*eof)(void *);
     UBool (*seekable)(void *);
-    UBool (*readline)(void *, UString *);
+    UBool (*readline)(void *, UString *); // can throw error
     size_t (*readbytes)(void *, char *, size_t);
-    size_t (*readuchars)(void *, UChar32 *, size_t);
+    size_t (*readuchars)(void *, UChar32 *, size_t); // can throw error
     void (*set_signature_length)(void *, size_t);
-    void (*set_encoding)(void *, const char *);
+    void (*set_encoding)(void *, const char *); // can throw error
     void (*rewind)(void *);
 } reader_t;
 

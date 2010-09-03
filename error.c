@@ -55,3 +55,18 @@ void error_destroy(error_t *error)
         free(error);
     }
 }
+
+void error_propagate(error_t **dst, error_t *src)
+{
+    if (NULL == dst) {
+        if (NULL != src) {
+            error_destroy(src);
+        }
+    } else {
+        if (NULL != *dst) {
+            debug("overwrite attempt of a previous error: %s\nBy: %s", (*dst)->message, src->message);
+        } else {
+            *dst = src;
+        }
+    }
+}
