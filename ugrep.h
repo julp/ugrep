@@ -58,9 +58,6 @@ const char *ubasename(const char *);
 # define debug(format, ...) \
     msg(INFO, format, ## __VA_ARGS__)
 
-# define error(error, type, format, ...) \
-    error_set(error, type, "%s:%d:" format " in %s()\n", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
-
 # define u_printf(...)                                \
     do {                                              \
         UFILE *ustdout = u_finit(stdout, NULL, NULL); \
@@ -70,18 +67,15 @@ const char *ubasename(const char *);
 # define msg(type, format, ...) \
     report(type, format "\n", ## __VA_ARGS__)
 
-# define error(error, type, format, ...) \
-    error_set(error, type, format "\n", ## __VA_ARGS__)
-
 # define debug(format, ...) /* NOP */
 #endif /* DEBUG */
 
-/* TODO: drop icu(), replace it by icu_error() */
+/* TODO: drop icu(), replace it by icu_error_set() */
 # define icu(status, function) \
     msg(FATAL, "ICU Error \"%s\" from " function "()", u_errorName(status))
 
-# define icu_error(error, type, status, function) \
-    error(error, type, "ICU Error \"%s\" from " function "()", u_errorName(status))
+# define icu_error_set(error, type, status, function) \
+    error_set(error, type, "ICU Error \"%s\" from " function "()", u_errorName(status))
 
 # define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
@@ -116,13 +110,19 @@ typedef struct {
 void error_destroy(error_t *);
 error_t *error_new(int, const char *, ...);
 void error_propagate(error_t **, error_t *);
+#ifdef DEBUG
+# define error_set(error, type, format, ...) \
+    _error_set(error, type, "%s:%d:" format " in %s()", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
+void _error_set(error_t **, int, const char *, ...);
+#else
 void error_set(error_t **, int, const char *, ...);
+#endif /* DEBUG */
 error_t *error_vnew(int, const char *, va_list);
 /* </error.c> */
 
 typedef struct {
     const char *name;
-    void *(*open)(const char *, int); // can throw error
+    void *(*open)(error_t **, const char *, int);
     void (*close)(void *);
     UBool (*eof)(void *);
     UBool (*seekable)(void *);

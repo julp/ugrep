@@ -121,7 +121,8 @@ int verbosity = WARN;
 
 void print_error(error_t *error)
 {
-    if (error && error->type >= verbosity) {
+    debug("error is %s", error ? "NOT NULL" : "NULL");
+    if (NULL != error && error->type >= verbosity) {
         int type;
         UFILE *ustderr;
 
@@ -233,7 +234,7 @@ typedef struct {
     UBool binary;
 } fd_t;
 
-UBool fd_open(fd_t *fd, const char *filename)
+UBool fd_open(error_t **error, fd_t *fd, const char *filename)
 {
     int fsfd;
     /*struct stat st;*/
@@ -244,7 +245,7 @@ UBool fd_open(fd_t *fd, const char *filename)
     size_t buffer_len;
 
     /*if (-1 == (stat(filename, &st))) {
-        msg(WARN, "can't stat %s: %s", filename, strerror(errno));
+        error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
         return FALSE;
     }*/
 
@@ -252,7 +253,7 @@ UBool fd_open(fd_t *fd, const char *filename)
 
     if (!strcmp("-", filename)) {
         if (!stdin_is_tty()) {
-            msg(WARN, "Sorry: cannot work with redirected and/or piped stdin (not seekable)");
+            error_set(error, WARN, "Sorry, can't work with redirected or piped stdin (not seekable, sources can use many codepage). Skip stdin.");
             goto failed;
         }
         fd->filename = "(standard input)";
@@ -261,12 +262,12 @@ UBool fd_open(fd_t *fd, const char *filename)
     } else {
         fd->filename = filename;
         if (-1 == (fsfd = open(filename, O_RDONLY))) {
-            msg(WARN, "can't open %s: %s", filename, strerror(errno));
+            error_set(error, WARN, "can't open %s: %s", filename, strerror(errno));
             goto failed;
         }
     }
 
-    if (NULL == (fd->reader_data = fd->reader->open(filename, fsfd))) {
+    if (NULL == (fd->reader_data = fd->reader->open(error, filename, fsfd))) {
         goto failed;
     }
 
@@ -291,22 +292,22 @@ UBool fd_open(fd_t *fd, const char *filename)
 
                 csd = ucsdet_open(&status);
                 if (U_FAILURE(status)) {
-                    icu(status, "ucsdet_open");
+                    icu_error_set(error, WARN, status, "ucsdet_open");
                     goto failed;
                 }
                 ucsdet_setText(csd, buffer, buffer_len, &status);
                 if (U_FAILURE(status)) {
-                    icu(status, "ucsdet_setText");
+                    icu_error_set(error, WARN, status, "ucsdet_setText");
                     goto failed;
                 }
                 ucm = ucsdet_detect(csd, &status);
                 if (U_FAILURE(status)) {
-                    icu(status, "ucsdet_detect");
+                    icu_error_set(error, WARN, status, "ucsdet_detect");
                     goto failed;
                 }
                 encoding = ucsdet_getName(ucm, &status);
                 if (U_FAILURE(status)) {
-                    icu(status, "ucsdet_getName");
+                    icu_error_set(error, WARN, status, "ucsdet_getName");
                     goto failed;
                 }
                 ucsdet_close(csd);
@@ -318,7 +319,7 @@ UBool fd_open(fd_t *fd, const char *filename)
             fd->reader->set_encoding(fd->reader_data, encoding); // a tester ?
             fd->reader->rewind(fd->reader_data);
         } else {
-            icu(status, "ucnv_detectUnicodeSignature");
+            icu_error_set(error, WARN, status, "ucnv_detectUnicodeSignature");
             goto failed;
         }
     }
@@ -424,64 +425,67 @@ static void usage(void)
 
 /* ========== adding patterns ========== */
 
-void add_pattern(slist_t *l, const UChar *pattern, int32_t length, int pattern_type, UBool case_insensitive, UBool word_bounded)
+UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t length, int pattern_type, UBool case_insensitive, UBool word_bounded)
 {
     void *data;
-    error_t *error;
     pattern_data_t *pdata;
 
-    error = NULL;
     pdata = mem_new(*pdata);
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compile(&error, pattern, length, case_insensitive, word_bounded))) {
-        print_error(error);
+    if (NULL == (data = engines[!!pattern_type]->compile(error, pattern, length, case_insensitive, word_bounded))) {
+        return FALSE;
     }
     pdata->pattern = data;
     pdata->engine = engines[!!pattern_type];
 
     slist_append(l, pdata);
+
+    return TRUE;
 }
 
-void add_patternC(slist_t *l, const char *pattern, int pattern_type, UBool case_insensitive, UBool word_bounded)
+UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern_type, UBool case_insensitive, UBool word_bounded)
 {
     void *data;
-    error_t *error;
     pattern_data_t *pdata;
 
-    error = NULL;
     pdata = mem_new(*pdata);
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compileC(&error, pattern, case_insensitive, word_bounded))) {
-        print_error(error);
+    if (NULL == (data = engines[!!pattern_type]->compileC(error, pattern, case_insensitive, word_bounded))) {
+        return FALSE;
     }
     pdata->pattern = data;
     pdata->engine = engines[!!pattern_type];
 
     slist_append(l, pdata);
+
+    return TRUE;
 }
 
-void source_patterns(const char *filename, slist_t *l, int pattern_type, UBool case_insensitive, UBool word_bounded)
+UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pattern_type, UBool case_insensitive, UBool word_bounded)
 {
     fd_t fd;
     UString *ustr;
 
     fd.reader = &stdio_reader;
 
-    ustr = ustring_new();
-    if (!fd_open(&fd, filename)) {
-        // TODO
-        exit(UGREP_EXIT_FAILURE);
+    if (!fd_open(error, &fd, filename)) {
+        return FALSE;
     }
+    ustr = ustring_new();
     while (fd_readline(&fd, ustr)) {
         ustring_chomp(ustr);
-        add_pattern(l, ustr->ptr, ustr->len, pattern_type, case_insensitive, word_bounded);
+        if (!add_pattern(error, l, ustr->ptr, ustr->len, pattern_type, case_insensitive, word_bounded)) {
+            return FALSE;
+        }
     }
     fd_close(&fd);
     ustring_destroy(ustr);
+
+    return TRUE;
 }
 
 static void pattern_destroy(void *data)
@@ -736,9 +740,12 @@ static void print_line(int lineno, UBool sep, UBool eol)
 
 static int procfile(fd_t *fd, const char *filename)
 {
+    error_t *error;
+
+    error = NULL;
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
 
-    if (fd_open(fd, filename)) {
+    if (fd_open(&error, fd, filename)) {
         if (BIN_FILE_TEXT != binbehave) {
             fd->binary = fd_is_binary(fd);
             debug("%s, binary file : %s", filename, fd->binary ? RED("yes") : GREEN("no"));
@@ -758,10 +765,8 @@ static int procfile(fd_t *fd, const char *filename)
             ustring_chomp(ustr);
             slist_clean(intervals);
             for (p = patterns->head; NULL != p; p = p->next) {
-                error_t *error;
                 FETCH_DATA(p->data, pdata, pattern_data_t);
 
-                error = NULL;
                 // <very bad: drop this ASAP!>
 /*
 For fixed string, make a lowered copy of ustr which on working
@@ -853,6 +858,8 @@ For fixed string, make a lowered copy of ustr which on working
         }
 endloop:
         fd_close(fd);
+    } else {
+        print_error(error);
     }
 
     return fd->matches;
@@ -921,16 +928,18 @@ int main(int argc, char **argv)
     int matches;
     UBool iFlag;
     UBool wFlag;
+    error_t *error;
     int pattern_type; // -E/F
 
     matches = 0;
+    error = NULL;
     wFlag = FALSE;
     iFlag = FALSE;
     color = COLOR_AUTO;
     pattern_type = PATTERN_AUTO;
 
     if (0 != atexit(exit_cb)) {
-        msg(FATAL, "can't register atexit callback");
+        fputs("can't register atexit() callback", stderr);
         return UGREP_EXIT_FAILURE;
     }
 
@@ -976,10 +985,14 @@ int main(int argc, char **argv)
                 cFlag = TRUE;
                 break;
             case 'e':
-                add_patternC(patterns, optarg, pattern_type, iFlag, wFlag); // return value? (errors)
+                if (!add_patternC(&error, patterns, optarg, pattern_type, iFlag, wFlag)) {
+                    print_error(error);
+                }
                 break;
             case 'f':
-                source_patterns(optarg, patterns, pattern_type, iFlag, wFlag); // return value? (errors)
+                if (!source_patterns(&error, optarg, patterns, pattern_type, iFlag, wFlag)) {
+                    print_error(error);
+                }
                 break;
             case 'h':
                 file_print = FALSE;
@@ -1066,7 +1079,9 @@ int main(int argc, char **argv)
         if (argc < 1) {
             usage();
         } else {
-            add_patternC(patterns, *argv++, pattern_type, iFlag, wFlag);
+            if (!add_patternC(&error, patterns, *argv++, pattern_type, iFlag, wFlag)) {
+                print_error(error);
+            }
             argc--;
         }
     }

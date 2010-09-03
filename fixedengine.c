@@ -44,7 +44,7 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, UBool c
     status = U_ZERO_ERROR;
     ucnv = ucnv_open(NULL, &status);
     if (U_FAILURE(status)) {
-        icu_error(error, FATAL, status, "ucnv_open");
+        icu_error_set(error, FATAL, status, "ucnv_open");
         return NULL;
     }
     len = strlen(pattern);
@@ -56,7 +56,7 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, UBool c
     p->pattern->ptr[p->pattern->len] = U_NUL;
     ucnv_close(ucnv);
     if (U_FAILURE(status)) {
-        icu_error(error, FATAL, status, "ucnv_toUChars");
+        icu_error_set(error, FATAL, status, "ucnv_toUChars");
         pattern_destroy(p);
         return NULL;
     }

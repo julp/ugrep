@@ -29,7 +29,11 @@ error_t *error_new(int type, const char *format, ...)
     return error;
 }
 
+#ifdef DEBUG
+void _error_set(error_t **error, int type, const char *format, ...)
+#else
 void error_set(error_t **error, int type, const char *format, ...)
+#endif /* DEBUG */
 {
     va_list args;
     error_t *tmp;

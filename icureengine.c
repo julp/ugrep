@@ -19,10 +19,10 @@ static void *engine_icure_compile(error_t **error, const UChar *upattern, int32_
             /*u_fprintf(ustderr, "Invalid pattern: error at offset %d\n", pe.offset);
             u_fprintf(ustderr, "\t%S\n", upattern);
             u_fprintf(ustderr, "\t%*c\n", pe.offset, '^');*/
-            error(error, FATAL, "Invalid pattern: error at offset %d\n\t%S\n\t%*c\n", pe.offset, upattern, pe.offset, '^');
+            error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%S\n\t%*c\n", pe.offset, upattern, pe.offset, '^');
         } else {
             //icu(status, "uregex_open");
-            icu_error(error, FATAL, status, "uregex_open");
+            icu_error_set(error, FATAL, status, "uregex_open");
         }
         return NULL;
     }
@@ -44,10 +44,10 @@ static void *engine_icure_compileC(error_t **error, const char *pattern, UBool c
             /*fprintf(stderr, "Invalid pattern: error at offset %d\n", pe.offset);
             fprintf(stderr, "\t%s\n", pattern);
             fprintf(stderr, "\t%*c\n", pe.offset, '^');*/
-            error(error, FATAL, "Invalid pattern: error at offset %d\n\t%s\n\t%*c\n", pe.offset, pattern, pe.offset, '^');
+            error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%s\n\t%*c\n", pe.offset, pattern, pe.offset, '^');
         } else {
             //icu(status, "uregex_openC");
-            icu_error(error, FATAL, status, "uregex_openC");
+            icu_error_set(error, FATAL, status, "uregex_openC");
         }
         return NULL;
     }
@@ -69,12 +69,12 @@ static engine_return_t engine_icure_match(error_t **error, void *data, const USt
     status = U_ZERO_ERROR;
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
-        icu_error(error, FATAL, status, "uregex_setText");
+        icu_error_set(error, FATAL, status, "uregex_setText");
         return ENGINE_FAILURE;
     }
     ret = uregex_find(uregex, 0, &status);
     if (U_FAILURE(status)) {
-        icu_error(error, FATAL, status, "uregex_find");
+        icu_error_set(error, FATAL, status, "uregex_find");
         return ENGINE_FAILURE;
     }
 
@@ -92,19 +92,19 @@ static engine_return_t engine_icure_match_all(error_t **error, void *data, const
     status = U_ZERO_ERROR;
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
-        icu_error(error, FATAL, status, "uregex_setText");
+        icu_error_set(error, FATAL, status, "uregex_setText");
         return ENGINE_FAILURE;
     }
     while (uregex_findNext(uregex, &status)) {
         matches++;
         l = uregex_start(uregex, 0, &status);
         if (U_FAILURE(status)) {
-            icu_error(error, FATAL, status, "uregex_start");
+            icu_error_set(error, FATAL, status, "uregex_start");
             return ENGINE_FAILURE;
         }
         u = uregex_end(uregex, 0, &status);
         if (U_FAILURE(status)) {
-            icu_error(error, FATAL, status, "uregex_end");
+            icu_error_set(error, FATAL, status, "uregex_end");
             return ENGINE_FAILURE;
         }
         if (interval_add(intervals, subject->len, l, u)) {
@@ -112,7 +112,7 @@ static engine_return_t engine_icure_match_all(error_t **error, void *data, const
         }
     }
     if (U_FAILURE(status)) {
-        icu_error(error, FATAL, status, "uregex_findNext");
+        icu_error_set(error, FATAL, status, "uregex_findNext");
         return ENGINE_FAILURE;
     }
     /*uregex_reset(uregex, 0, &status);
@@ -133,12 +133,12 @@ static engine_return_t engine_icure_whole_line_match(error_t **error, void *data
     status = U_ZERO_ERROR;
     uregex_setText(uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
-        icu_error(error, FATAL, status, "uregex_setText");
+        icu_error_set(error, FATAL, status, "uregex_setText");
         return ENGINE_FAILURE;
     }
     ret = uregex_matches(uregex, -1, &status);
     if (U_FAILURE(status)) {
-        icu_error(error, FATAL, status, "uregex_matches");
+        icu_error_set(error, FATAL, status, "uregex_matches");
         return ENGINE_FAILURE;
     }
 

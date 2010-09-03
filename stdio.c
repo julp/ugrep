@@ -16,7 +16,7 @@ typedef struct {
     size_t signature_length;
 } stdiofd_t;
 
-static void *stdiofd_open(const char *filename, int fd)
+static void *stdiofd_open(error_t **error, const char *filename, int fd)
 {
     stdiofd_t *stdiofd;
 
@@ -24,7 +24,7 @@ static void *stdiofd_open(const char *filename, int fd)
     //if (NULL == (stdiofd->fp = fopen(filename, "r"))) {
     //if (NULL == (stdiofd->ufp = u_fopen(filename, "r", NULL, NULL))) {
     if (NULL == (stdiofd->fp = fdopen(fd, "r"))) {
-        msg(WARN, "can't open %s: %s", filename, strerror(errno));
+        error_set(error, WARN, "can't open %s: %s", filename, strerror(errno));
         goto failed;
     }
     if (fd == STDIN_FILENO) {
@@ -95,11 +95,11 @@ static size_t stdiofd_readbytes(void *data, char *buffer, size_t max_len)
     FETCH_DATA(data, stdiofd, stdiofd_t);
 
     /*if (-1 == (fd = fileno(stdiofd->fp))) {
-        msg("fileno %s: %s", "TODO: filename", strerror(errno));
+        fprintf(stderr, "fileno %s: %s\n", "TODO: filename", strerror(errno));
         return 0;
     }
     if (-1 == (fstat(fd, &st))) {
-        msg("can't stat %s: %s", "TODO: filename", strerror(errno));
+        fprintf(stderr, "can't stat %s: %s\n", "TODO: filename", strerror(errno));
         return 0;
     }*/
     return fread(buffer, sizeof(*buffer), max_len/*st.st_size < max_len ? st.st_size : max_len*/, stdiofd->fp);
