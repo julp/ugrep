@@ -4,24 +4,17 @@
 
 static void *engine_icure_compile(error_t **error, const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
 {
-    UFILE *ustderr;
     UParseError pe;
     UErrorCode status;
     URegularExpression *uregex;
 
     status = U_ZERO_ERROR;
-    ustderr = u_finit(stdout, NULL, NULL);
     /* don't make a copy of upattern, ICU does this */
     uregex = uregex_open(upattern, length, case_insensitive ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
     if (U_FAILURE(status)) {
         if (U_REGEX_RULE_SYNTAX == status) {
-            //u_fprintf(ustderr, "Error at offset %d %S %S\n", pe.offset, pe.preContext, pe.postContext);
-            /*u_fprintf(ustderr, "Invalid pattern: error at offset %d\n", pe.offset);
-            u_fprintf(ustderr, "\t%S\n", upattern);
-            u_fprintf(ustderr, "\t%*c\n", pe.offset, '^');*/
             error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%S\n\t%*c\n", pe.offset, upattern, pe.offset, '^');
         } else {
-            //icu(status, "uregex_open");
             icu_error_set(error, FATAL, status, "uregex_open");
         }
         return NULL;
@@ -46,7 +39,6 @@ static void *engine_icure_compileC(error_t **error, const char *pattern, UBool c
             fprintf(stderr, "\t%*c\n", pe.offset, '^');*/
             error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%s\n\t%*c\n", pe.offset, pattern, pe.offset, '^');
         } else {
-            //icu(status, "uregex_openC");
             icu_error_set(error, FATAL, status, "uregex_openC");
         }
         return NULL;
