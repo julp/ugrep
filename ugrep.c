@@ -880,8 +880,13 @@ static int procdir(fd_t *fd, char **dirname)
     int ftsflags;
 
     matches = 0;
-    ftsflags = 0;
-    // TODO: options H/P/S
+    /*ftsflags = 0;
+    if (Hflag)
+        ftsflags = FTS_COMFOLLOW;
+    if (Pflag)
+        ftsflags = FTS_PHYSICAL;
+    if (Sflag)*/
+        ftsflags = FTS_LOGICAL;
     ftsflags |= FTS_NOSTAT | FTS_NOCHDIR;
 
     if (NULL == (fts = fts_open(dirname, ftsflags, NULL))) {
