@@ -3,8 +3,9 @@ TODO:
     * find a (proper) way to get insitive case matching with fixed strings
     * implement recursive option (and exclude options: exclude, exclude-dir, include)
     * implement -w option
-    * improve error handling (fd) and clean up msg or relative
+    * extend error handling (fd) and clean up msg or relative
     * implement context options (-A, -B, -C, -\d+)
+    * mmap failed on empty files (errno = EINVAL)
 
   - Normal:
     * write a man page
@@ -18,7 +19,36 @@ TODO:
     * [CHECK] mmap already used internaly by icu?
     * fixed string u_str* => u_mem*?
 
-Ideas :
+Notes:
+  - ugrep -ERin ap.che /etc/
+    * debug: off, intervals garbage: on
+      real    0m3.307s
+      user    0m3.263s
+      sys     0m0.032s
+    * debug: off, intervals garbage: off
+      real    0m3.291s
+      user    0m3.260s
+      sys     0m0.029s
+  - grep -ERin ap.che /etc/
+      real    0m2.387s
+      user    0m2.354s
+      sys     0m0.032s
+
+  - ugrep -ERin ... /etc/
+    * debug: off, intervals garbage: on
+      real    0m6.228s
+      user    0m4.666s
+      sys     0m0.489s
+    * debug: off, intervals garbage: off
+      real    0m6.309s
+      user    0m4.659s
+      sys     0m0.525s
+  - grep -ERin ... /etc/
+      real    1m57.071s
+      user    0m45.995s
+      sys     0m46.973s
+
+Ideas:
   - write ucat, a cat replacement ?
 
 Known bugs:
