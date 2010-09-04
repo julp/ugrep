@@ -5,13 +5,13 @@ TODO:
     * implement -w option
     * extend error handling (fd) and clean up msg or relative
     * implement context options (-A, -B, -C, -\d+)
-    * mmap failed on empty files (errno = EINVAL)
+    * mmap fail on empty files (errno = EINVAL)
 
   - Normal:
     * write a man page
 
   - Low:
-    * garbage slist_element_t and its data
+    * none
 
   - Other:
     * [HIGH] rewrite Windows specfic pieces to have a Windows build (both: statically and dynamically linked to ICU libraries)
