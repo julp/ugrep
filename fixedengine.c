@@ -99,7 +99,11 @@ static engine_return_t engine_fixed_match(error_t **UNUSED(error), void *data, c
     }
 }
 
+#ifdef OLD_INTERVAL
 static engine_return_t engine_fixed_match_all(error_t **UNUSED(error), void *data, const UString *subject, slist_t *intervals)
+#else
+static engine_return_t engine_fixed_match_all(error_t **UNUSED(error), void *data, const UString *subject, slist_pool_t *intervals)
+#endif /* OLD_INTERVAL */
 {
     UChar *m;
     int32_t matches, pos;

@@ -84,7 +84,11 @@ UString *ustr = NULL;
 slist_t *patterns = NULL;
 slist_element_t *p = NULL;
 reader_t *default_reader = NULL;
+#ifdef OLD_INTERVAL
 slist_t *intervals = NULL;
+#else
+slist_pool_t *intervals = NULL;
+#endif /* OLD_INTERVAL */
 
 UBool rFlag = FALSE;
 UBool xFlag = FALSE;
@@ -121,13 +125,12 @@ int verbosity = WARN;
 
 void print_error(error_t *error)
 {
-    debug("error is %s", error ? "NOT NULL" : "NULL");
     if (NULL != error && error->type >= verbosity) {
         int type;
         UFILE *ustderr;
 
         type = error->type;
-        ustderr = u_finit(stdout, NULL, NULL);
+        ustderr = u_finit(stderr, NULL, NULL);
         switch (type) {
             /*case INFO:
                 fprintf(stderr, "[ " GREEN("INFO") " ] ");
@@ -430,13 +433,13 @@ UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t len
     void *data;
     pattern_data_t *pdata;
 
-    pdata = mem_new(*pdata);
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
     if (NULL == (data = engines[!!pattern_type]->compile(error, pattern, length, case_insensitive, word_bounded))) {
         return FALSE;
     }
+    pdata = mem_new(*pdata);
     pdata->pattern = data;
     pdata->engine = engines[!!pattern_type];
 
@@ -450,13 +453,13 @@ UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern
     void *data;
     pattern_data_t *pdata;
 
-    pdata = mem_new(*pdata);
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
     if (NULL == (data = engines[!!pattern_type]->compileC(error, pattern, case_insensitive, word_bounded))) {
         return FALSE;
     }
+    pdata = mem_new(*pdata);
     pdata->pattern = data;
     pdata->engine = engines[!!pattern_type];
 
@@ -763,7 +766,11 @@ static int procfile(fd_t *fd, const char *filename)
             matches = 0;
             fd->lineno++;
             ustring_chomp(ustr);
+#ifdef OLD_INTERVAL
             slist_clean(intervals);
+#else
+            slist_pool_clean(intervals);
+#endif /* OLD_INTERVAL */
             for (p = patterns->head; NULL != p; p = p->next) {
                 FETCH_DATA(p->data, pdata, pattern_data_t);
 
@@ -884,7 +891,7 @@ static int procdir(fd_t *fd, char **dirname)
         switch (p->fts_info) {
             case FTS_DNR:
             case FTS_ERR:
-                msg(FATAL, "fts_read failed on %s: %s", p->fts_path, strerror(p->fts_errno));
+                msg(WARN, "fts_read failed on %s: %s", p->fts_path, strerror(p->fts_errno));
                 break;
             case FTS_D:
             case FTS_DP:
@@ -910,7 +917,11 @@ static void exit_cb(void)
         slist_destroy(patterns);
     }
     if (NULL != intervals) {
+#ifdef OLD_INTERVAL
         slist_destroy(intervals);
+#else
+        slist_pool_destroy(intervals);
+#endif /* OLD_INTERVAL */
     }
 }
 

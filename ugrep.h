@@ -2,6 +2,8 @@
 
 # define UGREP_H
 
+//# define OLD_INTERVAL 1
+
 # include <stdlib.h>
 # include <stdio.h>
 # include <string.h>
@@ -146,7 +148,11 @@ typedef struct {
     void *(*compileC)(error_t **, const char *, UBool, UBool);
     void (*pre_exec)(void *, UString *);
     engine_return_t (*match)(error_t **, void *, const UString *);
+#ifdef OLD_INTERVAL
     engine_return_t (*match_all)(error_t **, void *, const UString *, slist_t *);
+#else
+    engine_return_t (*match_all)(error_t **, void *, const UString *, slist_pool_t *);
+#endif /* OLD_INTERVAL */
     engine_return_t (*whole_line_match)(error_t **, void *, const UString *);
     void (*destroy)(void *);
 } engine_t;

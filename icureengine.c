@@ -73,7 +73,11 @@ static engine_return_t engine_icure_match(error_t **error, void *data, const USt
     return (ret ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
 
+#ifdef OLD_INTERVAL
 static engine_return_t engine_icure_match_all(error_t **error, void *data, const UString *subject, slist_t *intervals)
+#else
+static engine_return_t engine_icure_match_all(error_t **error, void *data, const UString *subject, slist_pool_t *intervals)
+#endif /* OLD_INTERVAL */
 {
     int matches;
     int32_t l, u;
