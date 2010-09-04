@@ -4,6 +4,8 @@
 
 //# define OLD_INTERVAL 1
 
+# include "config.h"
+
 # include <stdlib.h>
 # include <stdio.h>
 # include <string.h>
@@ -86,7 +88,6 @@ const char *ubasename(const char *);
 # define U_LF  0x000A /* \n */
 # define U_NUL 0x0000 /* \0 */
 
-# include "config.h"
 # include "alloc.h"
 # include "slist.h"
 # include "ustring.h"
