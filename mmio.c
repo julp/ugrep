@@ -148,17 +148,17 @@ static size_t mmfd_readbytes(void *data, char *buffer, size_t max_len)
     return n;
 }
 
-static void/*UBool*/ mmfd_set_encoding(void *data, const char *encoding)
+static UBool mmfd_set_encoding(error_t **error, void *data, const char *encoding)
 {
     UErrorCode status;
     FETCH_DATA(data, mmfd, mmfd_t);
 
     mmfd->ucnv = ucnv_open(encoding, &status);
     if (U_FAILURE(status)) {
-        icu(status, "ucnv_open");
+        icu_error_set(error, FATAL, status, "ucnv_open");
     }
 
-    //return U_SUCCESS(status);
+    return U_SUCCESS(status);
 }
 
 static void mmfd_set_signature_length(void *data, size_t signature_length)

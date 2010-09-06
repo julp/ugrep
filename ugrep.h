@@ -134,7 +134,7 @@ typedef struct {
     size_t (*readbytes)(void *, char *, size_t);
     size_t (*readuchars)(void *, UChar32 *, size_t); // can throw error
     void (*set_signature_length)(void *, size_t);
-    void (*set_encoding)(void *, const char *); // can throw error
+    UBool (*set_encoding)(error_t **, void *, const char *);
     void (*rewind)(void *);
 } reader_t;
 

@@ -319,7 +319,7 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
                 }
                 debug("%s, file encoding = %s", filename, encoding);
                 fd->encoding = encoding;
-                fd->reader->set_encoding(fd->reader_data, encoding); // a tester ?
+                fd->reader->set_encoding(error, fd->reader_data, encoding);
                 fd->reader->rewind(fd->reader_data);
             } else {
                 icu_error_set(error, WARN, status, "ucnv_detectUnicodeSignature");

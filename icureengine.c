@@ -113,7 +113,7 @@ static engine_return_t engine_icure_match_all(error_t **error, void *data, const
     }
     /*uregex_reset(uregex, 0, &status);
     if (U_FAILURE(status)) {
-        icu(status, "uregex_reset");
+        icu_error_set(error, FATAL, status, "uregex_reset");
         return ENGINE_FAILURE;
     }*/
 

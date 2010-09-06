@@ -210,7 +210,7 @@ static size_t compressedfd_readbytes(void *data, char *buffer, size_t max_len)
     return n;
 }
 
-static void/*UBool*/ compressedfd_set_encoding(void *data, const char *encoding)
+static UBool compressedfd_set_encoding(error_t **error, void *data, const char *encoding)
 {
     UErrorCode status;
     FETCH_DATA(data, compressedfd, compressedfd_t);
@@ -218,8 +218,10 @@ static void/*UBool*/ compressedfd_set_encoding(void *data, const char *encoding)
     status = U_ZERO_ERROR;
     compressedfd->ucnv = ucnv_open(encoding, &status);
     if (U_FAILURE(status)) {
-        icu(status, "ucnv_open");
+        icu_error_set(error, FATAL, status, "ucnv_open");
     }
+
+    return U_SUCCESS(status);
 }
 
 static void compressedfd_set_signature_length(void *data, size_t signature_length)

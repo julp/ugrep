@@ -105,12 +105,12 @@ static size_t stdiofd_readbytes(void *data, char *buffer, size_t max_len)
     return fread(buffer, sizeof(*buffer), max_len/*st.st_size < max_len ? st.st_size : max_len*/, stdiofd->fp);
 }
 
-static void/*UBool*/ stdiofd_set_encoding(void *data, const char *encoding)
+static UBool stdiofd_set_encoding(error_t **UNUSED(error), void *data, const char *encoding)
 {
     FETCH_DATA(data, stdiofd, stdiofd_t);
 
     //stdiofd->ufp = u_fadopt(stdiofd->fp, NULL, encoding);
-    u_fsetcodepage(encoding, stdiofd->ufp);
+    return (0 == u_fsetcodepage(encoding, stdiofd->ufp));
 }
 
 static void stdiofd_set_signature_length(void *data, size_t signature_length)
