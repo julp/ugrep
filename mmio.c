@@ -153,6 +153,7 @@ static UBool mmfd_set_encoding(error_t **error, void *data, const char *encoding
     UErrorCode status;
     FETCH_DATA(data, mmfd, mmfd_t);
 
+    status = U_ZERO_ERROR;
     mmfd->ucnv = ucnv_open(encoding, &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ucnv_open");
