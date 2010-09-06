@@ -284,46 +284,47 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
 
     if (fd->reader->seekable(fd->reader_data)) {
         if (0 == (buffer_len = fd->reader->readbytes(fd->reader_data, buffer, MAX_ENC_REL_LEN))) {
-            goto failed;
-        }
-        buffer[buffer_len] = '\0';
-        encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &signature_length, &status);
-        if (U_SUCCESS(status)) {
-            if (NULL == encoding) {
-                UCharsetDetector *csd;
-                const UCharsetMatch *ucm;
-
-                csd = ucsdet_open(&status);
-                if (U_FAILURE(status)) {
-                    icu_error_set(error, WARN, status, "ucsdet_open");
-                    goto failed;
-                }
-                ucsdet_setText(csd, buffer, buffer_len, &status);
-                if (U_FAILURE(status)) {
-                    icu_error_set(error, WARN, status, "ucsdet_setText");
-                    goto failed;
-                }
-                ucm = ucsdet_detect(csd, &status);
-                if (U_FAILURE(status)) {
-                    icu_error_set(error, WARN, status, "ucsdet_detect");
-                    goto failed;
-                }
-                encoding = ucsdet_getName(ucm, &status);
-                if (U_FAILURE(status)) {
-                    icu_error_set(error, WARN, status, "ucsdet_getName");
-                    goto failed;
-                }
-                ucsdet_close(csd);
-            } else {
-                fd->reader->set_signature_length(fd->reader_data, signature_length);
-            }
-            debug("%s, file encoding = %s", filename, encoding);
-            fd->encoding = encoding;
-            fd->reader->set_encoding(fd->reader_data, encoding); // a tester ?
-            fd->reader->rewind(fd->reader_data);
+            //goto failed;
         } else {
-            icu_error_set(error, WARN, status, "ucnv_detectUnicodeSignature");
-            goto failed;
+            buffer[buffer_len] = '\0';
+            encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &signature_length, &status);
+            if (U_SUCCESS(status)) {
+                if (NULL == encoding) {
+                    UCharsetDetector *csd;
+                    const UCharsetMatch *ucm;
+
+                    csd = ucsdet_open(&status);
+                    if (U_FAILURE(status)) {
+                        icu_error_set(error, WARN, status, "ucsdet_open");
+                        goto failed;
+                    }
+                    ucsdet_setText(csd, buffer, buffer_len, &status);
+                    if (U_FAILURE(status)) {
+                        icu_error_set(error, WARN, status, "ucsdet_setText");
+                        goto failed;
+                    }
+                    ucm = ucsdet_detect(csd, &status);
+                    if (U_FAILURE(status)) {
+                        icu_error_set(error, WARN, status, "ucsdet_detect");
+                        goto failed;
+                    }
+                    encoding = ucsdet_getName(ucm, &status);
+                    if (U_FAILURE(status)) {
+                        icu_error_set(error, WARN, status, "ucsdet_getName");
+                        goto failed;
+                    }
+                    ucsdet_close(csd);
+                } else {
+                    fd->reader->set_signature_length(fd->reader_data, signature_length);
+                }
+                debug("%s, file encoding = %s", filename, encoding);
+                fd->encoding = encoding;
+                fd->reader->set_encoding(fd->reader_data, encoding); // a tester ?
+                fd->reader->rewind(fd->reader_data);
+            } else {
+                icu_error_set(error, WARN, status, "ucnv_detectUnicodeSignature");
+                goto failed;
+            }
         }
     }
 

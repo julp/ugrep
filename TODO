@@ -5,7 +5,6 @@ TODO:
     * implement -w option
     * extend error handling (fd) and clean up msg or relative
     * implement context options (-A, -B, -C, -\d+)
-    * mmap fail on empty files (errno = EINVAL)
 
   - Normal:
     * write a man page
