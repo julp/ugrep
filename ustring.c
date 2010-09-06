@@ -190,7 +190,7 @@ UString *ustring_adopt_string(UChar *from)
     return ustring_adopt_string_len(from, u_strlen(from));
 }
 
-UBool ustring_tolower(UString *ustr)
+UBool ustring_tolower(UString *ustr, error_t **error)
 {
     UErrorCode status;
     int32_t result_len;
@@ -198,11 +198,11 @@ UBool ustring_tolower(UString *ustr)
     status = U_ZERO_ERROR;
     result_len = u_strFoldCase(ustr->ptr, ustr->len, ustr->ptr, ustr->len, 0, &status);
     if (U_FAILURE(status)) {
-        icu(status, "u_strFoldCase");
+        icu_error_set(error, FATAL, status, "u_strFoldCase");
         return FALSE;
     }
     if (result_len != ustr->len) {
-        //
+        error_set(error, FATAL, "Offsetted search is unreliable: the case-folded version has not the same length than the original");
         return FALSE;
     }
 

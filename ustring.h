@@ -25,7 +25,7 @@ void ustring_prepend_string(UString *, const UChar *);
 void ustring_prepend_string_len(UString *, const UChar *, int32_t);
 UString *ustring_sized_new(size_t);
 void ustring_sync(const UString *, UString *, double);
-UBool ustring_tolower(UString *);
+UBool ustring_tolower(UString *, error_t **);
 void ustring_truncate(UString *);
 
 #endif /* UGREP_STRING_H */

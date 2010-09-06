@@ -61,8 +61,7 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, UBool c
         return NULL;
     }
     if (case_insensitive) {
-        if (!ustring_tolower(p->pattern)) {
-            // TODO: error handling
+        if (!ustring_tolower(p->pattern, error)) {
             pattern_destroy(p);
             return NULL;
         }
@@ -76,7 +75,7 @@ static void engine_fixed_pre_exec(void *data, UString *subject)
     FETCH_DATA(data, p, fixed_pattern_t);
 
     if (p->case_insensitive) {
-        ustring_tolower(subject);
+        ustring_tolower(subject, NULL);
     }
 }
 

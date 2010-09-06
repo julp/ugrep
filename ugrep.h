@@ -90,7 +90,6 @@ const char *ubasename(const char *);
 
 # include "alloc.h"
 # include "slist.h"
-# include "ustring.h"
 # include "intervals.h"
 
 #ifndef MAX
@@ -122,6 +121,8 @@ void error_set(error_t **, int, const char *, ...);
 #endif /* DEBUG */
 error_t *error_vnew(int, const char *, va_list);
 /* </error.c> */
+
+# include "ustring.h"
 
 typedef struct {
     const char *name;
