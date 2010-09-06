@@ -1,21 +1,6 @@
 #include "ugrep.h"
 
-slist_pool_t *slist_pool_new(size_t elt_size, func_dtor_t dtor_func)
-{
-    slist_pool_t *l;
-
-    l = mem_new(*l);
-    l->elt_size = elt_size;
-    l->garbage = l->tail = l->head = NULL;
-    l->len = 0;
-#ifdef DEBUG
-    l->recycled = 0;
-#endif
-    l->dtor_func = dtor_func;
-
-    return l;
-}
-
+#ifdef OLD_INTERVAL
 static interval_t *interval_new(int32_t lower_limit, int32_t upper_limit)
 {
     interval_t *i;
@@ -25,6 +10,28 @@ static interval_t *interval_new(int32_t lower_limit, int32_t upper_limit)
     i->upper_limit = upper_limit;
 
     return i;
+}
+
+static void interval_append(slist_t *intervals, int32_t lower_limit, int32_t upper_limit)
+{
+    slist_append(intervals, interval_new(lower_limit, upper_limit));
+}
+#else
+
+slist_pool_t *slist_pool_new(size_t elt_size, func_dtor_t dtor_func)
+{
+    slist_pool_t *l;
+
+    l = mem_new(*l);
+    l->elt_size = elt_size;
+    l->garbage = l->tail = l->head = NULL;
+    l->len = 0;
+# ifdef DEBUG
+    l->recycled = 0;
+# endif /* DEBUG */
+    l->dtor_func = dtor_func;
+
+    return l;
 }
 
 UBool slist_pool_empty(slist_pool_t *l)
@@ -52,9 +59,9 @@ void slist_pool_destroy(slist_pool_t *l)
 {
     slist_element_t *el;
 
-#ifdef DEBUG
+# ifdef DEBUG
     debug("%d elements was recycled by garbage", l->recycled);
-#endif /* DEBUG */
+# endif /* DEBUG */
     if (NULL != (el = l->head)) {
         while (NULL != el) {
             slist_element_t *tmp = el;
@@ -87,9 +94,9 @@ static slist_element_t *slist_pool_element_new(slist_pool_t *l, const void *src)
         el = l->garbage;
         l->garbage = el->next;
         el->next = NULL;
-#ifdef DEBUG
+# ifdef DEBUG
         l->recycled++;
-#endif /* DEBUG */
+# endif /* DEBUG */
     } else {
         el = mem_new(*el);
         el->next = NULL;
@@ -114,30 +121,16 @@ void slist_pool_append(slist_pool_t *l, const void *src)
     }
 }
 
-/*static void interval_add_after(slist_t *UNUSED(intervals), slist_element_t *ref, int32_t lower_limit, int32_t upper_limit)
-{
-    slist_element_t *newel;
-
-    newel = mem_new(*newel);
-    newel->data = interval_new(lower_limit, upper_limit);
-    newel->next = ref->next;
-    ref->next = newel;
-}*/
-
-static void interval_append(slist_t *intervals, int32_t lower_limit, int32_t upper_limit)
-{
-    slist_append(intervals, interval_new(lower_limit, upper_limit));
-}
-
 static void slist_pool_garbage_element(slist_pool_t *l, slist_element_t *target, slist_element_t *previous)
 {
     previous->next = target->next;
     target->next = l->garbage->next;
     l->garbage = target;
-#ifdef DEBUG
+# ifdef DEBUG
     l->recycled++;
-#endif
+# endif /* DEBUG */
 }
+#endif /* OLD_INTERVAL */
 
 #define BETWEEN(value, lower, upper) \
     ((lower <= value) && (value <= upper))
@@ -250,11 +243,6 @@ UBool interval_add(slist_pool_t *intervals, int32_t max_upper_limit, int32_t low
     return FALSE;
 }
 
-static void interval_destroy(void *data)
-{
-    free(data);
-}
-
 #ifdef OLD_INTERVAL
 slist_t *intervals_new(void)
 #else
@@ -262,7 +250,7 @@ slist_pool_t *intervals_new(void)
 #endif /* OLD_INTERVAL */
 {
 #ifdef OLD_INTERVAL
-    return slist_new(free/*interval_destroy*/);
+    return slist_new(free);
 #else
     return slist_pool_new(sizeof(interval_t), free);
 #endif /* OLD_INTERVAL */
