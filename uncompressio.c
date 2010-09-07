@@ -166,7 +166,7 @@ static void compressedfd_rewind(void *data)
     compressedfd->ptr = compressedfd->base;
 }
 
-static UBool compressedfd_readline(void *data, UString *ustr)
+static UBool compressedfd_readline(error_t **error, void *data, UString *ustr)
 {
     UChar32 c;
     UErrorCode status;
@@ -184,7 +184,7 @@ static UBool compressedfd_readline(void *data, UString *ustr)
                 }*/
                 break;
             } else {
-                icu(status, "ucnv_getNextUChar");
+                icu_error_set(error, FATAL, status, "ucnv_getNextUChar");
                 return FALSE;
             }
         }

@@ -370,17 +370,14 @@ void fd_close(fd_t *fd)
     free(fd->reader_data);
 }
 
-/*void fd_rewind(fd_t *fd)
-{
-    if (fd->reader->seekable(fd->reader_data)) {
-        fd->reader->rewind(fd->reader_data);
-    }
-}*/
+UBool fd_eof(fd_t *fd) {
+    return fd->reader->eof(fd->reader_data);
+}
 
-int fd_readline(/*TODO: error_t **error,*/fd_t *fd, UString *ustr)
+UBool fd_readline(error_t **error, fd_t *fd, UString *ustr)
 {
     ustring_truncate(ustr);
-    return !fd->reader->eof(fd->reader_data) && fd->reader->readline(/*TODO: error,*/fd->reader_data, ustr);
+    return fd->reader->readline(error, fd->reader_data, ustr);
 }
 
 /* ========== getopt stuff ========== */
@@ -487,7 +484,7 @@ UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pat
         return FALSE;
     }
     ustr = ustring_new();
-    while (fd_readline(&fd, ustr)) {
+    while (fd_readline(error, &fd, ustr)) { // TODO: readline
         ustring_chomp(ustr);
         if (!add_pattern(error, l, ustr->ptr, ustr->len, pattern_type, case_insensitive, word_bounded)) {
             return FALSE;
@@ -757,10 +754,13 @@ static int procfile(fd_t *fd, const char *filename)
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
 
     if (fd_open(&error, fd, filename)) {
-        while (/*!*/fd_readline(/*TODO: error,*/fd, ustr)) {
+        while (!fd_eof(fd)) {
             int matches;
             engine_return_t ret;
 
+            if (!fd_readline(&error, fd, ustr)) {
+                print_error(error);
+            }
             matches = 0;
             fd->lineno++;
             ustring_chomp(ustr);

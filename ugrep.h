@@ -74,10 +74,6 @@ const char *ubasename(const char *);
 # define debug(format, ...) /* NOP */
 #endif /* DEBUG */
 
-/* TODO: drop icu(), replace it by icu_error_set() */
-# define icu(status, function) \
-    msg(FATAL, "ICU Error \"%s\" from " function "()", u_errorName(status))
-
 # define icu_error_set(error, type, status, function) \
     error_set(error, type, "ICU Error \"%s\" from " function "()", u_errorName(status))
 
@@ -130,7 +126,7 @@ typedef struct {
     void (*close)(void *);
     UBool (*eof)(void *);
     UBool (*seekable)(void *);
-    UBool (*readline)(void *, UString *); // can throw error
+    UBool (*readline)(error_t **error, void *, UString *);
     size_t (*readbytes)(void *, char *, size_t);
     int32_t (*readuchars)(error_t **error, void *, UChar32 *, size_t);
     void (*set_signature_length)(void *, size_t);

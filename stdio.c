@@ -54,9 +54,9 @@ static void stdiofd_close(void *data)
     u_fclose(stdiofd->ufp);
 }
 
-static size_t stdiofd_readuchars(void *data, UChar32 *buffer, size_t max_len)
+static int32_t stdiofd_readuchars(error_t **UNUSED(error), void *data, UChar32 *buffer, size_t max_len)
 {
-    size_t i;
+    int32_t i;
     UChar32 c;
     FETCH_DATA(data, stdiofd, stdiofd_t);
 
@@ -76,7 +76,7 @@ static void stdiofd_rewind(void *data)
     fseek(stdiofd->fp, (long) stdiofd->signature_length, SEEK_SET);
 }
 
-static UBool stdiofd_readline(void *data, UString *ustr)
+static UBool stdiofd_readline(error_t **UNUSED(error), void *data, UString *ustr)
 {
     UChar c;
     FETCH_DATA(data, stdiofd, stdiofd_t);

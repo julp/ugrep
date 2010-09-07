@@ -8,14 +8,14 @@
 
 #include "ugrep.h"
 
-#ifndef SIZE_T_MAX
+/*#ifndef SIZE_T_MAX
 #  define SIZE_T_MAX (~((size_t) 0))
-#endif /* !SIZE_T_MAX */
+#endif*/ /* !SIZE_T_MAX */
 
 typedef struct {
     int fd;
     size_t len;
-    char *base, *end, *ptr;
+    char *start, *base, *end, *ptr;
     UConverter *ucnv;
 } mmfd_t;
 
@@ -39,16 +39,16 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
         goto close;
     }
     if (0 == (mmfd->len = (size_t) st.st_size)) {
-        mmfd->base = NULL;
+        mmfd->start = NULL;
     } else {
-        mmfd->base = mmap(NULL, mmfd->len, PROT_READ, MAP_PRIVATE, mmfd->fd, (off_t) 0);
+        mmfd->start = mmap(NULL, mmfd->len, PROT_READ, MAP_PRIVATE, mmfd->fd, (off_t) 0);
         if (MAP_FAILED == mmfd->base) {
             error_set(error, WARN, "mmap failed on %s: %s", filename, strerror(errno));
             goto close;
         }
     }
-    mmfd->ptr = mmfd->base;
-    mmfd->end = mmfd->base + mmfd->len;
+    mmfd->ptr = mmfd->base = mmfd->start;
+    mmfd->end = mmfd->start + mmfd->len;
     mmfd->ucnv = NULL;
 
     return mmfd;
@@ -67,7 +67,7 @@ static void mmfd_close(void *data)
     if (NULL != mmfd->ucnv) {
         ucnv_close(mmfd->ucnv);
     }
-    munmap(mmfd->base, mmfd->len);
+    munmap(mmfd->start, mmfd->len);
     close(mmfd->fd);
 }
 
@@ -104,7 +104,7 @@ static void mmfd_rewind(void *data)
     mmfd->ptr = mmfd->base;
 }
 
-static UBool mmfd_readline(void *data, UString *ustr)
+static UBool mmfd_readline(error_t **error, void *data, UString *ustr)
 {
     UChar32 c;
     UErrorCode status;
@@ -122,7 +122,7 @@ static UBool mmfd_readline(void *data, UString *ustr)
                 }*/
                 break;
             } else {
-                icu(status, "ucnv_getNextUChar");
+                icu_error_set(error, FATAL, status, "ucnv_getNextUChar");
                 return FALSE;
             }
         }
@@ -167,7 +167,7 @@ static void mmfd_set_signature_length(void *data, size_t signature_length)
     FETCH_DATA(data, mmfd, mmfd_t);
 
     mmfd->len -= signature_length;
-    mmfd->ptr = mmfd->base += signature_length;
+    mmfd->ptr = mmfd->base = mmfd->start + signature_length;
 }
 
 static UBool mmfd_eof(void *data)
