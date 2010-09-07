@@ -5,12 +5,13 @@ TODO:
     * implement -w option
     * extend error handling (fd) and clean up msg or relative
     * implement context options (-A, -B, -C, -\d+)
+    * improve binary file handling (--binary-files=text|binary not implemented and display)
 
   - Normal:
     * write a man page
 
   - Low:
-    * none
+    * extend new line to form feed (0x0c), carriage return (0x0d), next line (0x85), line separator (0x2028), paragraph separator (0x2029) ?
 
   - Other:
     * [HIGH] rewrite Windows specfic pieces to have a Windows build (both: statically and dynamically linked to ICU libraries)
