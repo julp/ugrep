@@ -45,18 +45,19 @@ void error_set(error_t **error, int type, const char *format, ...)
         if (NULL == *error) {
             *error = tmp;
         } else {
-            debug("overwrite attempt of a previous error: %s\nBy: %s", (*error)->message, tmp->message);
+            debug("overwrite attempt of a previous error: %S\nBy: %S", (*error)->message, tmp->message);
         }
     }
 }
 
 void error_destroy(error_t *error)
 {
-    if (error) {
+    if (NULL != error) {
         if (error->message) {
             free(error->message);
         }
         free(error);
+        error = NULL;
     }
 }
 
@@ -68,7 +69,7 @@ void error_propagate(error_t **dst, error_t *src)
         }
     } else {
         if (NULL != *dst) {
-            debug("overwrite attempt of a previous error: %s\nBy: %s", (*dst)->message, src->message);
+            debug("overwrite attempt of a previous error: %S\nBy: %S", (*dst)->message, src->message);
         } else {
             *dst = src;
         }

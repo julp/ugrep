@@ -71,10 +71,10 @@ static void mmfd_close(void *data)
     close(mmfd->fd);
 }
 
-static size_t mmfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
+static int32_t mmfd_readuchars(error_t **error, void *data, UChar32 *buffer, size_t max_len)
 {
     UChar32 c;
-    size_t i, len;
+    int32_t i, len;
     UErrorCode status;
     FETCH_DATA(data, mmfd, mmfd_t);
 
@@ -86,8 +86,8 @@ static size_t mmfd_readuchars(void *data, UChar32 *buffer, size_t max_len)
             if (U_INDEX_OUTOFBOUNDS_ERROR == status) {
                 break;
             } else {
-                icu(status, "ucnv_getNextUChar");
-                return 0;
+                icu_error_set(error, FATAL, status, "ucnv_getNextUChar");
+                return -1;
             }
         }
         buffer[i] = c;

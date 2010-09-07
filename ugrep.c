@@ -79,7 +79,7 @@ engine_t *engines[] = {
 
 int binbehave = BIN_FILE_SKIP;
 
-UFILE *ustdout = NULL;
+UFILE *ustdout = NULL, *ustderr = NULL;
 UString *ustr = NULL;
 slist_t *patterns = NULL;
 slist_element_t *p = NULL;
@@ -127,19 +127,17 @@ void print_error(error_t *error)
 {
     if (NULL != error && error->type >= verbosity) {
         int type;
-        UFILE *ustderr;
 
         type = error->type;
-        ustderr = u_finit(stderr, NULL, NULL);
         switch (type) {
-            /*case INFO:
-                fprintf(stderr, "[ " GREEN("INFO") " ] ");
-                break;*/
             case WARN:
-                fprintf(stderr, "[ " YELLOW("WARN") " ] ");
+                u_fprintf(ustderr, "[ " YELLOW("WARN") " ] ");
                 break;
             case FATAL:
-                fprintf(stderr, "[ " RED("ERR ") " ] ");
+                u_fprintf(ustderr, "[ " RED("ERR ") " ] ");
+                break;
+            default:
+                u_fprintf(ustderr, "[ BUG ] Unknown error type for:\n");
                 break;
         }
         u_fputs(error->message, ustderr);
@@ -167,7 +165,7 @@ void report(int type, const char *format, ...)
                 break;
         }
         va_start(args, format);
-        vfprintf(stderr, format, args);
+        u_vfprintf(ustderr, format, args);
         va_end(args);
         if (type == FATAL) {
             exit(UGREP_EXIT_FAILURE);
@@ -187,6 +185,19 @@ static UBool stdin_is_tty(void) {
 static UBool is_binary_uchar(UChar32 c)
 {
     return !u_isprint(c) && !u_isspace(c) && U_BS != c;
+}
+
+static UBool is_binary(UChar32 *buffer, size_t buffer_len)
+{
+    UChar32 *p;
+
+    for (p = buffer; U_NUL != *p; p++) {
+        if (is_binary_uchar(*p)) {
+            return TRUE;
+        }
+    }
+
+    return (p - buffer) < buffer_len;
 }
 
 static UBool is_pattern(const UChar *pattern)
@@ -242,10 +253,10 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
     int fsfd;
     /*struct stat st;*/
     UErrorCode status;
+    size_t buffer_len;
     const char *encoding;
     int32_t signature_length;
     char buffer[MAX_ENC_REL_LEN + 1];
-    size_t buffer_len;
 
     /*if (-1 == (stat(filename, &st))) {
         error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
@@ -283,9 +294,7 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
     fd->binary = FALSE;
 
     if (fd->reader->seekable(fd->reader_data)) {
-        if (0 == (buffer_len = fd->reader->readbytes(fd->reader_data, buffer, MAX_ENC_REL_LEN))) {
-            //goto failed;
-        } else {
+        if (0 != (buffer_len = fd->reader->readbytes(fd->reader_data, buffer, MAX_ENC_REL_LEN))) {
             buffer[buffer_len] = '\0';
             encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &signature_length, &status);
             if (U_SUCCESS(status)) {
@@ -319,8 +328,27 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
                 }
                 debug("%s, file encoding = %s", filename, encoding);
                 fd->encoding = encoding;
-                fd->reader->set_encoding(error, fd->reader_data, encoding);
+                if (!fd->reader->set_encoding(error, fd->reader_data, encoding)) {
+                    goto failed;
+                }
                 fd->reader->rewind(fd->reader_data);
+                if (BIN_FILE_TEXT != binbehave) {
+                    size_t ubuffer_len;
+                    UChar32 ubuffer[MAX_BIN_REL_LEN + 1];
+
+                    if (-1 == (ubuffer_len = fd->reader->readuchars(error, fd->reader_data, ubuffer, MAX_BIN_REL_LEN))) {
+                        goto failed;
+                    }
+                    ubuffer[ubuffer_len] = U_NUL;
+                    fd->binary = is_binary(ubuffer, ubuffer_len);
+                    debug("%s, binary file : %s", filename, fd->binary ? RED("yes") : GREEN("no"));
+                    if (fd->binary) {
+                        if (BIN_FILE_SKIP == binbehave) {
+                            goto failed;
+                        }
+                    }
+                    fd->reader->rewind(fd->reader_data);
+                }
             } else {
                 icu_error_set(error, WARN, status, "ucnv_detectUnicodeSignature");
                 goto failed;
@@ -336,44 +364,23 @@ failed:
     return FALSE;
 }
 
-int fd_is_binary(fd_t *fd)
-{
-    UChar32 *p;
-    size_t buffer_len;
-    UChar32 buffer[MAX_BIN_REL_LEN + 1];
-
-    if (fd->reader->seekable(fd->reader_data)) {
-        buffer_len = fd->reader->readuchars(fd->reader_data, buffer, MAX_BIN_REL_LEN);
-        buffer[buffer_len] = U_NUL;
-        for (p = buffer; U_NUL != *p; p++) {
-            if (is_binary_uchar(*p)) {
-                return TRUE;
-            }
-        }
-
-        return (p - buffer) < buffer_len;
-    } else {
-        return FALSE; // In stdin we trust
-    }
-}
-
 void fd_close(fd_t *fd)
 {
     fd->reader->close(fd->reader_data);
     free(fd->reader_data);
 }
 
-void fd_rewind(fd_t *fd)
+/*void fd_rewind(fd_t *fd)
 {
     if (fd->reader->seekable(fd->reader_data)) {
         fd->reader->rewind(fd->reader_data);
     }
-}
+}*/
 
-int fd_readline(fd_t *fd, UString *ustr)
+int fd_readline(/*TODO: error_t **error,*/fd_t *fd, UString *ustr)
 {
     ustring_truncate(ustr);
-    return !fd->reader->eof(fd->reader_data) && fd->reader->readline(fd->reader_data, ustr);
+    return !fd->reader->eof(fd->reader_data) && fd->reader->readline(/*TODO: error,*/fd->reader_data, ustr);
 }
 
 /* ========== getopt stuff ========== */
@@ -750,17 +757,7 @@ static int procfile(fd_t *fd, const char *filename)
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
 
     if (fd_open(&error, fd, filename)) {
-        if (BIN_FILE_TEXT != binbehave) {
-            fd->binary = fd_is_binary(fd);
-            debug("%s, binary file : %s", filename, fd->binary ? RED("yes") : GREEN("no"));
-            if (fd->binary) {
-                if (BIN_FILE_SKIP == binbehave) {
-                    goto endloop;
-                }
-            }
-            fd_rewind(fd);
-        }
-        while (fd_readline(fd, ustr)) {
+        while (/*!*/fd_readline(/*TODO: error,*/fd, ustr)) {
             int matches;
             engine_return_t ret;
 
@@ -864,7 +861,6 @@ For fixed string, make a lowered copy of ustr which on working
                 print_file(fd->filename, TRUE, FALSE, TRUE);
             }
         }
-endloop:
         fd_close(fd);
     } else {
         print_error(error);
@@ -963,6 +959,7 @@ int main(int argc, char **argv)
     patterns = slist_new(pattern_destroy);
     default_reader = &mm_reader;
     ustdout = u_finit(stdout, NULL, NULL);
+    ustderr = u_finit(stderr, NULL, NULL);
 
     debug("system locale = %s", u_fgetlocale(ustdout));
     debug("system codepage = %s", u_fgetcodepage(ustdout));

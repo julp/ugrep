@@ -132,7 +132,7 @@ typedef struct {
     UBool (*seekable)(void *);
     UBool (*readline)(void *, UString *); // can throw error
     size_t (*readbytes)(void *, char *, size_t);
-    size_t (*readuchars)(void *, UChar32 *, size_t); // can throw error
+    int32_t (*readuchars)(error_t **error, void *, UChar32 *, size_t);
     void (*set_signature_length)(void *, size_t);
     UBool (*set_encoding)(error_t **, void *, const char *);
     void (*rewind)(void *);
