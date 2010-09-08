@@ -12,6 +12,7 @@
 
 #include "ugrep.h"
 
+#define MIN_CONFIDENCE  39   // Minimum confidence for a match (in percents)
 #define MAX_ENC_REL_LEN 4096 // Maximum relevant length for encoding analyse (in bytes)
 #define MAX_BIN_REL_LEN 4096 // Maximum relevant length for binary analyse
 
@@ -299,7 +300,9 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
             encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &signature_length, &status);
             if (U_SUCCESS(status)) {
                 if (NULL == encoding) {
+                    int32_t confidence;
                     UCharsetDetector *csd;
+                    const char *tmpencoding;
                     const UCharsetMatch *ucm;
 
                     csd = ucsdet_open(&status);
@@ -317,10 +320,19 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
                         icu_error_set(error, WARN, status, "ucsdet_detect");
                         goto failed;
                     }
-                    encoding = ucsdet_getName(ucm, &status);
+                    confidence = ucsdet_getConfidence(ucm, &status);
+                    tmpencoding = ucsdet_getName(ucm, &status);
                     if (U_FAILURE(status)) {
                         icu_error_set(error, WARN, status, "ucsdet_getName");
+                        ucsdet_close(csd);
                         goto failed;
+                    }
+                    if (confidence > MIN_CONFIDENCE) {
+                        encoding = tmpencoding;
+                        debug("%s, confidence of " GREEN("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
+                    } else {
+                        debug("%s, confidence of " RED("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
+                        //encoding = "US-ASCII";
                     }
                     ucsdet_close(csd);
                 } else {
@@ -749,9 +761,11 @@ static void print_line(int lineno, UBool sep, UBool eol)
 static int procfile(fd_t *fd, const char *filename)
 {
     error_t *error;
+    //UBool _line_print; /* line_print local override */
 
     error = NULL;
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
+    //_line_print = line_print && (!fd->binary || (fd->binary && BIN_FILE_BIN != binbehave));
 
     if (fd_open(&error, fd, filename)) {
         while (!fd_eof(fd)) {
@@ -783,7 +797,7 @@ For fixed string, make a lowered copy of ustr which on working
                 if (xFlag) {
                     ret = pdata->engine->whole_line_match(&error, pdata->pattern, ustr);
                 } else {
-                    if (colorize && line_print) {
+                    if (colorize && /*_*/line_print) {
                         ret = pdata->engine->match_all(&error, pdata->pattern, ustr, intervals);
                     } else {
                         ret = pdata->engine->match(&error, pdata->pattern, ustr);
@@ -793,13 +807,13 @@ For fixed string, make a lowered copy of ustr which on working
                     print_error(error);
                 } else if (ENGINE_WHOLE_LINE_MATCH == ret) {
                     matches++;
-                    break; // no need to continue
+                    break; // no need to continue (line level)
                 } else {
                     matches += ret;
                 }
             }
             fd->matches += (matches > 0);
-            if (line_print) {
+            if (/*_*/line_print) {
                 if (matches > 0) {
                     if (!vFlag) {
                         if (file_print) {
@@ -837,7 +851,9 @@ For fixed string, make a lowered copy of ustr which on working
                         u_fputs(ustr->ptr, ustdout);
                     }
                 } else {
-                    if (vFlag) {
+                    /*if (fd->binary && BIN_FILE_BIN == binbehave) {
+                        goto out; // no need to continue (file level)
+                    } else*/ if (vFlag) {
                         if (file_print) {
                             print_file(fd->filename, FALSE, TRUE, FALSE);
                         }
@@ -849,7 +865,8 @@ For fixed string, make a lowered copy of ustr which on working
                 }
             }
         }
-        if (!line_print) {
+out:
+        if (!/*_*/line_print) {
             if (cFlag) {
                 if (file_print) {
                     print_file(fd->filename, fd->matches == 0, TRUE, FALSE);
@@ -859,7 +876,9 @@ For fixed string, make a lowered copy of ustr which on working
                 print_file(fd->filename, FALSE, FALSE, TRUE);
             } else if (LFlag && !fd->matches) {
                 print_file(fd->filename, TRUE, FALSE, TRUE);
-            }
+            }/* else if (fd->binary && BIN_FILE_BIN == binbehave) {
+                u_fprintf(ustdout, "Binary file %s matches\n", fd->filename);
+            }*/
         }
         fd_close(fd);
     } else {
@@ -961,8 +980,8 @@ int main(int argc, char **argv)
     ustdout = u_finit(stdout, NULL, NULL);
     ustderr = u_finit(stderr, NULL, NULL);
 
-    debug("system locale = %s", u_fgetlocale(ustdout));
-    debug("system codepage = %s", u_fgetcodepage(ustdout));
+    debug("system locale = " YELLOW("%s"), u_fgetlocale(ustdout));
+    debug("system codepage = " YELLOW("%s"), u_fgetcodepage(ustdout));
 
     // TODO: __progname (platform specific) => basename(argv[0])
     switch (__progname[1]) {
