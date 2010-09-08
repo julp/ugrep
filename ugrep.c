@@ -488,24 +488,29 @@ UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern
 UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pattern_type, UBool case_insensitive, UBool word_bounded)
 {
     fd_t fd;
+    UBool retval;
     UString *ustr;
 
+    retval = TRUE;
     fd.reader = &stdio_reader;
-
     if (!fd_open(error, &fd, filename)) {
         return FALSE;
     }
     ustr = ustring_new();
-    while (fd_readline(error, &fd, ustr)) { // TODO: readline
-        ustring_chomp(ustr);
-        if (!add_pattern(error, l, ustr->ptr, ustr->len, pattern_type, case_insensitive, word_bounded)) {
-            return FALSE;
+    while (retval && !fd_eof(&fd)) {
+        if(!fd_readline(error, &fd, ustr)) {
+            retval = FALSE;
+        } else {
+            ustring_chomp(ustr);
+            if (!add_pattern(error, l, ustr->ptr, ustr->len, pattern_type, case_insensitive, word_bounded)) {
+                retval = FALSE;
+            }
         }
     }
     fd_close(&fd);
     ustring_destroy(ustr);
 
-    return TRUE;
+    return retval;
 }
 
 static void pattern_destroy(void *data)
