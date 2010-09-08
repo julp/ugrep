@@ -766,11 +766,11 @@ static void print_line(int lineno, UBool sep, UBool eol)
 static int procfile(fd_t *fd, const char *filename)
 {
     error_t *error;
-    //UBool _line_print; /* line_print local override */
+    UBool _line_print; /* line_print local override */
 
     error = NULL;
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
-    //_line_print = line_print && (!fd->binary || (fd->binary && BIN_FILE_BIN != binbehave));
+    _line_print = line_print && (!fd->binary || (fd->binary && BIN_FILE_BIN != binbehave));
 
     if (fd_open(&error, fd, filename)) {
         while (!fd_eof(fd)) {
@@ -802,7 +802,7 @@ For fixed string, make a lowered copy of ustr which on working
                 if (xFlag) {
                     ret = pdata->engine->whole_line_match(&error, pdata->pattern, ustr);
                 } else {
-                    if (colorize && /*_*/line_print) {
+                    if (colorize && _line_print) {
                         ret = pdata->engine->match_all(&error, pdata->pattern, ustr, intervals);
                     } else {
                         ret = pdata->engine->match(&error, pdata->pattern, ustr);
@@ -816,9 +816,13 @@ For fixed string, make a lowered copy of ustr which on working
                 } else {
                     matches += ret;
                 }
+                if (lFlag && matches > 0) {
+                    fd->matches = 1;
+                    goto endfile;
+                }
             }
             fd->matches += (matches > 0);
-            if (/*_*/line_print) {
+            if (_line_print) {
                 if (matches > 0) {
                     if (!vFlag) {
                         if (file_print) {
@@ -856,9 +860,9 @@ For fixed string, make a lowered copy of ustr which on working
                         u_fputs(ustr->ptr, ustdout);
                     }
                 } else {
-                    /*if (fd->binary && BIN_FILE_BIN == binbehave) {
-                        goto out; // no need to continue (file level)
-                    } else*/ if (vFlag) {
+                    if (fd->binary && BIN_FILE_BIN == binbehave) {
+                        goto endfile; // no need to continue (file level)
+                    } else if (vFlag) {
                         if (file_print) {
                             print_file(fd->filename, FALSE, TRUE, FALSE);
                         }
@@ -870,8 +874,8 @@ For fixed string, make a lowered copy of ustr which on working
                 }
             }
         }
-out:
-        if (!/*_*/line_print) {
+endfile:
+        if (!_line_print) {
             if (cFlag) {
                 if (file_print) {
                     print_file(fd->filename, fd->matches == 0, TRUE, FALSE);
@@ -881,9 +885,9 @@ out:
                 print_file(fd->filename, FALSE, FALSE, TRUE);
             } else if (LFlag && !fd->matches) {
                 print_file(fd->filename, TRUE, FALSE, TRUE);
-            }/* else if (fd->binary && BIN_FILE_BIN == binbehave) {
+            } else if (fd->binary && BIN_FILE_BIN == binbehave && ((!vFlag && fd->matches) || (vFlag && !fd->matches))) {
                 u_fprintf(ustdout, "Binary file %s matches\n", fd->filename);
-            }*/
+            }
         }
         fd_close(fd);
     } else {
@@ -1111,7 +1115,11 @@ int main(int argc, char **argv)
     argv += optind;
 
     line_print = line_print && !cFlag && !lFlag && !LFlag;
+    /* Options overrides, in case of incompatibility between them */
     colorize = (COLOR_ALWAYS == color) || (COLOR_AUTO == color && stdout_is_tty());
+    if (binbehave != BIN_FILE_TEXT && (cFlag || lFlag || LFlag)) {
+        binbehave = BIN_FILE_TEXT;
+    }
 
     if (slist_empty(patterns)) {
         if (argc < 1) {

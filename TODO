@@ -5,11 +5,7 @@ TODO:
     * implement -w option
     * extend error handling (fd) and clean up msg or relative
     * implement context options (-A, -B, -C, -\d+)
-
-    * improve binary file handling (--binary-files=text|binary not implemented and display)
-    * lflag: stop at first match
-    * cFlag, lflag, LFlag cancel --binary-files (except vFlag)
-    * cFlag actually seems broken with binary files (because encoding? /bin/cp is UTF-32LE detected)
+    * improve binary file handling: display (handle non printable characters)
 
   - Normal:
     * write a man page
