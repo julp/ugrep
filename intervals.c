@@ -1,7 +1,10 @@
 #include "ugrep.h"
 
 #ifdef OLD_INTERVAL
-static interval_t *interval_new(int32_t lower_limit, int32_t upper_limit)
+static interval_t *interval_new(int32_t, int32_t) WARN_UNUSED_RESULT;
+static void interval_append(slist_t *, int32_t, int32_t) NONNULL();
+
+static interval_t *interval_new(int32_t lower_limit, int32_t upper_limit) /* WARN_UNUSED_RESULT */
 {
     interval_t *i;
 
@@ -12,13 +15,17 @@ static interval_t *interval_new(int32_t lower_limit, int32_t upper_limit)
     return i;
 }
 
-static void interval_append(slist_t *intervals, int32_t lower_limit, int32_t upper_limit)
+static void interval_append(slist_t *intervals, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
 {
+    require_else_return(NULL != intervals);
+
     slist_append(intervals, interval_new(lower_limit, upper_limit));
 }
 #else
+static slist_element_t *slist_pool_element_new(slist_pool_t *, const void *) WARN_UNUSED_RESULT NONNULL();
+static void slist_pool_garbage_element(slist_pool_t *, slist_element_t *, slist_element_t *) NONNULL();
 
-slist_pool_t *slist_pool_new(size_t elt_size, func_dtor_t dtor_func)
+slist_pool_t *slist_pool_new(size_t elt_size, func_dtor_t dtor_func) /* WARN_UNUSED_RESULT */
 {
     slist_pool_t *l;
 
@@ -34,14 +41,18 @@ slist_pool_t *slist_pool_new(size_t elt_size, func_dtor_t dtor_func)
     return l;
 }
 
-UBool slist_pool_empty(slist_pool_t *l)
+UBool slist_pool_empty(slist_pool_t *l) /* NONNULL() */
 {
+    require_else_return_false(NULL != l);
+
     return (NULL == l->head);
 }
 
-void slist_pool_clean(slist_pool_t *l)
+void slist_pool_clean(slist_pool_t *l) /* NONNULL() */
 {
     slist_element_t *el;
+
+    require_else_return(NULL != l);
 
     if (NULL != (el = l->head)) {
         while (NULL != el) {
@@ -55,10 +66,11 @@ void slist_pool_clean(slist_pool_t *l)
     }
 }
 
-void slist_pool_destroy(slist_pool_t *l)
+void slist_pool_destroy(slist_pool_t *l) /* NONNULL() */
 {
     slist_element_t *el;
 
+    require_else_return(NULL != l);
 # ifdef DEBUG
     debug("%d elements was recycled by garbage", l->recycled);
 # endif /* DEBUG */
@@ -85,11 +97,13 @@ void slist_pool_destroy(slist_pool_t *l)
     free(l);
 }
 
-static slist_element_t *slist_pool_element_new(slist_pool_t *l, const void *src)
+static slist_element_t *slist_pool_element_new(slist_pool_t *l, const void *src) /* WARN_UNUSED_RESULT NONNULL() */
 {
     slist_element_t *el;
 
-    // fetch element of garbage (and increment l->recycled) else alloc one
+    require_else_return_null(NULL != l);
+    require_else_return_null(NULL != src);
+
     if (NULL != l->garbage) {
         el = l->garbage;
         l->garbage = el->next;
@@ -108,9 +122,12 @@ static slist_element_t *slist_pool_element_new(slist_pool_t *l, const void *src)
     return el;
 }
 
-void slist_pool_append(slist_pool_t *l, const void *src)
+void slist_pool_append(slist_pool_t *l, const void *src) /* NONNULL() */
 {
     slist_element_t *el;
+
+    require_else_return(NULL != l);
+    require_else_return(NULL != src);
 
     el = slist_pool_element_new(l, src);
     if (NULL == l->tail) {
@@ -121,8 +138,12 @@ void slist_pool_append(slist_pool_t *l, const void *src)
     }
 }
 
-static void slist_pool_garbage_element(slist_pool_t *l, slist_element_t *target, slist_element_t *previous)
+static void slist_pool_garbage_element(slist_pool_t *l, slist_element_t *target, slist_element_t *previous) /* NONNULL() */
 {
+    require_else_return(NULL != l);
+    require_else_return(NULL != target);
+    require_else_return(NULL != previous);
+
     previous->next = target->next;
     target->next = l->garbage->next;
     l->garbage = target;
@@ -139,12 +160,14 @@ static void slist_pool_garbage_element(slist_pool_t *l, slist_element_t *target,
     (((value) >= (interval)->lower_limit) && ((value) <= (interval)->upper_limit))
 
 #ifdef OLD_INTERVAL
-UBool interval_add(slist_t *intervals, int32_t max_upper_limit, int32_t lower_limit, int32_t upper_limit)
+UBool interval_add(slist_t *intervals, int32_t max_upper_limit, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
 #else
-UBool interval_add(slist_pool_t *intervals, int32_t max_upper_limit, int32_t lower_limit, int32_t upper_limit)
+UBool interval_add(slist_pool_t *intervals, int32_t max_upper_limit, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
 #endif /* OLD_INTERVAL */
 {
     slist_element_t *prev, *from, *to;
+
+    require_else_return_false(NULL != intervals);
 
     if (lower_limit == 0 && upper_limit == max_upper_limit) {
         return TRUE;
@@ -244,9 +267,9 @@ UBool interval_add(slist_pool_t *intervals, int32_t max_upper_limit, int32_t low
 }
 
 #ifdef OLD_INTERVAL
-slist_t *intervals_new(void)
+slist_t *intervals_new(void) /* WARN_UNUSED_RESULT */
 #else
-slist_pool_t *intervals_new(void)
+slist_pool_t *intervals_new(void) /* WARN_UNUSED_RESULT */
 #endif /* OLD_INTERVAL */
 {
 #ifdef OLD_INTERVAL

@@ -2,7 +2,7 @@
 
 #define ERROR_MAX_LEN 596
 
-error_t *error_vnew(int type, const char *format, va_list args)
+error_t *error_vnew(int type, const char *format, va_list args) /* WARN_UNUSED_RESULT */
 {
     int32_t length;
     error_t *error;
@@ -17,7 +17,7 @@ error_t *error_vnew(int type, const char *format, va_list args)
     return error;
 }
 
-error_t *error_new(int type, const char *format, ...)
+error_t *error_new(int type, const char *format, ...) /* WARN_UNUSED_RESULT */
 {
     error_t *error;
     va_list args;

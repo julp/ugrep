@@ -1,6 +1,6 @@
 #include "ugrep.h"
 
-slist_t *slist_new(func_dtor_t dtor_func)
+slist_t *slist_new(func_dtor_t dtor_func) /* WARN_UNUSED_RESULT */
 {
     slist_t *l;
 
@@ -12,19 +12,25 @@ slist_t *slist_new(func_dtor_t dtor_func)
     return l;
 }
 
-size_t slist_length(slist_t *l)
+size_t slist_length(slist_t *l) /* NONNULL() */
 {
+    require_else_return_zero(NULL != l);
+
     return l->len;
 }
 
-UBool slist_empty(slist_t *l)
+UBool slist_empty(slist_t *l) /* NONNULL() */
 {
+    require_else_return_false(NULL != l);
+
     return (NULL == l->head);
 }
 
-void slist_append(slist_t *l, void *data)
+void slist_append(slist_t *l, void *data) /* NONNULL(1) */
 {
     slist_element_t *n;
+
+    require_else_return(NULL != l);
 
     n = mem_new(*n);
     n->next = NULL;
@@ -37,9 +43,11 @@ void slist_append(slist_t *l, void *data)
     }
 }
 
-void slist_clean(slist_t *l)
+void slist_clean(slist_t *l) /* NONNULL() */
 {
     slist_element_t *el;
+
+    require_else_return(NULL != l);
 
     if (NULL != (el = l->head)) {
         while (NULL != el) {
@@ -55,8 +63,10 @@ void slist_clean(slist_t *l)
     }
 }
 
-void slist_destroy(slist_t *l)
+void slist_destroy(slist_t *l) /* NONNULL() */
 {
+    require_else_return(NULL != l);
+
     slist_clean(l);
     free(l);
 }

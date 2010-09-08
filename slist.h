@@ -16,11 +16,11 @@ typedef struct {
     func_dtor_t dtor_func;
 } slist_t;
 
-void slist_append(slist_t *, void *);
-void slist_clean(slist_t *);
-void slist_destroy(slist_t *);
-UBool slist_empty(slist_t *);
-size_t slist_length(slist_t *);
-slist_t *slist_new(func_dtor_t);
+void slist_append(slist_t *, void *) NONNULL(1);
+void slist_clean(slist_t *) NONNULL();
+void slist_destroy(slist_t *) NONNULL();
+UBool slist_empty(slist_t *) NONNULL();
+size_t slist_length(slist_t *) NONNULL();
+slist_t *slist_new(func_dtor_t) WARN_UNUSED_RESULT;
 
 #endif /* !SLIST_H */

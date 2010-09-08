@@ -38,6 +38,18 @@
 #  define UNEXPECTED(condition) (condition)
 # endif /* (UN)EXPECTED */
 
+# if GCC_VERSION >= 3004
+#  define WARN_UNUSED_RESULT __attribute__((warn_unused_result))
+# else
+#  define WARN_UNUSED_RESULT
+# endif /* WARN_UNUSED_RESULT */
+
+# if GCC_VERSION >= 3003 && !defined(DEBUG)
+#  define NONNULL(...) __attribute__((nonnull(__VA_ARGS__)))
+# else
+#  define NONNULL(...)
+# endif /* NONNULL */
+
 # define ensure(expr)                                                                                           \
     do {                                                                                                        \
         if (EXPECTED(expr)) {                                                                                   \
@@ -46,6 +58,38 @@
             exit(EXIT_FAILURE);                                                                                 \
         }                                                                                                       \
     } while (0);
+
+# ifdef DEBUG
+#  define require_else_return(expr)                                                                                        \
+    do {                                                                                                                   \
+        if (EXPECTED(expr)) {                                                                                              \
+        } else {                                                                                                           \
+            fprintf(stderr, "[%s:%d]: assertion \"%s\" failed in %s()\n", ubasename(__FILE__), __LINE__, #expr, __func__); \
+            return;                                                                                                        \
+        }                                                                                                                  \
+    } while (0);
+
+#  define require_else_return_val(expr, val)                                                                               \
+    do {                                                                                                                   \
+        if (EXPECTED(expr)) {                                                                                              \
+        } else {                                                                                                           \
+            fprintf(stderr, "[%s:%d]: assertion \"%s\" failed in %s()\n", ubasename(__FILE__), __LINE__, #expr, __func__); \
+            return (val);                                                                                                  \
+        }                                                                                                                  \
+    } while (0);
+
+#  define require_else_return_null(expr)  require_else_return_val(expr, NULL)
+#  define require_else_return_zero(expr)  require_else_return_val(expr, 0)
+#  define require_else_return_true(expr)  require_else_return_val(expr, TRUE)
+#  define require_else_return_false(expr) require_else_return_val(expr, FALSE)
+# else
+#  define require_else_return(expr)
+#  define require_else_return_val(expr, val)
+#  define require_else_return_null(expr)
+#  define require_else_return_zero(expr)
+#  define require_else_return_true(expr)
+#  define require_else_return_false(expr)
+# endif /* DEBUG */
 
 enum {
     INFO,
@@ -106,7 +150,7 @@ typedef struct {
 } error_t;
 
 void error_destroy(error_t *);
-error_t *error_new(int, const char *, ...);
+error_t *error_new(int, const char *, ...) WARN_UNUSED_RESULT;
 void error_propagate(error_t **, error_t *);
 #ifdef DEBUG
 # define error_set(error, type, format, ...) \
@@ -115,7 +159,7 @@ void _error_set(error_t **, int, const char *, ...);
 #else
 void error_set(error_t **, int, const char *, ...);
 #endif /* DEBUG */
-error_t *error_vnew(int, const char *, va_list);
+error_t *error_vnew(int, const char *, va_list) WARN_UNUSED_RESULT;
 /* </error.c> */
 
 # include "ustring.h"

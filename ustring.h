@@ -8,24 +8,25 @@ typedef struct {
     size_t allocated;
 } UString;
 
-UString *ustring_adopt_string(UChar *);
-UString *ustring_adopt_string_len(UChar *, int32_t);
-void ustring_append_char(UString *, UChar);
-void ustring_append_string(UString *, const UChar *);
-void ustring_append_string_len(UString *, const UChar *, int32_t);
-UChar *ustring_chomp(UString *);
-void ustring_destroy(UString *);
-UString *ustring_dup_string(const UChar *);
-UString *ustring_dup_string_len(const UChar *, int32_t);
-UBool ustring_empty(const UString *);
-void ustring_insert_len(UString *, size_t, const UChar *, size_t);
-UString *ustring_new(void);
-void ustring_prepend_char(UString *, UChar);
-void ustring_prepend_string(UString *, const UChar *);
-void ustring_prepend_string_len(UString *, const UChar *, int32_t);
-UString *ustring_sized_new(size_t);
-void ustring_sync(const UString *, UString *, double);
-UBool ustring_tolower(UString *, error_t **);
-void ustring_truncate(UString *);
+UString *ustring_adopt_string(UChar *) NONNULL();
+UString *ustring_adopt_string_len(UChar *, size_t);
+void ustring_append_char(UString *, UChar) NONNULL();
+void ustring_append_string(UString *, const UChar *) NONNULL();
+void ustring_append_string_len(UString *, const UChar *, int32_t) NONNULL();
+void ustring_chomp(UString *) NONNULL();
+void ustring_destroy(UString *) NONNULL();
+UString *ustring_dup_string(const UChar *) NONNULL();
+UString *ustring_dup_string_len(const UChar *, size_t) NONNULL();
+UBool ustring_empty(const UString *) NONNULL();
+void ustring_insert_len(UString *, size_t, const UChar *, size_t) NONNULL();
+UString *ustring_new(void) WARN_UNUSED_RESULT;
+void ustring_prepend_char(UString *, UChar) NONNULL();
+void ustring_prepend_string(UString *, const UChar *) NONNULL();
+void ustring_prepend_string_len(UString *, const UChar *, int32_t) NONNULL();
+UString *ustring_sized_new(size_t) WARN_UNUSED_RESULT;
+void ustring_subreplace_len(UString *, const UChar *, size_t, size_t, size_t) NONNULL();
+void ustring_sync(const UString *, UString *, double) NONNULL();
+UBool ustring_tolower(UString *, error_t **) NONNULL(1);
+void ustring_truncate(UString *) NONNULL();
 
 #endif /* UGREP_STRING_H */
