@@ -345,7 +345,7 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
                 }
                 fd->reader->rewind(fd->reader_data);
                 if (BIN_FILE_TEXT != binbehave) {
-                    size_t ubuffer_len;
+                    int32_t ubuffer_len;
                     UChar32 ubuffer[MAX_BIN_REL_LEN + 1];
 
                     if (-1 == (ubuffer_len = fd->reader->readuchars(error, fd->reader_data, ubuffer, MAX_BIN_REL_LEN))) {
