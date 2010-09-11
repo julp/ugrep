@@ -36,7 +36,7 @@ UString *ustring_sized_new(size_t requested) /* WARN_UNUSED_RESULT */
     ustr = mem_new(*ustr);
     ustr->len = 0;
     ustr->allocated = nearest_power(requested);
-    ustr->ptr = mem_new_n(UChar, ustr->allocated + 1);
+    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
     *ustr->ptr = U_NUL;
 
     return ustr;
@@ -48,8 +48,8 @@ static void _ustring_maybe_expand(UString *ustr, size_t length) /* NONNULL() */
 
     if (ustr->len + length >= ustr->allocated) {
         //debug("Expand from %d to %d effective UChar", ustr->allocated, ustr->allocated*2);
-        ustr->allocated *= 2;
-        ustr->ptr = mem_renew(ustr->ptr, UChar, ustr->allocated + 1);
+        ustr->allocated = nearest_power(ustr->len + length);
+        ustr->ptr = mem_renew(ustr->ptr, *ustr->ptr, ustr->allocated + 1);
     }
 }
 
@@ -113,7 +113,7 @@ void ustring_sync(const UString *ref, UString *buffer, double ratio) /* NONNULL(
 
     if (buffer->allocated <= ref->allocated * ratio) {
         buffer->allocated = ref->allocated * ratio;
-        buffer->ptr = mem_renew(buffer->ptr, UChar, buffer->allocated + 1);
+        buffer->ptr = mem_renew(buffer->ptr, *buffer->ptr, buffer->allocated + 1);
     }
 }
 
@@ -155,6 +155,39 @@ void ustring_subreplace_len(UString *ustr, const UChar *replacement, size_t repl
         }
         ustr->len += diff_len;
         ustr->ptr[ustr->len] = 0;
+    }
+}
+
+void ustring_dump(UString *ustr) /* NONNULL() */
+{
+    size_t len;
+    UChar *p, *end;
+    const char replacement[] = "0x%04X";
+    int replacement_len = 6;
+
+    require_else_return(NULL != ustr);
+
+    len = 0;
+    end = ustr->ptr + ustr->len;
+    for (p = ustr->ptr; p < end; p++) {
+        if (!u_isprint(*p)) {
+            len += replacement_len - 1;
+        }
+    }
+    if (len > 0) {
+        _ustring_maybe_expand(ustr, len);
+        end = ustr->ptr + ustr->len;
+        ustr->len += len;
+        ustr->ptr[ustr->len] = U_NUL;
+        p = ustr->ptr + ustr->len;
+        while (--end >= ustr->ptr) {
+            if (!u_isprint(*end)) {
+                p -= replacement_len;
+                u_snprintf(p, replacement_len, replacement, *end);
+            } else {
+                *--p = *end;
+            }
+        }
     }
 }
 

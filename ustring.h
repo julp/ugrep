@@ -15,6 +15,7 @@ void ustring_append_string(UString *, const UChar *) NONNULL();
 void ustring_append_string_len(UString *, const UChar *, int32_t) NONNULL();
 void ustring_chomp(UString *) NONNULL();
 void ustring_destroy(UString *) NONNULL();
+void ustring_dump(UString *) NONNULL();
 UString *ustring_dup_string(const UChar *) NONNULL();
 UString *ustring_dup_string_len(const UChar *, size_t) NONNULL();
 UBool ustring_empty(const UString *) NONNULL();
