@@ -3,7 +3,6 @@ TODO:
     * find a (proper) way to get insitive case matching with fixed strings
     * implement recursive option (and exclude options: exclude, exclude-dir, include)
     * implement -w option
-    * extend error handling (fd) and clean up msg or relative
     * implement context options (-A, -B, -C, -\d+)
     * improve binary file handling: display (handle non printable characters)
 
