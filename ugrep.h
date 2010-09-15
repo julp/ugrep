@@ -128,8 +128,12 @@ const char *ubasename(const char *);
 # define U_LF  0x000A /* \n */
 # define U_NUL 0x0000 /* \0 */
 
+typedef void *(*func_ctor_t)(void); /* Constructor callback */
+typedef void (*func_dtor_t)(void *); /* Destructor callback */
+
 # include "alloc.h"
 # include "slist.h"
+# include "fixed_circular_list.h"
 # include "intervals.h"
 
 #ifndef MAX

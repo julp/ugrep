@@ -16,6 +16,9 @@
 #define MAX_ENC_REL_LEN 4096 // Maximum relevant length for encoding analyse (in bytes)
 #define MAX_BIN_REL_LEN 4096 // Maximum relevant length for binary analyse
 
+#define SEP_MATCH_UCHAR    0x003a
+#define SEP_NO_MATCH_UCHAR 0x002d
+
 #ifdef DEBUG
 # define RED(str)    "\33[1;31m" str "\33[0m"
 # define GREEN(str)  "\33[1;32m" str "\33[0m"
@@ -44,6 +47,27 @@ enum {
     PATTERN_REGEXP,
     PATTERN_AUTO
 };
+
+typedef struct {
+    UString *ustr;
+    UBool no_match;
+} line_t;
+
+void *line_ctor() {
+    line_t *l;
+
+    l = mem_new(*l);
+    l->ustr = ustring_new();
+
+    return l;
+}
+
+void line_dtor(void *data) {
+    FETCH_DATA(data, l, line_t);
+
+    ustring_destroy(l->ustr);
+    free(l);
+}
 
 /* ========== global variables ========== */
 
@@ -81,7 +105,8 @@ engine_t *engines[] = {
 int binbehave = BIN_FILE_SKIP;
 
 UFILE *ustdout = NULL, *ustderr = NULL;
-UString *ustr = NULL;
+//UString *ustr = NULL;
+fixed_circular_list_t *lines = NULL;
 slist_t *patterns = NULL;
 slist_element_t *p = NULL;
 reader_t *default_reader = NULL;
@@ -99,7 +124,7 @@ UBool cFlag = FALSE;
 UBool lFlag = FALSE;
 UBool LFlag = FALSE;
 
-UBool file_print = TRUE; // -H/h
+UBool file_print = FALSE; // -H/h
 UBool colorize = TRUE;
 UBool line_print = TRUE;
 
@@ -138,7 +163,8 @@ void print_error(error_t *error)
                 u_fprintf(ustderr, "[ " RED("ERR ") " ] ");
                 break;
             default:
-                u_fprintf(ustderr, "[ BUG ] Unknown error type for:\n");
+                type = FATAL;
+                u_fprintf(ustderr, "[ " RED("BUG ") " ] Unknown error type for:\n");
                 break;
         }
         u_fputs(error->message, ustderr);
@@ -248,6 +274,12 @@ typedef struct {
     size_t matches;
     UBool binary;
 } fd_t;
+
+void fd_close(fd_t *fd)
+{
+    fd->reader->close(fd->reader_data);
+    free(fd->reader_data);
+}
 
 UBool fd_open(error_t **error, fd_t *fd, const char *filename)
 {
@@ -371,15 +403,10 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
     return TRUE;
 failed:
     if (NULL != fd->reader_data) {
-        fd->reader->close(fd->reader_data);
+        //fd->reader->close(fd->reader_data);
+        fd_close(fd);
     }
     return FALSE;
-}
-
-void fd_close(fd_t *fd)
-{
-    fd->reader->close(fd->reader_data);
-    free(fd->reader_data);
 }
 
 UBool fd_eof(fd_t *fd) {
@@ -400,7 +427,7 @@ enum {
     READER_OPT
 };
 
-static char optstr[] = "EFHLRVce:f:hilnqrsvwx";
+static char optstr[] = "B:EFHLRVce:f:hilnqrsvwx";
 
 static struct option long_options[] =
 {
@@ -408,6 +435,7 @@ static struct option long_options[] =
     {"colour",              required_argument, NULL, COLOR_OPT},
     {"binary-files",        required_argument, NULL, BINARY_OPT},
     {"reader",              required_argument, NULL, READER_OPT},
+    {"before-context",      required_argument, NULL, 'B'},
     {"extended-regexp",     no_argument,       NULL, 'E'}, // POSIX
     {"fixed-string",        no_argument,       NULL, 'F'}, // POSIX
     {"with-filename",       no_argument,       NULL, 'H'},
@@ -517,6 +545,7 @@ static void pattern_destroy(void *data)
 {
     FETCH_DATA(data, p, pattern_data_t);
     p->engine->destroy(p->pattern);
+    free(data);
 }
 
 /* ========== highlighting ========== */
@@ -557,7 +586,9 @@ typedef enum {
     LINE_MATCH,
     FILE_MATCH,
     FILE_NO_MATCH,
-    LINE_NUMBER
+    LINE_NUMBER,
+    SEP_MATCH,
+    SEP_NO_MATCH
 } color_type_t;
 
 #define MAX_ATTRS   8
@@ -574,6 +605,8 @@ color_t colors[] = {
     {"file-match",    {0x001b, 0x005b, 0x0033, 0x0032, 0x006d, U_NUL}},
     {"file-no-match", {0x001b, 0x005b, 0x0033, 0x0031, 0x006d, U_NUL}},
     {"line-number",   {0x001b, 0x005b, 0x0033, 0x0035, 0x006d, U_NUL}},
+    {"sep-match",     {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, U_NUL}},
+    {"sep-no-match",  {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, U_NUL}},
     {NULL,            {U_NUL}}
 };
 
@@ -729,24 +762,30 @@ nextline:
 
 /* ========== process on file and/or directory helper ========== */
 
-static void print_file(const char *filename, UBool no_match, UBool sep, UBool eol)
+static void print_file(const char *filename, UBool no_file_match, UBool no_line_match, UBool print_sep, UBool eol)
 {
-    if (colorize && *colors[no_match ? FILE_NO_MATCH : FILE_MATCH].value) {
-        u_file_write(colors[no_match ? FILE_NO_MATCH : FILE_MATCH].value, -1, ustdout);
+    if (colorize && *colors[no_file_match ? FILE_NO_MATCH : FILE_MATCH].value) {
+        u_file_write(colors[no_file_match ? FILE_NO_MATCH : FILE_MATCH].value, -1, ustdout);
     }
     u_fprintf(ustdout, "%s", filename);
-    if (colorize && *colors[no_match ? FILE_NO_MATCH : FILE_MATCH].value) {
+    if (colorize && *colors[no_file_match ? FILE_NO_MATCH : FILE_MATCH].value) {
         u_file_write(reset, reset_len, ustdout);
     }
-    if (sep) {
-        u_fputc(0x003a, ustdout); // TODO: color
+    if (print_sep) {
+        if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
+            u_file_write(colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value, -1, ustdout);
+        }
+        u_fputc(no_line_match ? SEP_NO_MATCH_UCHAR : SEP_MATCH_UCHAR, ustdout);
+        if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
+            u_file_write(reset, reset_len, ustdout);
+        }
     }
     if (eol) {
         u_fputc(U_LF, ustdout);
     }
 }
 
-static void print_line(int lineno, UBool sep, UBool eol)
+static void print_line(int lineno, UBool no_line_match, UBool print_sep, UBool eol)
 {
     if (colorize && *colors[LINE_NUMBER].value) {
         u_file_write(colors[LINE_NUMBER].value, -1, ustdout);
@@ -755,8 +794,14 @@ static void print_line(int lineno, UBool sep, UBool eol)
     if (colorize && *colors[LINE_NUMBER].value) {
         u_file_write(reset, reset_len, ustdout);
     }
-    if (sep) {
-        u_fputc(0x003a, ustdout); // TODO: color
+    if (print_sep) {
+        if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
+            u_file_write(colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value, -1, ustdout);
+        }
+        u_fputc(no_line_match ? SEP_NO_MATCH_UCHAR : SEP_MATCH_UCHAR, ustdout);
+        if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
+            u_file_write(reset, reset_len, ustdout);
+        }
     }
     if (eol) {
         u_fputc(U_LF, ustdout);
@@ -765,24 +810,34 @@ static void print_line(int lineno, UBool sep, UBool eol)
 
 static int procfile(fd_t *fd, const char *filename)
 {
+    UString *ustr;
     error_t *error;
     UBool _line_print; /* line_print local override */
+    UBool _colorize;
+    size_t last_line_print = INT_MAX;
 
     error = NULL;
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
     _line_print = line_print && (!fd->binary || (fd->binary && BIN_FILE_BIN != binbehave));
+    _colorize = colorize && (fixed_circular_list_size(lines) > 1 || !vFlag);
 
+    fixed_circular_list_clean(lines);
     if (fd_open(&error, fd, filename)) {
         while (!fd_eof(fd)) {
             int matches;
             engine_return_t ret;
+            FETCH_DATA(fixed_circular_list_fetch(lines), line, line_t);
 
+            ustr = line->ustr;
             if (!fd_readline(&error, fd, ustr)) {
                 print_error(error);
             }
             matches = 0;
             fd->lineno++;
             ustring_chomp(ustr);
+            if (BIN_FILE_TEXT == binbehave) {
+                ustring_dump(ustr);
+            }
 #ifdef OLD_INTERVAL
             slist_clean(intervals);
 #else
@@ -802,7 +857,7 @@ For fixed string, make a lowered copy of ustr which on working
                 if (xFlag) {
                     ret = pdata->engine->whole_line_match(&error, pdata->pattern, ustr);
                 } else {
-                    if (colorize && _line_print) {
+                    if (_colorize && _line_print) {
                         ret = pdata->engine->match_all(&error, pdata->pattern, ustr, intervals);
                     } else {
                         ret = pdata->engine->match(&error, pdata->pattern, ustr);
@@ -816,21 +871,72 @@ For fixed string, make a lowered copy of ustr which on working
                 } else {
                     matches += ret;
                 }
-                if (lFlag && matches > 0) {
+                if (matches > 0 && (lFlag || (!vFlag && fd->binary && BIN_FILE_BIN == binbehave))) {
                     fd->matches = 1;
-                    goto endfile;
+                    goto endfile; // no need to continue (file level)
                 }
             }
-            fd->matches += (matches > 0);
+            fd->matches += line->no_match = (matches > 0);
             if (_line_print) {
+                if (_colorize) {
+                    if (ENGINE_WHOLE_LINE_MATCH == ret) {
+                        if (*colors[LINE_MATCH].value) {
+                            ustring_prepend_string(ustr, colors[LINE_MATCH].value);
+                            ustring_append_string_len(ustr, reset, reset_len);
+                        }
+                    } else {
+                        if (*colors[SINGLE_MATCH].value) {
+                            int32_t decalage;
+                            slist_element_t *el;
+                            UChar *before;
+                            int32_t before_len;
+
+                            decalage = 0;
+                            before = colors[SINGLE_MATCH].value;
+                            before_len = u_strlen(before);
+                            for (el = intervals->head; el; el = el->next) {
+                                FETCH_DATA(el->data, i, interval_t);
+
+                                ustring_insert_len(ustr, i->lower_limit + decalage, before, before_len);
+                                ustring_insert_len(ustr, i->upper_limit + decalage + before_len, reset, reset_len);
+                                decalage += before_len + reset_len;
+                            }
+                        }
+                    }
+                }
+                if ((!vFlag && matches > 0) || (vFlag && 0 == matches)) {
+                    flist_element_t *el;
+
+                    if (fixed_circular_list_length(lines) > 1) {
+                        if (fd->lineno - fixed_circular_list_size(lines) > last_line_print) {
+                            puts("--"); // TODO: color
+                        }
+                    }
+                    fixed_circular_list_foreach(lines, el) {
+                        //FETCH_DATA(el->data, ustr, UString);
+                        FETCH_DATA(el->data, l, line_t);
+
+                        if (file_print) {
+                            print_file(fd->filename, FALSE, vFlag ? l->no_match : !l->no_match, TRUE, FALSE);
+                        }
+                        if (nFlag) {
+                            print_line(fd->lineno - _i, vFlag ? l->no_match : !l->no_match, TRUE, FALSE);
+                        }
+                        u_fputs(l->ustr->ptr, ustdout);
+                    }
+                    last_line_print = fd->lineno;
+                    fixed_circular_list_clean(lines);
+                }
+            }
+#if 0
                 if (matches > 0) {
                     if (!vFlag) {
-                        if (file_print) {
+                        /*if (file_print) {
                             print_file(fd->filename, FALSE, TRUE, FALSE);
                         }
                         if (nFlag) {
                             print_line(fd->lineno, TRUE, FALSE);
-                        }
+                        }*/
                         if (colorize) {
                             if (ENGINE_WHOLE_LINE_MATCH == ret) {
                                 if (*colors[LINE_MATCH].value) {
@@ -857,34 +963,69 @@ For fixed string, make a lowered copy of ustr which on working
                                 }
                             }
                         }
-                        u_fputs(ustr->ptr, ustdout);
+                        //u_fputs(ustr->ptr, ustdout);
+                        {
+                            flist_element_t *el;
+
+                            fixed_circular_list_foreach(lines, el) {
+                                //FETCH_DATA(el->data, ustr, UString);
+                                FETCH_DATA(el->data, l, line_t);
+
+                                if (file_print) {
+                                    print_file(fd->filename, FALSE, !l->no_match, TRUE, FALSE);
+                                }
+                                if (nFlag) {
+                                    print_line(fd->lineno - _i, !l->no_match, TRUE, FALSE);
+                                }
+                                u_fputs(l->ustr->ptr, ustdout);
+                            }
+                            fixed_circular_list_clean(lines);
+                        }
                     }
                 } else {
                     if (fd->binary && BIN_FILE_BIN == binbehave) {
                         goto endfile; // no need to continue (file level)
                     } else if (vFlag) {
-                        if (file_print) {
-                            print_file(fd->filename, FALSE, TRUE, FALSE);
+                        /*if (file_print) {
+                            print_file(fd->filename, FALSE, FALSE, TRUE, FALSE);
                         }
                         if (nFlag) {
-                            print_line(fd->lineno, TRUE, FALSE);
+                            print_line(fd->lineno, FALSE, TRUE, FALSE);
                         }
-                        u_fputs(ustr->ptr, ustdout);
+                        u_fputs(ustr->ptr, ustdout);*/
+                        {
+                            flist_element_t *el;
+
+                            fixed_circular_list_foreach(lines, el) {
+                                //FETCH_DATA(el->data, ustr, UString);
+                                FETCH_DATA(el->data, l, line_t);
+
+                                if (file_print) {
+                                    print_file(fd->filename, FALSE, l->no_match, TRUE, FALSE);
+                                }
+                                if (nFlag) {
+                                    print_line(fd->lineno - _i, l->no_match, TRUE, FALSE);
+                                }
+                                u_fputs(l->ustr->ptr, ustdout);
+                            }
+                            fixed_circular_list_clean(lines);
+                        }
                     }
                 }
             }
+#endif
         }
 endfile:
         if (!_line_print) {
             if (cFlag) {
                 if (file_print) {
-                    print_file(fd->filename, fd->matches == 0, TRUE, FALSE);
+                    print_file(fd->filename, fd->matches == 0, FALSE, TRUE, FALSE);
                 }
                 u_fprintf(ustdout, "%d\n", fd->matches);
             } else if (lFlag && fd->matches) {
-                print_file(fd->filename, FALSE, FALSE, TRUE);
+                print_file(fd->filename, FALSE, FALSE, FALSE, TRUE);
             } else if (LFlag && !fd->matches) {
-                print_file(fd->filename, TRUE, FALSE, TRUE);
+                print_file(fd->filename, TRUE, FALSE, FALSE, TRUE);
             } else if (fd->binary && BIN_FILE_BIN == binbehave && ((!vFlag && fd->matches) || (vFlag && !fd->matches))) {
                 u_fprintf(ustdout, "Binary file %s matches\n", fd->filename);
             }
@@ -940,8 +1081,11 @@ static int procdir(fd_t *fd, char **dirname)
 
 static void exit_cb(void)
 {
-    if (NULL != ustr) {
+    /*if (NULL != ustr) {
         ustring_destroy(ustr);
+    }*/
+    if (NULL != lines) {
+        fixed_circular_list_destroy(lines);
     }
     if (NULL != patterns) {
         slist_destroy(patterns);
@@ -971,11 +1115,13 @@ int main(int argc, char **argv)
     UBool wFlag;
     error_t *error;
     int pattern_type; // -E/F
+    size_t before_context;
 
     matches = 0;
     error = NULL;
     wFlag = FALSE;
     iFlag = FALSE;
+    before_context = 0;
     color = COLOR_AUTO;
     pattern_type = PATTERN_AUTO;
 
@@ -1004,6 +1150,9 @@ int main(int argc, char **argv)
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
+            case 'B':
+                before_context = atoi(optarg); // TODO
+                break;
             case 'E':
                 pattern_type = PATTERN_REGEXP;
                 break;
@@ -1136,7 +1285,9 @@ int main(int argc, char **argv)
         parse_userpref();
     }
 
-    ustr = ustring_new();
+    //ustr = ustring_new();
+    //lines = fixed_circular_list_new(before_context + 1, (func_ctor_t) ustring_new, (func_dtor_t) ustring_destroy);
+    lines = fixed_circular_list_new(before_context + 1, line_ctor, line_dtor);
     intervals = intervals_new();
 
     if (0 == argc) {

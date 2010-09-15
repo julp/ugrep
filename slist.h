@@ -2,8 +2,6 @@
 
 # define SLIST_H
 
-typedef void (*func_dtor_t)(void *); /* Destructor callback */
-
 typedef struct slist_element_t {
     struct slist_element_t *next;
     void *data;
