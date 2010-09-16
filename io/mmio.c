@@ -42,7 +42,7 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
         mmfd->start = NULL;
     } else {
         mmfd->start = mmap(NULL, mmfd->len, PROT_READ, MAP_PRIVATE, mmfd->fd, (off_t) 0);
-        if (MAP_FAILED == mmfd->base) {
+        if (MAP_FAILED == mmfd->start) {
             error_set(error, WARN, "mmap failed on %s: %s", filename, strerror(errno));
             goto close;
         }
