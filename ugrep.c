@@ -1108,7 +1108,7 @@ int main(int argc, char **argv)
     };
 
     int c;
-    fd_t fd;
+    fd_t fd = { 0 };
     int color;
     int matches;
     UBool iFlag;
