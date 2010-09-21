@@ -124,6 +124,9 @@ UBool cFlag = FALSE;
 UBool lFlag = FALSE;
 UBool LFlag = FALSE;
 
+size_t after_context = 0;
+size_t before_context = 0;
+
 UBool file_print = FALSE; // -H/h
 UBool colorize = TRUE;
 UBool line_print = TRUE;
@@ -427,7 +430,7 @@ enum {
     READER_OPT
 };
 
-static char optstr[] = "B:EFHLRVce:f:hilnqrsvwx";
+static char optstr[] = "A:B:EFHLRVce:f:hilnqrsvwx";
 
 static struct option long_options[] =
 {
@@ -435,6 +438,7 @@ static struct option long_options[] =
     {"colour",              required_argument, NULL, COLOR_OPT},
     {"binary-files",        required_argument, NULL, BINARY_OPT},
     {"reader",              required_argument, NULL, READER_OPT},
+    {"after-context",       required_argument, NULL, 'A'},
     {"before-context",      required_argument, NULL, 'B'},
     {"extended-regexp",     no_argument,       NULL, 'E'}, // POSIX
     {"fixed-string",        no_argument,       NULL, 'F'}, // POSIX
@@ -463,7 +467,7 @@ static void usage(void)
 {
     fprintf(
         stderr,
-        "usage: %s [-EFHLRVchilnqrsvwx]\n"
+        "usage: %s [-EFHLRVchilnqrsvwx] [-A num] [-B num]\n"
         "\t[-e pattern] [-f file] [--binary-files=value]\n"
         "\t[pattern] [file ...]\n",
         __progname
@@ -812,17 +816,20 @@ static int procfile(fd_t *fd, const char *filename)
 {
     UString *ustr;
     error_t *error;
-    UBool _line_print; /* line_print local override */
     UBool _colorize;
-    size_t last_line_print = INT_MAX;
+    size_t last_line_print = 0;
+    int _after_context;
 
     error = NULL;
+    _after_context = 0;
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
-    _line_print = line_print && (!fd->binary || (fd->binary && BIN_FILE_BIN != binbehave));
-    _colorize = colorize && (fixed_circular_list_size(lines) > 1 || !vFlag);
+    _colorize = colorize && (before_context || after_context || !vFlag);
 
     fixed_circular_list_clean(lines);
     if (fd_open(&error, fd, filename)) {
+        UBool _line_print; /* line_print local override */
+
+        _line_print = line_print && (!fd->binary || (fd->binary && BIN_FILE_BIN != binbehave));
         while (!fd_eof(fd)) {
             int matches;
             engine_return_t ret;
@@ -869,16 +876,26 @@ For fixed string, make a lowered copy of ustr which on working
                     matches++;
                     break; // no need to continue (line level)
                 } else {
-                    matches += ret;
+                    //matches += ret;
+                    //matches += (ret && !vFlag) || (!ret && vFlag);
+                    if (!vFlag) {
+                        matches += ret;
+                    } else {
+                        matches += !ret;
+                    }
                 }
-                if (matches > 0 && (lFlag || (!vFlag && fd->binary && BIN_FILE_BIN == binbehave))) {
+                //if (matches > 0 && (lFlag || (!vFlag && fd->binary && BIN_FILE_BIN == binbehave))) {
+                if (matches && (lFlag || (fd->binary && BIN_FILE_BIN == binbehave))) {
+                    debug("file skipping");
                     fd->matches = 1;
                     goto endfile; // no need to continue (file level)
                 }
             }
-            fd->matches += line->no_match = (matches > 0);
+            fd->matches += /*line->no_match =*/ (matches > 0);
+            line->no_match = !matches; //(!matches && !vFlag) || (matches && vFlag);
             if (_line_print) {
-                if (_colorize) {
+                //if (_colorize && matches) {
+                if (_colorize && ((matches && !vFlag) || (!matches && vFlag))) {
                     if (ENGINE_WHOLE_LINE_MATCH == ret) {
                         if (*colors[LINE_MATCH].value) {
                             ustring_prepend_string(ustr, colors[LINE_MATCH].value);
@@ -904,28 +921,47 @@ For fixed string, make a lowered copy of ustr which on working
                         }
                     }
                 }
-                if ((!vFlag && matches > 0) || (vFlag && 0 == matches)) {
+                //if ((!vFlag && matches) || (vFlag && !matches)) {
+                if (!line->no_match) {
                     flist_element_t *el;
 
-                    if (fixed_circular_list_length(lines) > 1) {
+                    /*if (fixed_circular_list_length(lines) > 1) {
                         if (fd->lineno - fixed_circular_list_size(lines) > last_line_print) {
                             puts("--"); // TODO: color
                         }
+                    }*/
+                    if ( (before_context || after_context) && last_line_print > before_context && (fd->lineno - before_context > last_line_print + after_context) ) {
+                        puts("--"); // TODO: color
                     }
                     fixed_circular_list_foreach(lines, el) {
                         //FETCH_DATA(el->data, ustr, UString);
                         FETCH_DATA(el->data, l, line_t);
 
-                        if (file_print) {
-                            print_file(fd->filename, FALSE, vFlag ? l->no_match : !l->no_match, TRUE, FALSE);
+                        if (fd->lineno - _i > last_line_print) {
+                            if (file_print) {
+                                print_file(fd->filename, FALSE, l->no_match /*vFlag ? l->no_match : !l->no_match*/, TRUE, FALSE);
+                            }
+                            if (nFlag) {
+                                print_line(fd->lineno - _i, l->no_match /*vFlag ? l->no_match : !l->no_match*/, TRUE, FALSE);
+                            }
+                            u_fputs(l->ustr->ptr, ustdout);
                         }
-                        if (nFlag) {
-                            print_line(fd->lineno - _i, vFlag ? l->no_match : !l->no_match, TRUE, FALSE);
-                        }
-                        u_fputs(l->ustr->ptr, ustdout);
                     }
                     last_line_print = fd->lineno;
+                    _after_context = after_context;
                     fixed_circular_list_clean(lines);
+                } else {
+                    if (fd->lineno > last_line_print && _after_context > 0) {
+                        if (file_print) {
+                            print_file(fd->filename, FALSE, line->no_match /*vFlag ? matches : !matches*/, TRUE, FALSE);
+                        }
+                        if (nFlag) {
+                            print_line(fd->lineno, line->no_match /*vFlag ? matches : !matches*/, TRUE, FALSE);
+                        }
+                        u_fputs(ustr->ptr, ustdout);
+                        last_line_print = fd->lineno;
+                        _after_context--;
+                    }
                 }
             }
 #if 0
@@ -1026,7 +1062,7 @@ endfile:
                 print_file(fd->filename, FALSE, FALSE, FALSE, TRUE);
             } else if (LFlag && !fd->matches) {
                 print_file(fd->filename, TRUE, FALSE, FALSE, TRUE);
-            } else if (fd->binary && BIN_FILE_BIN == binbehave && ((!vFlag && fd->matches) || (vFlag && !fd->matches))) {
+            } else if (fd->binary && BIN_FILE_BIN == binbehave && fd->matches/*((!vFlag && fd->matches) || (vFlag && !fd->matches))*/) {
                 u_fprintf(ustdout, "Binary file %s matches\n", fd->filename);
             }
         }
@@ -1115,13 +1151,11 @@ int main(int argc, char **argv)
     UBool wFlag;
     error_t *error;
     int pattern_type; // -E/F
-    size_t before_context;
 
     matches = 0;
     error = NULL;
     wFlag = FALSE;
     iFlag = FALSE;
-    before_context = 0;
     color = COLOR_AUTO;
     pattern_type = PATTERN_AUTO;
 
@@ -1150,8 +1184,11 @@ int main(int argc, char **argv)
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
+            case 'A':
+                after_context = atoi(optarg); // TODO: atoi => strto(u)l
+                break;
             case 'B':
-                before_context = atoi(optarg); // TODO
+                before_context = atoi(optarg); // TODO: atoi => strto(u)l
                 break;
             case 'E':
                 pattern_type = PATTERN_REGEXP;
@@ -1263,7 +1300,11 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    line_print = line_print && !cFlag && !lFlag && !LFlag;
+    //line_print = line_print && !cFlag && !lFlag && !LFlag;
+    if (cFlag || lFlag || LFlag) {
+        before_context = after_context = 0;
+        line_print = FALSE;
+    }
     /* Options overrides, in case of incompatibility between them */
     colorize = (COLOR_ALWAYS == color) || (COLOR_AUTO == color && stdout_is_tty());
     if (binbehave != BIN_FILE_TEXT && (cFlag || lFlag || LFlag)) {
