@@ -592,7 +592,8 @@ typedef enum {
     FILE_NO_MATCH,
     LINE_NUMBER,
     SEP_MATCH,
-    SEP_NO_MATCH
+    SEP_NO_MATCH,
+    CONTEXT_SEP
 } color_type_t;
 
 #define MAX_ATTRS   8
@@ -611,6 +612,7 @@ color_t colors[] = {
     {"line-number",   {0x001b, 0x005b, 0x0033, 0x0035, 0x006d, U_NUL}},
     {"sep-match",     {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, U_NUL}},
     {"sep-no-match",  {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, U_NUL}},
+    {"context-sep",   {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, U_NUL}},
     {NULL,            {U_NUL}}
 };
 
@@ -925,13 +927,16 @@ For fixed string, make a lowered copy of ustr which on working
                 if (!line->no_match) {
                     flist_element_t *el;
 
-                    /*if (fixed_circular_list_length(lines) > 1) {
-                        if (fd->lineno - fixed_circular_list_size(lines) > last_line_print) {
-                            puts("--"); // TODO: color
-                        }
-                    }*/
                     if ( (before_context || after_context) && last_line_print > before_context && (fd->lineno - before_context > last_line_print + after_context) ) {
-                        puts("--"); // TODO: color
+                        const UChar linesep[] = {SEP_NO_MATCH_UCHAR, SEP_NO_MATCH_UCHAR, U_NUL};
+
+                        if (colorize && *colors[CONTEXT_SEP].value) {
+                            u_file_write(colors[CONTEXT_SEP].value, -1, ustdout);
+                        }
+                        u_fputs(linesep, ustdout);
+                        if (colorize && *colors[CONTEXT_SEP].value) {
+                            u_file_write(reset, reset_len, ustdout);
+                        }
                     }
                     fixed_circular_list_foreach(lines, el) {
                         //FETCH_DATA(el->data, ustr, UString);
