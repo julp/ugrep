@@ -430,7 +430,7 @@ enum {
     READER_OPT
 };
 
-static char optstr[] = "A:B:EFHLRVce:f:hilnqrsvwx";
+static char optstr[] = "A:B:C:EFHLRVce:f:hilnqrsvwx";
 
 static struct option long_options[] =
 {
@@ -440,6 +440,7 @@ static struct option long_options[] =
     {"reader",              required_argument, NULL, READER_OPT},
     {"after-context",       required_argument, NULL, 'A'},
     {"before-context",      required_argument, NULL, 'B'},
+    {"context",             required_argument, NULL, 'C'},
     {"extended-regexp",     no_argument,       NULL, 'E'}, // POSIX
     {"fixed-string",        no_argument,       NULL, 'F'}, // POSIX
     {"with-filename",       no_argument,       NULL, 'H'},
@@ -1190,10 +1191,24 @@ int main(int argc, char **argv)
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
             case 'A':
-                after_context = atoi(optarg); // TODO: atoi => strto(u)l
-                break;
             case 'B':
-                before_context = atoi(optarg); // TODO: atoi => strto(u)l
+            case 'C':
+                if (NULL != optarg) {
+                    long val;
+                    char *endptr;
+
+                    val = strtol(optarg, &endptr, 10);
+                    if (0 != errno || endptr == optarg || *endptr != '\0' || val </*=*/ 0) {
+                        fprintf(stderr, "Context out of range\n");
+                        return UGREP_EXIT_USAGE;
+                    }
+                    if (c != 'A') {
+                        after_context = val;
+                    }
+                    if (c != 'B') {
+                        before_context = val;
+                    }
+                }
                 break;
             case 'E':
                 pattern_type = PATTERN_REGEXP;
