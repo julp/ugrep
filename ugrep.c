@@ -53,7 +53,7 @@ typedef struct {
     UBool no_match;
 } line_t;
 
-void *line_ctor() {
+void *line_ctor(void) {
     line_t *l;
 
     l = mem_new(*l);
@@ -106,14 +106,13 @@ int binbehave = BIN_FILE_SKIP;
 
 UFILE *ustdout = NULL, *ustderr = NULL;
 //UString *ustr = NULL;
-fixed_circular_list_t *lines = NULL;
-slist_t *patterns = NULL;
-slist_element_t *p = NULL;
-reader_t *default_reader = NULL;
+static fixed_circular_list_t *lines = NULL;
+static slist_t *patterns = NULL;
+static reader_t *default_reader = NULL;
 #ifdef OLD_INTERVAL
-slist_t *intervals = NULL;
+static slist_t *intervals = NULL;
 #else
-slist_pool_t *intervals = NULL;
+static slist_pool_t *intervals = NULL;
 #endif /* OLD_INTERVAL */
 
 UBool rFlag = FALSE;
@@ -835,6 +834,7 @@ static int procfile(fd_t *fd, const char *filename)
         _line_print = line_print && (!fd->binary || (fd->binary && BIN_FILE_BIN != binbehave));
         while (!fd_eof(fd)) {
             int matches;
+            slist_element_t *p;
             engine_return_t ret;
             FETCH_DATA(fixed_circular_list_fetch(lines), line, line_t);
 
