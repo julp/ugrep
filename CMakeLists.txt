@@ -15,7 +15,7 @@ find_package(ICU REQUIRED)
 find_package(ZLIB)
 find_package(BZip2)
 
-set(BASE_SOURCES ugrep.c alloc.c ustring.c io/mmio.c io/stdio.c slist.c engines/fixedengine.c engines/icureengine.c intervals.c error.c fixed_circular_list.c)
+set(BASE_SOURCES ugrep.c alloc.c ustring.c io/mmio.c io/stdio.c slist.c engines/fixedengine.c engines/icureengine.c engines/icusearchengine.c intervals.c error.c fixed_circular_list.c)
 set(EXTRA_SOURCES)
 set(EXTRA_LIBS)
 
@@ -75,3 +75,5 @@ list(APPEND CMAKE_INSTALL_MANIFEST_FILES \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
 install(CODE "EXEC_PROGRAM(${CMAKE_COMMAND} ARGS -E create_symlink \"${CMAKE_INSTALL_PREFIX}/bin/ugrep\" \"${CMAKE_INSTALL_PREFIX}/bin/uegrep\")
 list(APPEND CMAKE_INSTALL_MANIFEST_FILES \"${CMAKE_INSTALL_PREFIX}/bin/uegrep\")
 ")
+
+add_custom_target(test COMMAND find ${CMAKE_SOURCE_DIR}/test -name '*.sh' -exec bash {} "\;")

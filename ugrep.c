@@ -94,11 +94,13 @@ reader_t *available_readers[] = {
     NULL
 };
 
-extern engine_t fixed_engine;
+//extern engine_t fixed_engine;
+extern engine_t icusearch_engine;
 extern engine_t icure_engine;
 
 engine_t *engines[] = {
-    &fixed_engine,
+    //&fixed_engine,
+    &icusearch_engine,
     &icure_engine
 };
 
@@ -860,9 +862,9 @@ static int procfile(fd_t *fd, const char *filename)
 /*
 For fixed string, make a lowered copy of ustr which on working
 */
-                if (!xFlag) {
+                /*if (!xFlag) {
                     pdata->engine->pre_exec(pdata->pattern, ustr);
-                }
+                }*/
                 // </very bad: drop this ASAP!>
                 if (xFlag) {
                     ret = pdata->engine->whole_line_match(&error, pdata->pattern, ustr);

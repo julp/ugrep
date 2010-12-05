@@ -16,7 +16,14 @@
 # include <unicode/ustdio.h>
 # include <unicode/ustring.h>
 # include <unicode/ucsdet.h>
+
 # include <unicode/uregex.h>
+
+# include <unicode/uloc.h>
+# include <unicode/ucol.h>
+# include <unicode/ubrk.h>
+# include <unicode/usearch.h>
+
 
 # ifdef __GNUC__
 #  define GCC_VERSION (__GNUC__ * 1000 + __GNUC_MINOR__)
@@ -192,7 +199,6 @@ typedef enum {
 typedef struct {
     void *(*compile)(error_t **, const UChar *, int32_t, UBool, UBool);
     void *(*compileC)(error_t **, const char *, UBool, UBool);
-    void (*pre_exec)(void *, UString *);
     engine_return_t (*match)(error_t **, void *, const UString *);
 #ifdef OLD_INTERVAL
     engine_return_t (*match_all)(error_t **, void *, const UString *, slist_t *);

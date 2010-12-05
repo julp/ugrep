@@ -3,6 +3,7 @@
 #define WORD_BOUNDARY(c) \
     (!u_isalnum(c) && 0x005f != c)
 
+/* TODO: UNSAFE, code unit considered */
 #define IS_BOUNDED_MATCH(pattern, subject, match) \
     ( \
         ((match - subject->ptr == 0) || (WORD_BOUNDARY(subject->ptr[match - subject->ptr - 1]))) \
@@ -60,23 +61,8 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, UBool c
         pattern_destroy(p);
         return NULL;
     }
-    if (case_insensitive) {
-        if (!ustring_tolower(p->pattern, error)) {
-            pattern_destroy(p);
-            return NULL;
-        }
-    }
 
     return p;
-}
-
-static void engine_fixed_pre_exec(void *data, UString *subject)
-{
-    FETCH_DATA(data, p, fixed_pattern_t);
-
-    if (p->case_insensitive) {
-        ustring_tolower(subject, NULL);
-    }
 }
 
 static engine_return_t engine_fixed_match(error_t **UNUSED(error), void *data, const UString *subject)
@@ -144,7 +130,6 @@ static void engine_fixed_destroy(void *data)
 engine_t fixed_engine = {
     engine_fixed_compile,
     engine_fixed_compileC,
-    engine_fixed_pre_exec,
     engine_fixed_match,
     engine_fixed_match_all,
     engine_fixed_whole_line_match,

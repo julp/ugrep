@@ -47,11 +47,6 @@ static void *engine_icure_compileC(error_t **error, const char *pattern, UBool c
     return uregex;
 }
 
-static void engine_icure_pre_exec(void *UNUSED(data), UString *UNUSED(subject))
-{
-    /* NOP */
-}
-
 static engine_return_t engine_icure_match(error_t **error, void *data, const UString *subject)
 {
     UBool ret;
@@ -151,7 +146,6 @@ static void engine_icure_destroy(void *data)
 engine_t icure_engine = {
     engine_icure_compile,
     engine_icure_compileC,
-    engine_icure_pre_exec,
     engine_icure_match,
     engine_icure_match_all,
     engine_icure_whole_line_match,

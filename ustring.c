@@ -132,70 +132,113 @@ void ustring_truncate(UString *ustr) /* NONNULL() */
     ustr->len = 0;
 }
 
-void ustring_subreplace_len(UString *ustr, const UChar *replacement, size_t replacement_length, size_t position, size_t length) /* NONNULL() */
+/* TODO: CHECK */
+void ustring_subreplace_len(
+    UString *ustr,
+    const UChar *replacement,
+    size_t replacement_length, /* Unit : CU */
+    size_t position,           /* Unit : CP */
+    size_t length              /* Unit : CP */
+) /* NONNULL() */
 {
+    size_t ustr_cp_len; /* Unit : CP */
+    int32_t diff_cu_len, start_cu_pos, end_cu_pos, cu_length; /* Unit : CU */
+
     require_else_return(NULL != ustr);
     require_else_return(NULL != replacement);
-    require_else_return(position <= ustr->len);
 
-    if (position <= ustr->len) {
-        int32_t diff_len;
+    ustr_cp_len = u_countChar32(ustr->ptr, ustr->len);
 
-        diff_len = replacement_length - length;
-        if (diff_len > 0) {
-            _ustring_maybe_expand(ustr, diff_len);
-        }
-        if (replacement >= ustr->ptr && replacement <= ustr->ptr + ustr->len) {
-            // TODO: overlap
-        } else {
-            if (replacement_length != length) {
-                memmove(ustr->ptr + position + length + diff_len, ustr->ptr + position + length, ustr->len - position);
-            }
-            memcpy(ustr->ptr + position, replacement, replacement_length);
-        }
-        ustr->len += diff_len;
-        ustr->ptr[ustr->len] = 0;
+    require_else_return(position <= ustr_cp_len);
+    require_else_return(position + length <= ustr_cp_len);
+
+    start_cu_pos = 0;
+    U16_FWD_N(ustr->ptr, start_cu_pos, ustr->len, position);
+    end_cu_pos = start_cu_pos;
+    U16_FWD_N(ustr->ptr, end_cu_pos, ustr->len, position + length);
+
+    cu_length = end_cu_pos - start_cu_pos;
+    diff_cu_len = replacement_length - cu_length;
+    if (diff_cu_len > 0) {
+        _ustring_maybe_expand(ustr, diff_cu_len);
     }
+    printf("start_cu_pos = %d, end_cu_pos = %d, diff_cu_len = %d\n", start_cu_pos, end_cu_pos, diff_cu_len);
+    if (replacement >= ustr->ptr && replacement <= ustr->ptr + ustr->len) {
+        // TODO: overlap
+    } else {
+        if (u_countChar32(replacement, replacement_length) != length) {
+            u_memmove(ustr->ptr + start_cu_pos + cu_length + diff_cu_len, ustr->ptr + start_cu_pos + cu_length, ustr->len - start_cu_pos);
+        }
+        u_memcpy(ustr->ptr + start_cu_pos, replacement, replacement_length);
+    }
+    ustr->len += diff_cu_len;
+    ustr->ptr[ustr->len] = 0;
 }
 
+/* TODO: CHECK */
 void ustring_dump(UString *ustr) /* NONNULL() */
 {
-    size_t len;
-    UChar *p, *end;
+    UChar *p;
+    UChar32 c;
+    size_t i, len;
+    const int replacement_len = 6;
     const char replacement[] = "0x%04X";
-    int replacement_len = 6;
 
     require_else_return(NULL != ustr);
 
     len = 0;
-    end = ustr->ptr + ustr->len;
-    for (p = ustr->ptr; p < end; p++) {
-        if (!u_isprint(*p)) {
-            len += replacement_len - 1;
+    for (i = 0; i < ustr->len; ) {
+        U16_NEXT(ustr->ptr, i, ustr->len, c);
+        switch (c) {
+            case 0x09:
+            case 0x0D:
+                len++;
+                break;
+            default:
+                if (!u_isprint(c)) {
+                    len += replacement_len - U16_LENGTH(c);
+                }
         }
     }
     if (len > 0) {
         _ustring_maybe_expand(ustr, len);
-        end = ustr->ptr + ustr->len;
         ustr->len += len;
-        ustr->ptr[ustr->len] = U_NUL;
+        ustr->ptr[ustr->len] = 0;
         p = ustr->ptr + ustr->len;
-        while (--end >= ustr->ptr) {
-            if (!u_isprint(*end)) {
-                p -= replacement_len;
-                u_snprintf(p, replacement_len, replacement, *end);
-            } else {
-                *--p = *end;
+        while (i > 0) {
+            U16_PREV(ustr->ptr, 0, i, c);
+            switch (c) {
+                case 0x09:
+                    *--p = 0x74;
+                    *--p = 0x5C;
+                    break;
+                case 0x0D:
+                    *--p = 0x72;
+                    *--p = 0x5C;
+                    break;
+                default:
+                    if (!u_isprint(c)) {
+                        p -= replacement_len;
+                        u_snprintf(p, replacement_len, replacement, c);
+                    } else {
+                        if (U_IS_BMP(c)) {
+                            *--p = c;
+                        } else {
+                            *--p = U16_LEAD(c);
+                            *--p = U16_TRAIL(c);
+                        }
+                    }
             }
         }
     }
 }
 
+/* UNSAFE: code units */
 void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t length) /* NONNULL() */
 {
     require_else_return(c != NULL);
     require_else_return(NULL != ustr);
-    require_else_return(position <= ustr->len); // TODO
+    require_else_return(position <= ustr->len);
 
     _ustring_maybe_expand(ustr, length);
     if (c >= ustr->ptr && c <= ustr->ptr + ustr->len) {
@@ -227,6 +270,7 @@ void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t l
     ustr->ptr[ustr->len] = U_NUL;
 }
 
+/* UNSAFE: code units */
 UString *ustring_dup_string_len(const UChar *from, size_t length) /* NONNULL() */
 {
     UString *ustr;
@@ -267,25 +311,4 @@ UString *ustring_adopt_string(UChar *from) /* NONNULL() */
     require_else_return_null(NULL != from);
 
     return ustring_adopt_string_len(from, (size_t) u_strlen(from));
-}
-
-UBool ustring_tolower(UString *ustr, error_t **error) /* NONNULL(1) */
-{
-    UErrorCode status;
-    size_t result_len;
-
-    require_else_return_false(ustr != NULL);
-
-    status = U_ZERO_ERROR;
-    result_len = (size_t) u_strFoldCase(ustr->ptr, ustr->len, ustr->ptr, ustr->len, 0, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "u_strFoldCase");
-        return FALSE;
-    }
-    if (result_len != ustr->len) {
-        error_set(error, FATAL, "Offsetted search is unreliable: the case-folded version has not the same length than the original");
-        return FALSE;
-    }
-
-    return TRUE;
 }
