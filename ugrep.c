@@ -94,9 +94,10 @@ reader_t *available_readers[] = {
     NULL
 };
 
-//extern engine_t fixed_engine;
-extern engine_t icusearch_engine;
-extern engine_t icure_engine;
+// TODO: merge fixed + search (need to know about -x in compile)
+extern engine_t fixed_engine; // best without -i or -w except -xi (whole line match)
+extern engine_t icusearch_engine; // complete fixed engine (-i, -w managed)
+extern engine_t icure_engine; // -w not managed, add \b to front and end, for now
 
 engine_t *engines[] = {
     //&fixed_engine,
@@ -858,14 +859,6 @@ static int procfile(fd_t *fd, const char *filename)
             for (p = patterns->head; NULL != p; p = p->next) {
                 FETCH_DATA(p->data, pdata, pattern_data_t);
 
-                // <very bad: drop this ASAP!>
-/*
-For fixed string, make a lowered copy of ustr which on working
-*/
-                /*if (!xFlag) {
-                    pdata->engine->pre_exec(pdata->pattern, ustr);
-                }*/
-                // </very bad: drop this ASAP!>
                 if (xFlag) {
                     ret = pdata->engine->whole_line_match(&error, pdata->pattern, ustr);
                 } else {

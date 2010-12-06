@@ -3,13 +3,16 @@
 #define WORD_BOUNDARY(c) \
     (!u_isalnum(c) && 0x005f != c)
 
-/* TODO: UNSAFE, code unit considered */
-#define IS_BOUNDED_MATCH(pattern, subject, match) \
-    ( \
-        ((match - subject->ptr == 0) || (WORD_BOUNDARY(subject->ptr[match - subject->ptr - 1]))) \
-        && \
-        ((match - subject->ptr + pattern->len == subject->len) || (WORD_BOUNDARY(subject->ptr[match - subject->ptr + pattern->len]))) \
-    )
+static int is_bounded_match(const UString *pattern, const UString *subject, const UChar *match) {
+    UChar32 start;
+    UChar32 end;
+
+    U16_GET(subject->ptr, 0, match - subject->ptr - 1, subject->len, start);
+    U16_GET(subject->ptr, 0, match - subject->ptr + pattern->len, subject->len, end);
+
+    //return u_hasBinaryProperty(start, UCHAR_WORD_BREAK) && u_hasBinaryProperty(end, UCHAR_WORD_BREAK);
+    return WORD_BOUNDARY(start) && WORD_BOUNDARY(end);
+}
 
 typedef struct {
     UString *pattern;
@@ -29,8 +32,8 @@ static void *engine_fixed_compile(error_t **UNUSED(error), const UChar *upattern
 
     p = mem_new(*p);
     p->pattern = ustring_dup_string_len(upattern, length);
-    p->case_insensitive = case_insensitive;
     p->word_bounded = word_bounded;
+    p->case_insensitive = case_insensitive;
 
     return p;
 }
@@ -77,7 +80,7 @@ static engine_return_t engine_fixed_match(error_t **UNUSED(error), void *data, c
         if (NULL == m) {
             return ENGINE_NO_MATCH;
         } else {
-            return IS_BOUNDED_MATCH(p->pattern, subject, m) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH;
+            return is_bounded_match(p->pattern, subject, m) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH;
         }
     } else {
         return (NULL != u_strFindFirst(subject->ptr, subject->len, p->pattern->ptr, p->pattern->len) ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
@@ -97,7 +100,7 @@ static engine_return_t engine_fixed_match_all(error_t **UNUSED(error), void *dat
     matches = pos = 0;
     while (NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, p->pattern->ptr, p->pattern->len))) {
         pos = m - subject->ptr;
-        if (!p->word_bounded || (p->word_bounded && IS_BOUNDED_MATCH(p->pattern, subject, m))) {
+        if (!p->word_bounded || (p->word_bounded && is_bounded_match(p->pattern, subject, m))) {
             matches++;
             if (interval_add(intervals, subject->len, pos, pos + p->pattern->len)) {
                 return ENGINE_WHOLE_LINE_MATCH;

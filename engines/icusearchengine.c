@@ -1,6 +1,7 @@
 #include "ugrep.h"
 
-static UChar EMPTY_STR[] = { 0, 0 };
+static UChar _USEARCH_FAKE_USTR[] = { 0, 0 };
+#define USEARCH_FAKE_USTR _USEARCH_FAKE_USTR, 1 // empty stings refused by usearch
 
 static void *engine_icusearch_compile(error_t **error, const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
 {
@@ -8,35 +9,35 @@ static void *engine_icusearch_compile(error_t **error, const UChar *upattern, in
     UErrorCode status;
     UBreakIterator *ubrk;
     UStringSearch *usearch;
+    const char *inherited_loc;
 
     ubrk = NULL;
     status = U_ZERO_ERROR;
+    inherited_loc = uloc_getDefault();
     if (word_bounded) {
-        ubrk = ubrk_open(UBRK_WORD, uloc_getDefault(), EMPTY_STR, 1, &status);
+        ubrk = ubrk_open(UBRK_WORD, inherited_loc, USEARCH_FAKE_USTR, &status);
         if (U_FAILURE(status)) {
             icu_error_set(error, FATAL, status, "ubrk_open");
             return NULL;
         }
     }
-    ucol = ucol_open(NULL, &status);
+    ucol = ucol_open(inherited_loc, &status);
     if (U_FAILURE(status)) {
+        if (NULL != ubrk) {
+            ubrk_close(ubrk);
+        }
         icu_error_set(error, FATAL, status, "ucol_open");
         return NULL;
     }
     if (case_insensitive) {
-        ucol_setAttribute(ucol, UCOL_STRENGTH, UCOL_PRIMARY, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "ucol_setAttribute");
-            return NULL;
-        }
-        ucol_setAttribute(ucol, UCOL_CASE_LEVEL, UCOL_ON, &status); /* TODO: set it even if case_insensitive == FALSE to ignore accents? */
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "ucol_setAttribute");
-            return NULL;
-        }
+        ucol_setStrength(ucol, UCOL_PRIMARY);
     }
-    usearch = usearch_openFromCollator(upattern, length, EMPTY_STR, 1, ucol, ubrk, &status);
+    usearch = usearch_openFromCollator(upattern, length, USEARCH_FAKE_USTR, ucol, ubrk, &status);
     if (U_FAILURE(status)) {
+        if (NULL != ubrk) {
+            ubrk_close(ubrk);
+        }
+        ucol_close(ucol);
         icu_error_set(error, FATAL, status, "usearch_openFromCollator");
         return NULL;
     }
@@ -48,69 +49,62 @@ static void *engine_icusearch_compileC(error_t **error, const char *pattern, UBo
 {
     int32_t len;
     UCollator *ucol;
+    UChar *upattern;
     UConverter *ucnv;
     UErrorCode status;
-    UString *upattern;
+    int32_t upattern_len;
     UBreakIterator *ubrk;
     UStringSearch *usearch;
+    const char *inherited_loc;
+    int32_t upattern_allocated;
 
-    /*
-     * TODO: upattern never freed? Use Uchar*?
-     */
+    status = U_ZERO_ERROR;
     ucnv = ucnv_open(NULL, &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ucnv_open");
         return NULL;
     }
     len = strlen(pattern);
-    upattern = ustring_sized_new(len * ucnv_getMaxCharSize(ucnv) + 1);
-    upattern->len = ucnv_toUChars(ucnv, upattern->ptr, upattern->allocated, pattern, len, &status);
-    upattern->ptr[upattern->len] = U_NUL;
+    upattern_allocated = len * ucnv_getMaxCharSize(ucnv) + 1;
+    upattern = mem_new_n(UChar, upattern_allocated);
+    upattern_len = ucnv_toUChars(ucnv, upattern, upattern_allocated, pattern, len, &status);
+    upattern[upattern_len] = U_NUL;
     ucnv_close(ucnv);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ucnv_toUChars");
-        ustring_destroy(upattern);
+        free(upattern);
         return NULL;
     }
-
     ubrk = NULL;
-    status = U_ZERO_ERROR;
+    inherited_loc = uloc_getDefault();
     if (word_bounded) {
-        ubrk = ubrk_open(UBRK_WORD, uloc_getDefault(), EMPTY_STR, 1, &status);
+        ubrk = ubrk_open(UBRK_WORD, inherited_loc, USEARCH_FAKE_USTR, &status);
         if (U_FAILURE(status)) {
             icu_error_set(error, FATAL, status, "ubrk_open");
-            ustring_destroy(upattern);
+            free(upattern);
             return NULL;
         }
     }
-    ucol = ucol_open(NULL, &status);
+    ucol = ucol_open(inherited_loc, &status);
     if (U_FAILURE(status)) {
+        if (NULL != ubrk) {
+            ubrk_close(ubrk);
+        }
         icu_error_set(error, FATAL, status, "ucol_open");
-        // TODO: free ubrk ?
-        ustring_destroy(upattern);
+        free(upattern);
         return NULL;
     }
     if (case_insensitive) {
-        ucol_setAttribute(ucol, UCOL_STRENGTH, UCOL_PRIMARY, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "ucol_setAttribute");
-            // TODO: free ubrk ?
-            ustring_destroy(upattern);
-            return NULL;
-        }
-        ucol_setAttribute(ucol, UCOL_CASE_LEVEL, UCOL_ON, &status); /* TODO: set it even if case_insensitive == FALSE to ignore accents? */
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "ucol_setAttribute");
-            // TODO: free ubrk ?
-            ustring_destroy(upattern);
-            return NULL;
-        }
+        ucol_setStrength(ucol, UCOL_PRIMARY);
     }
-    usearch = usearch_openFromCollator(upattern->ptr, upattern->len, EMPTY_STR, 1, ucol, ubrk, &status);
+    usearch = usearch_openFromCollator(upattern, upattern_len, USEARCH_FAKE_USTR, ucol, ubrk, &status);
     if (U_FAILURE(status)) {
+        if (NULL != ubrk) {
+            ubrk_close(ubrk);
+        }
+        ucol_close(ucol);
         icu_error_set(error, FATAL, status, "usearch_openFromCollator");
-        // TODO: free ubrk + ucol ?
-        ustring_destroy(upattern);
+        free(upattern);
         return NULL;
     }
 
@@ -169,14 +163,9 @@ static engine_return_t engine_icusearch_match_all(error_t **error, void *data, c
             }
         }
         if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "usearch_[first|next]"/*(matches == 0 ? "usearch_first" : "usearch_next")*/);
+            icu_error_set(error, FATAL, status, "usearch_[first|next]");
             return ENGINE_FAILURE;
         }
-        /*usearch_reset(usearch, 0, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "usearch_reset");
-            return ENGINE_FAILURE;
-        }*/
 
         return (matches ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
     } else {
@@ -202,7 +191,7 @@ static engine_return_t engine_icusearch_whole_line_match(error_t **error, void *
         return ENGINE_FAILURE;
     }
 
-    // TODO: unsafe because of case, the length could be different?
+    // TODO: is it safe ? (because of case, the length could be different)
     return (ret != USEARCH_DONE && usearch_getMatchedLength(usearch) == subject->len ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
 }
 
@@ -210,9 +199,9 @@ static void engine_icusearch_destroy(void *data)
 {
     FETCH_DATA(data, usearch, UStringSearch);
 
-    // TODO: are associated UBreakIterator and UCollator destroyed too ?
-    // ucol_close(usearch_getCollator(usearch));
-    // ubrk_close(usearch_getBreakIterator(usearch));
+    // TODO: free pattern?
+    ucol_close(usearch_getCollator(usearch));
+    // ubrk_close(usearch_getBreakIterator(usearch)); // done by usearch_close
     usearch_close(usearch);
 }
 
