@@ -3,7 +3,7 @@
 static UChar _USEARCH_FAKE_USTR[] = { 0, 0 };
 #define USEARCH_FAKE_USTR _USEARCH_FAKE_USTR, 1 // empty stings refused by usearch
 
-static void *engine_icusearch_compile(error_t **error, const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
+static void *engine_search_compile(error_t **error, const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
 {
     UCollator *ucol;
     UErrorCode status;
@@ -45,7 +45,7 @@ static void *engine_icusearch_compile(error_t **error, const UChar *upattern, in
     return usearch;
 }
 
-static void *engine_icusearch_compileC(error_t **error, const char *pattern, UBool case_insensitive, UBool word_bounded)
+static void *engine_search_compileC(error_t **error, const char *pattern, UBool case_insensitive, UBool word_bounded)
 {
     int32_t len;
     UCollator *ucol;
@@ -111,7 +111,7 @@ static void *engine_icusearch_compileC(error_t **error, const char *pattern, UBo
     return usearch;
 }
 
-static engine_return_t engine_icusearch_match(error_t **error, void *data, const UString *subject)
+static engine_return_t engine_search_match(error_t **error, void *data, const UString *subject)
 {
     int32_t ret;
     UErrorCode status;
@@ -137,9 +137,9 @@ static engine_return_t engine_icusearch_match(error_t **error, void *data, const
 }
 
 #ifdef OLD_INTERVAL
-static engine_return_t engine_icusearch_match_all(error_t **error, void *data, const UString *subject, slist_t *intervals)
+static engine_return_t engine_search_match_all(error_t **error, void *data, const UString *subject, slist_t *intervals)
 #else
-static engine_return_t engine_icusearch_match_all(error_t **error, void *data, const UString *subject, slist_pool_t *intervals)
+static engine_return_t engine_search_match_all(error_t **error, void *data, const UString *subject, slist_pool_t *intervals)
 #endif /* OLD_INTERVAL */
 {
     int matches;
@@ -173,7 +173,7 @@ static engine_return_t engine_icusearch_match_all(error_t **error, void *data, c
     }
 }
 
-static engine_return_t engine_icusearch_whole_line_match(error_t **error, void *data, const UString *subject)
+static engine_return_t engine_search_whole_line_match(error_t **error, void *data, const UString *subject)
 {
     int32_t ret;
     UErrorCode status;
@@ -195,7 +195,7 @@ static engine_return_t engine_icusearch_whole_line_match(error_t **error, void *
     return (ret != USEARCH_DONE && usearch_getMatchedLength(usearch) == subject->len ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
 }
 
-static void engine_icusearch_destroy(void *data)
+static void engine_search_destroy(void *data)
 {
     FETCH_DATA(data, usearch, UStringSearch);
 
@@ -205,11 +205,11 @@ static void engine_icusearch_destroy(void *data)
     usearch_close(usearch);
 }
 
-engine_t icusearch_engine = {
-    engine_icusearch_compile,
-    engine_icusearch_compileC,
-    engine_icusearch_match,
-    engine_icusearch_match_all,
-    engine_icusearch_whole_line_match,
-    engine_icusearch_destroy
+engine_t search_engine = {
+    engine_search_compile,
+    engine_search_compileC,
+    engine_search_match,
+    engine_search_match_all,
+    engine_search_whole_line_match,
+    engine_search_destroy
 };

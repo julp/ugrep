@@ -2,7 +2,7 @@
 
 // const UChar b[] = {0x005c, 0x0062, U_NUL};
 
-static void *engine_icure_compile(error_t **error, const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
+static void *engine_re_compile(error_t **error, const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
 {
     UParseError pe;
     UErrorCode status;
@@ -23,7 +23,7 @@ static void *engine_icure_compile(error_t **error, const UChar *upattern, int32_
     return uregex;
 }
 
-static void *engine_icure_compileC(error_t **error, const char *pattern, UBool case_insensitive, UBool word_bounded)
+static void *engine_re_compileC(error_t **error, const char *pattern, UBool case_insensitive, UBool word_bounded)
 {
     UParseError pe;
     UErrorCode status;
@@ -47,7 +47,7 @@ static void *engine_icure_compileC(error_t **error, const char *pattern, UBool c
     return uregex;
 }
 
-static engine_return_t engine_icure_match(error_t **error, void *data, const UString *subject)
+static engine_return_t engine_re_match(error_t **error, void *data, const UString *subject)
 {
     UBool ret;
     UErrorCode status;
@@ -69,9 +69,9 @@ static engine_return_t engine_icure_match(error_t **error, void *data, const USt
 }
 
 #ifdef OLD_INTERVAL
-static engine_return_t engine_icure_match_all(error_t **error, void *data, const UString *subject, slist_t *intervals)
+static engine_return_t engine_re_match_all(error_t **error, void *data, const UString *subject, slist_t *intervals)
 #else
-static engine_return_t engine_icure_match_all(error_t **error, void *data, const UString *subject, slist_pool_t *intervals)
+static engine_return_t engine_re_match_all(error_t **error, void *data, const UString *subject, slist_pool_t *intervals)
 #endif /* OLD_INTERVAL */
 {
     int matches;
@@ -115,7 +115,7 @@ static engine_return_t engine_icure_match_all(error_t **error, void *data, const
     return (matches ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
 
-static engine_return_t engine_icure_whole_line_match(error_t **error, void *data, const UString *subject)
+static engine_return_t engine_re_whole_line_match(error_t **error, void *data, const UString *subject)
 {
     UBool ret;
     UErrorCode status;
@@ -136,18 +136,18 @@ static engine_return_t engine_icure_whole_line_match(error_t **error, void *data
     return (ret ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
 }
 
-static void engine_icure_destroy(void *data)
+static void engine_re_destroy(void *data)
 {
     FETCH_DATA(data, uregex, URegularExpression);
 
     uregex_close(uregex);
 }
 
-engine_t icure_engine = {
-    engine_icure_compile,
-    engine_icure_compileC,
-    engine_icure_match,
-    engine_icure_match_all,
-    engine_icure_whole_line_match,
-    engine_icure_destroy
+engine_t re_engine = {
+    engine_re_compile,
+    engine_re_compileC,
+    engine_re_match,
+    engine_re_match_all,
+    engine_re_whole_line_match,
+    engine_re_destroy
 };

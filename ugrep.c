@@ -96,13 +96,13 @@ reader_t *available_readers[] = {
 
 // TODO: merge fixed + search (need to know about -x in compile)
 extern engine_t fixed_engine; // best without -i or -w except -xi (whole line match)
-extern engine_t icusearch_engine; // complete fixed engine (-i, -w managed)
-extern engine_t icure_engine; // -w not managed, add \b to front and end, for now
+extern engine_t search_engine; // complete fixed engine (-i, -w managed)
+extern engine_t re_engine; // -w not managed, add \b to front and end, for now
 
 engine_t *engines[] = {
     //&fixed_engine,
-    &icusearch_engine,
-    &icure_engine
+    &search_engine,
+    &re_engine
 };
 
 int binbehave = BIN_FILE_SKIP;
