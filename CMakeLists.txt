@@ -1,10 +1,16 @@
 cmake_minimum_required(VERSION 2.6)
 
-set(CMAKE_C_FLAGS_MAINTAINER "-g -DDEBUG -Wall -Wextra -std=gnu99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wuninitialized -Wunreachable-code -Wno-comment -Wnonnull" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
+project(ugrep)
+
+if(MSVC)
+    # http://msdn.microsoft.com/en-us/library/19z1t1wy%28v=VS.80%29.aspx
+    # /GS /Wall
+    set(CMAKE_C_FLAGS_MAINTAINER "/D DEBUG /Od" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
+else(MSVC)
+    set(CMAKE_C_FLAGS_MAINTAINER "-g -DDEBUG -Wall -Wextra -std=gnu99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wuninitialized -Wunreachable-code -Wno-comment -Wnonnull" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
+endif(MSVC)
 mark_as_advanced(CMAKE_C_FLAGS_MAINTAINER)
 set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES} Maintainer")
-
-project(ugrep)
 
 set(UGREP_VERSION_MAJOR 0)
 set(UGREP_VERSION_MINOR 3)
@@ -16,7 +22,7 @@ find_package(ZLIB)
 find_package(BZip2)
 
 set(BASE_SOURCES ugrep.c alloc.c ustring.c io/mmio.c io/stdio.c slist.c engines/fixed.c engines/re.c engines/icusearchengine.c intervals.c error.c fixed_circular_list.c)
-set(EXTRA_SOURCES)
+set(EXTRA_SOURCES "")
 set(EXTRA_LIBS)
 
 # option(DEBUG "debug" OFF)
@@ -51,6 +57,11 @@ if(BZIP2_FOUND)
     set(EXTRA_LIBS ${EXTRA_LIBS} ${BZIP2_LIBRARIES})
     set(HAVE_BZIP2 TRUE)
 endif(BZIP2_FOUND)
+
+if(MSVC)
+    set(EXTRA_SOURCES ${EXTRA_SOURCES} win32/getopt_long.c)
+    include_directories(${CMAKE_SOURCE_DIR}/win32)
+endif(MSVC)
 
 configure_file(
     "config.h.in"

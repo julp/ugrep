@@ -57,6 +57,11 @@
 #  define NONNULL(...)
 # endif /* NONNULL */
 
+# ifdef _MSC_VER
+#  define __func__ __FUNCTION__
+#  define MAXPATHLEN _MAX_PATH
+# endif /* _MSC_VER */
+
 # define ensure(expr)                                                                                           \
     do {                                                                                                        \
         if (EXPECTED(expr)) {                                                                                   \

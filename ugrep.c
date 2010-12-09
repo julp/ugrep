@@ -1,13 +1,21 @@
 #include <limits.h>
-#include <sys/param.h>
+#ifdef _MSC_VER
+# define STRICT
+# include <windows.h>
+# include <io.h>
+# include <direct.h>
+# include <shlobj.h>
+#else
+# include <sys/param.h>
+# include <unistd.h>
+# include <pwd.h>
+# include <fts.h>
+#endif /* _MSC_VER */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <errno.h>
-#include <unistd.h>
-#include <fts.h>
-#include <pwd.h>
 #include <ctype.h>
 
 #include "ugrep.h"
@@ -207,11 +215,19 @@ void report(int type, const char *format, ...)
 
 static UBool stdout_is_tty(void)
 {
+#ifdef _MSC_VER
+    return _isatty(_fileno(stdout));
+#else
     return (1 == isatty(STDOUT_FILENO));
+#endif /* _MSC_VER */
 }
 
 static UBool stdin_is_tty(void) {
+#ifdef _MSC_VER
+    return _isatty(_fileno(stderr));
+#else
     return (1 == isatty(STDIN_FILENO));
+#endif /* _MSC_VER */
 }
 
 static UBool is_binary_uchar(UChar32 c)
@@ -310,7 +326,11 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
         }
         fd->filename = "(standard input)";
         fd->reader = &stdio_reader;
+#ifdef _MSC_VER
+        fsfd = _fileno(stdout);
+#else
         fsfd = STDIN_FILENO;
+#endif /* _MSC_VER */
     } else {
         fd->filename = filename;
         if (-1 == (fsfd = open(filename, O_RDONLY))) {
@@ -635,11 +655,27 @@ static void parse_userpref(void)
     char *home;
 
     if (NULL == (home = getenv("HOME"))) {
+#ifdef _MSC_VER
+# ifndef CSIDL_PROFILE
+#  define CSIDL_PROFILE 40
+# endif /* CSIDL_PROFILE */
+        if (NULL == (home = getenv("USERPROFILE"))) {
+            HRESULT hr;
+            LPITEMIDLIST pidl = NULL;
+
+            hr = SHGetSpecialFolderLocation (NULL, CSIDL_PROFILE, &pidl);
+            if (hr == S_OK) {
+                SHGetPathFromIDList(pidl, home);
+                CoTaskMemFree (pidl);
+            }
+        }
+#else
         struct passwd *pwd;
 
         if (NULL != (pwd = getpwuid(getuid()))) {
             home = pwd->pw_dir;
         }
+#endif /* _MSC_VER */
     }
 
     if (NULL != home) {
