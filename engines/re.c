@@ -2,7 +2,7 @@
 
 // const UChar b[] = {0x005c, 0x0062, U_NUL};
 
-static void *engine_re_compile(error_t **error, const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
+static void *engine_re_compile(error_t **error, const UChar *upattern, int32_t length, uint32_t flags)
 {
     UParseError pe;
     UErrorCode status;
@@ -10,7 +10,7 @@ static void *engine_re_compile(error_t **error, const UChar *upattern, int32_t l
 
     status = U_ZERO_ERROR;
     /* don't make a copy of upattern, ICU does this */
-    uregex = uregex_open(upattern, length, case_insensitive ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
+    uregex = uregex_open(upattern, length, IS_CASE_INSENSITIVE(flags) ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
     if (U_FAILURE(status)) {
         if (U_REGEX_RULE_SYNTAX == status) {
             error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%S\n\t%*c\n", pe.offset, upattern, pe.offset, '^');
@@ -23,14 +23,14 @@ static void *engine_re_compile(error_t **error, const UChar *upattern, int32_t l
     return uregex;
 }
 
-static void *engine_re_compileC(error_t **error, const char *pattern, UBool case_insensitive, UBool word_bounded)
+static void *engine_re_compileC(error_t **error, const char *pattern, uint32_t flags)
 {
     UParseError pe;
     UErrorCode status;
     URegularExpression *uregex;
 
     status = U_ZERO_ERROR;
-    uregex = uregex_openC(pattern, case_insensitive ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
+    uregex = uregex_openC(pattern, IS_CASE_INSENSITIVE(flags) ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
     if (U_FAILURE(status)) {
         if (U_REGEX_RULE_SYNTAX == status) {
             //u_fprintf(ustderr, "Error at offset %d %S %S\n", pe.offset, pe.preContext, pe.postContext);

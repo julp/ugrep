@@ -3,7 +3,7 @@
 static UChar _USEARCH_FAKE_USTR[] = { 0, 0 };
 #define USEARCH_FAKE_USTR _USEARCH_FAKE_USTR, 1 // empty stings refused by usearch
 
-static void *engine_search_compile(error_t **error, const UChar *upattern, int32_t length, UBool case_insensitive, UBool word_bounded)
+static void *engine_search_compile(error_t **error, const UChar *upattern, int32_t length, uint32_t flags)
 {
     UCollator *ucol;
     UErrorCode status;
@@ -45,7 +45,7 @@ static void *engine_search_compile(error_t **error, const UChar *upattern, int32
     return usearch;
 }
 
-static void *engine_search_compileC(error_t **error, const char *pattern, UBool case_insensitive, UBool word_bounded)
+static void *engine_search_compileC(error_t **error, const char *pattern, uint32_t flags)
 {
     int32_t len;
     UCollator *ucol;

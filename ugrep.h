@@ -194,6 +194,16 @@ typedef struct {
     void (*rewind)(void *);
 } reader_t;
 
+enum {
+    OPT_CASE_INSENSITIVE = 1,
+    OPT_WORD_BOUND       = 2,
+    OPT_WHOLE_LINE_MATCH = 4
+} /*engine_flag_t*/;
+
+# define IS_CASE_INSENSITIVE(flags) ((flags & OPT_CASE_INSENSITIVE))
+# define IS_WHOLE_LINE(flags)       ((flags & OPT_WHOLE_LINE_MATCH))
+# define IS_WORD_BOUNDED(flags)     ((flags & OPT_WORD_BOUND))
+
 typedef enum {
     ENGINE_FAILURE     = -1,
     ENGINE_NO_MATCH    =  0,
@@ -202,8 +212,8 @@ typedef enum {
 } engine_return_t;
 
 typedef struct {
-    void *(*compile)(error_t **, const UChar *, int32_t, UBool, UBool);
-    void *(*compileC)(error_t **, const char *, UBool, UBool);
+    void *(*compile)(error_t **, const UChar *, int32_t, uint32_t);
+    void *(*compileC)(error_t **, const char *, uint32_t);
     engine_return_t (*match)(error_t **, void *, const UString *);
 #ifdef OLD_INTERVAL
     engine_return_t (*match_all)(error_t **, void *, const UString *, slist_t *);

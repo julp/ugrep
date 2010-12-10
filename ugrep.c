@@ -102,14 +102,11 @@ reader_t *available_readers[] = {
     NULL
 };
 
-// TODO: merge fixed + search (need to know about -x in compile)
-extern engine_t fixed_engine; // best without -i or -w except -xi (whole line match)
-extern engine_t search_engine; // complete fixed engine (-i, -w managed)
-extern engine_t re_engine; // -w not managed, add \b to front and end, for now
+extern engine_t fixed_engine;
+extern engine_t re_engine;
 
 engine_t *engines[] = {
-    //&fixed_engine,
-    &search_engine,
+    &fixed_engine,
     &re_engine
 };
 
@@ -500,7 +497,13 @@ static void usage(void)
 
 /* ========== adding patterns ========== */
 
-UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t length, int pattern_type, UBool case_insensitive, UBool word_bounded)
+# define OPTIONS_TO_ENGINE_FLAGS(flags, iFlag, wFlag, xFlag) \
+    flags = ((iFlag ? OPT_CASE_INSENSITIVE : 0) | (xFlag ? OPT_WHOLE_LINE_MATCH : 0) | (wFlag ? OPT_WORD_BOUND : 0)); \
+    if ((flags & (OPT_WHOLE_LINE_MATCH | OPT_WORD_BOUND)) == (OPT_WHOLE_LINE_MATCH | OPT_WORD_BOUND)) { \
+        flags &= ~OPT_WORD_BOUND; \
+    }
+
+UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t length, int pattern_type, uint32_t flags)
 {
     void *data;
     pattern_data_t *pdata;
@@ -508,7 +511,7 @@ UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t len
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compile(error, pattern, length, case_insensitive, word_bounded))) {
+    if (NULL == (data = engines[!!pattern_type]->compile(error, pattern, length, flags))) {
         return FALSE;
     }
     pdata = mem_new(*pdata);
@@ -520,7 +523,7 @@ UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t len
     return TRUE;
 }
 
-UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern_type, UBool case_insensitive, UBool word_bounded)
+UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern_type, uint32_t flags)
 {
     void *data;
     pattern_data_t *pdata;
@@ -528,7 +531,11 @@ UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compileC(error, pattern, case_insensitive, word_bounded))) {
+    debug("options = %d", flags);
+    debug("options CI : %s", flags & OPT_CASE_INSENSITIVE ? GREEN("YES") : RED("NO"));
+    debug("options WL : %s", flags & OPT_WHOLE_LINE_MATCH ? GREEN("YES") : RED("NO"));
+    debug("options WB : %s", flags & OPT_WORD_BOUND ? GREEN("YES") : RED("NO"));
+    if (NULL == (data = engines[!!pattern_type]->compileC(error, pattern, flags))) {
         return FALSE;
     }
     pdata = mem_new(*pdata);
@@ -540,7 +547,7 @@ UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern
     return TRUE;
 }
 
-UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pattern_type, UBool case_insensitive, UBool word_bounded)
+UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pattern_type, uint32_t flags)
 {
     fd_t fd;
     UBool retval;
@@ -557,7 +564,7 @@ UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pat
             retval = FALSE;
         } else {
             ustring_chomp(ustr);
-            if (!add_pattern(error, l, ustr->ptr, ustr->len, pattern_type, case_insensitive, word_bounded)) {
+            if (!add_pattern(error, l, ustr->ptr, ustr->len, pattern_type, flags)) {
                 retval = FALSE;
             }
         }
@@ -1181,11 +1188,12 @@ int main(int argc, char **argv)
     };
 
     int c;
-    fd_t fd = { 0 };
+    fd_t fd = { 0, 0, 0, 0, 0, 0, 0, 0 };
     int color;
     int matches;
     UBool iFlag;
     UBool wFlag;
+    uint32_t flags;
     error_t *error;
     int pattern_type; // -E/F
 
@@ -1264,12 +1272,14 @@ int main(int argc, char **argv)
                 cFlag = TRUE;
                 break;
             case 'e':
-                if (!add_patternC(&error, patterns, optarg, pattern_type, iFlag, wFlag)) {
+                OPTIONS_TO_ENGINE_FLAGS(flags, iFlag, wFlag, xFlag);
+                if (!add_patternC(&error, patterns, optarg, pattern_type, flags)) {
                     print_error(error);
                 }
                 break;
             case 'f':
-                if (!source_patterns(&error, optarg, patterns, pattern_type, iFlag, wFlag)) {
+                OPTIONS_TO_ENGINE_FLAGS(flags, iFlag, wFlag, xFlag);
+                if (!source_patterns(&error, optarg, patterns, pattern_type, flags)) {
                     print_error(error);
                 }
                 break;
@@ -1362,11 +1372,12 @@ int main(int argc, char **argv)
         binbehave = BIN_FILE_TEXT;
     }
 
+    OPTIONS_TO_ENGINE_FLAGS(flags, iFlag, wFlag, xFlag);
     if (slist_empty(patterns)) {
         if (argc < 1) {
             usage();
         } else {
-            if (!add_patternC(&error, patterns, *argv++, pattern_type, iFlag, wFlag)) {
+            if (!add_patternC(&error, patterns, *argv++, pattern_type, flags)) {
                 print_error(error);
             }
             argc--;
