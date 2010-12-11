@@ -964,6 +964,7 @@ static int procfile(fd_t *fd, const char *filename)
                 }
                 //if ((!vFlag && matches) || (vFlag && !matches)) {
                 if (!line->no_match) {
+                    int i;
                     flist_element_t *el;
 
                     if ( (before_context || after_context) && last_line_print > before_context && (fd->lineno - before_context > last_line_print + after_context) ) {
@@ -977,16 +978,16 @@ static int procfile(fd_t *fd, const char *filename)
                             u_file_write(reset, reset_len, ustdout);
                         }
                     }
-                    fixed_circular_list_foreach(lines, el) {
+                    fixed_circular_list_foreach(i, lines, el) {
                         //FETCH_DATA(el->data, ustr, UString);
                         FETCH_DATA(el->data, l, line_t);
 
-                        if (fd->lineno - _i > last_line_print) {
+                        if (fd->lineno - i > last_line_print) {
                             if (file_print) {
                                 print_file(fd->filename, FALSE, l->no_match /*vFlag ? l->no_match : !l->no_match*/, TRUE, FALSE);
                             }
                             if (nFlag) {
-                                print_line(fd->lineno - _i, l->no_match /*vFlag ? l->no_match : !l->no_match*/, TRUE, FALSE);
+                                print_line(fd->lineno - i, l->no_match /*vFlag ? l->no_match : !l->no_match*/, TRUE, FALSE);
                             }
                             u_fputs(l->ustr->ptr, ustdout);
                         }

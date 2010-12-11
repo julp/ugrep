@@ -2,9 +2,9 @@
 
 # define FIXED_CIRCULAR_LIST_H
 
-# define fixed_circular_list_foreach(/*fixed_circular_list_t **/l, /*flist_element_t **/el) \
+# define fixed_circular_list_foreach(/*int */ index, /*fixed_circular_list_t **/l, /*flist_element_t **/el) \
     el = l->head; \
-    for (int _i = fixed_circular_list_length(l) - 1; el->used && _i >= 0; el = el->next, _i--)
+    for (index = fixed_circular_list_length(l) - 1; el->used && index >= 0; el = el->next, index--)
 
 typedef struct flist_element_t {
     struct flist_element_t *next;
