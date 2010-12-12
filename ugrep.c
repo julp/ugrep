@@ -847,7 +847,7 @@ static void print_file(const char *filename, UBool no_file_match, UBool no_line_
 #endif /* !NO_COLOR */
     }
     if (eol) {
-        u_fputc(U_LF, ustdout);
+        u_fputc(U_LF, ustdout); // TODO: system dependant
     }
 }
 
@@ -878,7 +878,7 @@ static void print_line(int lineno, UBool no_line_match, UBool print_sep, UBool e
 #endif /* !NO_COLOR */
     }
     if (eol) {
-        u_fputc(U_LF, ustdout);
+        u_fputc(U_LF, ustdout); // TODO: system dependant
     }
 }
 
@@ -1284,11 +1284,11 @@ int main(int argc, char **argv)
                         fprintf(stderr, "Context out of range\n");
                         return UGREP_EXIT_USAGE;
                     }
-                    if (c != 'A') {
-                        after_context = val;
-                    }
-                    if (c != 'B') {
+                    if ('A' != c) {
                         before_context = val;
+                    }
+                    if ('B' != c) {
+                        after_context = val;
                     }
                 }
                 break;
