@@ -539,10 +539,6 @@ UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    debug("options = %d", flags);
-    debug("options CI : %s", flags & OPT_CASE_INSENSITIVE ? GREEN("YES") : RED("NO"));
-    debug("options WL : %s", flags & OPT_WHOLE_LINE_MATCH ? GREEN("YES") : RED("NO"));
-    debug("options WB : %s", flags & OPT_WORD_BOUND ? GREEN("YES") : RED("NO"));
     if (NULL == (data = engines[!!pattern_type]->compileC(error, pattern, flags))) {
         return FALSE;
     }
