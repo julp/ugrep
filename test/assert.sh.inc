@@ -27,9 +27,9 @@ assertExitValue() {
 
 assertOutputValue() {
     if [ $# -lt 3 ]; then
-        echo "ArgumentError: ${FUNCNAME[0]}(message, command1, command2[, operator = '='])"
+        echo "ArgumentError: ${FUNCNAME[0]}(message, command1, command2[, operator = '=='])"
         return $FALSE
     fi
-    __assertTrue "$1" "[ \`$2\` ${4:-=} \`$3\` ]"
+    __assertTrue "$1" "[[ \`$2\` ${4:-==} \`$3\` ]]"
     return $?
 }

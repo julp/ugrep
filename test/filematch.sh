@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# charset: UTF-8
+
 . test/assert.sh.inc
 
 ARGS='élève test/utf8_eleve.txt'
