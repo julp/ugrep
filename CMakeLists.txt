@@ -25,6 +25,11 @@ set(BASE_SOURCES ugrep.c alloc.c ustring.c io/mmio.c io/stdio.c slist.c engines/
 set(EXTRA_SOURCES "")
 set(EXTRA_LIBS)
 
+option(NO_COLOR "color" OFF)
+if(NO_COLOR)
+    add_definitions(-DNO_COLOR=1)
+endif(NO_COLOR)
+
 # option(DEBUG "debug" OFF)
 # if(DEBUG)
 #     foreach(cflag -Wall -Wextra -std=gnu99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wunreachable-code -Wno-comment -Wnonnull)

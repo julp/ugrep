@@ -135,7 +135,9 @@ size_t after_context = 0;
 size_t before_context = 0;
 
 UBool file_print = FALSE; // -H/h
+#ifndef NO_COLOR
 UBool colorize = TRUE;
+#endif /* !NO_COLOR */
 UBool line_print = TRUE;
 
 /* ========== general helper functions ========== */
@@ -210,14 +212,16 @@ void report(int type, const char *format, ...)
     }
 }
 
+#ifndef NO_COLOR
 static UBool stdout_is_tty(void)
 {
-#ifdef _MSC_VER
+# ifdef _MSC_VER
     return _isatty(_fileno(stdout));
-#else
+# else
     return (1 == isatty(STDOUT_FILENO));
-#endif /* _MSC_VER */
+# endif /* _MSC_VER */
 }
+#endif /* !NO_COLOR */
 
 static UBool stdin_is_tty(void) {
 #ifdef _MSC_VER
@@ -444,8 +448,10 @@ UBool fd_readline(error_t **error, fd_t *fd, UString *ustr)
 /* ========== getopt stuff ========== */
 
 enum {
-    COLOR_OPT = CHAR_MAX + 1,
-    BINARY_OPT,
+    BINARY_OPT = CHAR_MAX + 1,
+#ifndef NO_COLOR
+    COLOR_OPT,
+#endif /* !NO_COLOR */
     READER_OPT
 };
 
@@ -453,8 +459,10 @@ static char optstr[] = "A:B:C:EFHLRVce:f:hilnqrsvwx";
 
 static struct option long_options[] =
 {
+#ifndef NO_COLOR
     {"color",               required_argument, NULL, COLOR_OPT},
     {"colour",              required_argument, NULL, COLOR_OPT},
+#endif /* !NO_COLOR */
     {"binary-files",        required_argument, NULL, BINARY_OPT},
     {"reader",              required_argument, NULL, READER_OPT},
     {"after-context",       required_argument, NULL, 'A'},
@@ -584,6 +592,7 @@ static void pattern_destroy(void *data)
 
 /* ========== highlighting ========== */
 
+#ifndef NO_COLOR
 typedef struct {
     const char *name;
     int fg;
@@ -626,8 +635,8 @@ typedef enum {
     CONTEXT_SEP
 } color_type_t;
 
-#define MAX_ATTRS   8
-#define MAX_SEQ_LEN 64
+# define MAX_ATTRS   8
+# define MAX_SEQ_LEN 64
 
 typedef struct {
     const char *name;
@@ -662,10 +671,10 @@ static void parse_userpref(void)
     char *home;
 
     if (NULL == (home = getenv("HOME"))) {
-#ifdef _MSC_VER
-# ifndef CSIDL_PROFILE
-#  define CSIDL_PROFILE 40
-# endif /* CSIDL_PROFILE */
+# ifdef _MSC_VER
+#  ifndef CSIDL_PROFILE
+#   define CSIDL_PROFILE 40
+#  endif /* CSIDL_PROFILE */
         if (NULL == (home = getenv("USERPROFILE"))) {
             HRESULT hr;
             LPITEMIDLIST pidl = NULL;
@@ -676,13 +685,13 @@ static void parse_userpref(void)
                 CoTaskMemFree (pidl);
             }
         }
-#else
+# else
         struct passwd *pwd;
 
         if (NULL != (pwd = getpwuid(getuid()))) {
             home = pwd->pw_dir;
         }
-#endif /* _MSC_VER */
+# endif /* _MSC_VER */
     }
 
     if (NULL != home) {
@@ -811,26 +820,35 @@ nextline:
         }
     }
 }
+#endif /* !NO_COLOR */
 
 /* ========== process on file and/or directory helper ========== */
 
 static void print_file(const char *filename, UBool no_file_match, UBool no_line_match, UBool print_sep, UBool eol)
 {
+#ifndef NO_COLOR
     if (colorize && *colors[no_file_match ? FILE_NO_MATCH : FILE_MATCH].value) {
         u_file_write(colors[no_file_match ? FILE_NO_MATCH : FILE_MATCH].value, -1, ustdout);
     }
+#endif /* !NO_COLOR */
     u_fprintf(ustdout, "%s", filename);
+#ifndef NO_COLOR
     if (colorize && *colors[no_file_match ? FILE_NO_MATCH : FILE_MATCH].value) {
         u_file_write(reset, reset_len, ustdout);
     }
+#endif /* !NO_COLOR */
     if (print_sep) {
+#ifndef NO_COLOR
         if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
             u_file_write(colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value, -1, ustdout);
         }
+#endif /* !NO_COLOR */
         u_fputc(no_line_match ? SEP_NO_MATCH_UCHAR : SEP_MATCH_UCHAR, ustdout);
+#ifndef NO_COLOR
         if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
             u_file_write(reset, reset_len, ustdout);
         }
+#endif /* !NO_COLOR */
     }
     if (eol) {
         u_fputc(U_LF, ustdout);
@@ -839,21 +857,29 @@ static void print_file(const char *filename, UBool no_file_match, UBool no_line_
 
 static void print_line(int lineno, UBool no_line_match, UBool print_sep, UBool eol)
 {
+#ifndef NO_COLOR
     if (colorize && *colors[LINE_NUMBER].value) {
         u_file_write(colors[LINE_NUMBER].value, -1, ustdout);
     }
+#endif /* !NO_COLOR */
     u_fprintf(ustdout, "%d", lineno);
+#ifndef NO_COLOR
     if (colorize && *colors[LINE_NUMBER].value) {
         u_file_write(reset, reset_len, ustdout);
     }
+#endif /* !NO_COLOR */
     if (print_sep) {
+#ifndef NO_COLOR
         if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
             u_file_write(colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value, -1, ustdout);
         }
+#endif /* !NO_COLOR */
         u_fputc(no_line_match ? SEP_NO_MATCH_UCHAR : SEP_MATCH_UCHAR, ustdout);
+#ifndef NO_COLOR
         if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
             u_file_write(reset, reset_len, ustdout);
         }
+#endif /* !NO_COLOR */
     }
     if (eol) {
         u_fputc(U_LF, ustdout);
@@ -864,14 +890,18 @@ static int procfile(fd_t *fd, const char *filename)
 {
     UString *ustr;
     error_t *error;
+#ifndef NO_COLOR
     UBool _colorize;
+#endif /* !NO_COLOR */
     size_t last_line_print = 0;
     int _after_context;
 
     error = NULL;
     _after_context = 0;
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
+#ifndef NO_COLOR
     _colorize = colorize && (before_context || after_context || !vFlag);
+#endif /* !NO_COLOR */
 
     fixed_circular_list_clean(lines);
     if (fd_open(&error, fd, filename)) {
@@ -905,11 +935,15 @@ static int procfile(fd_t *fd, const char *filename)
                 if (xFlag) {
                     ret = pdata->engine->whole_line_match(&error, pdata->pattern, ustr);
                 } else {
+#ifndef NO_COLOR
                     if (_colorize && _line_print) {
                         ret = pdata->engine->match_all(&error, pdata->pattern, ustr, intervals);
                     } else {
+#endif /* !NO_COLOR */
                         ret = pdata->engine->match(&error, pdata->pattern, ustr);
+#ifndef NO_COLOR
                     }
+#endif /* !NO_COLOR */
                 }
                 if (ENGINE_FAILURE == ret) {
                     print_error(error);
@@ -935,6 +969,7 @@ static int procfile(fd_t *fd, const char *filename)
             fd->matches += /*line->no_match =*/ (matches > 0);
             line->no_match = !matches; //(!matches && !vFlag) || (matches && vFlag);
             if (_line_print) {
+#ifndef NO_COLOR
                 //if (_colorize && matches) {
                 if (_colorize && ((matches && !vFlag) || (!matches && vFlag))) {
                     if (ENGINE_WHOLE_LINE_MATCH == ret) {
@@ -962,6 +997,7 @@ static int procfile(fd_t *fd, const char *filename)
                         }
                     }
                 }
+#endif /* !NO_COLOR */
                 //if ((!vFlag && matches) || (vFlag && !matches)) {
                 if (!line->no_match) {
                     int i;
@@ -970,13 +1006,17 @@ static int procfile(fd_t *fd, const char *filename)
                     if ( (before_context || after_context) && last_line_print > before_context && (fd->lineno - before_context > last_line_print + after_context) ) {
                         const UChar linesep[] = {SEP_NO_MATCH_UCHAR, SEP_NO_MATCH_UCHAR, U_NUL};
 
+#ifndef NO_COLOR
                         if (colorize && *colors[CONTEXT_SEP].value) {
                             u_file_write(colors[CONTEXT_SEP].value, -1, ustdout);
                         }
+#endif /* !NO_COLOR */
                         u_fputs(linesep, ustdout);
+#ifndef NO_COLOR
                         if (colorize && *colors[CONTEXT_SEP].value) {
                             u_file_write(reset, reset_len, ustdout);
                         }
+#endif /* !NO_COLOR */
                     }
                     fixed_circular_list_foreach(i, lines, el) {
                         //FETCH_DATA(el->data, ustr, UString);
@@ -1182,15 +1222,19 @@ static void exit_cb(void)
 
 int main(int argc, char **argv)
 {
+#ifndef NO_COLOR
     enum {
         COLOR_AUTO,
         COLOR_NEVER,
         COLOR_ALWAYS
     };
+#endif /* !NO_COLOR */
 
     int c;
     fd_t fd = { 0, 0, 0, 0, 0, 0, 0, 0 };
+#ifndef NO_COLOR
     int color;
+#endif /* !NO_COLOR */
     int matches;
     UBool iFlag;
     UBool wFlag;
@@ -1202,7 +1246,9 @@ int main(int argc, char **argv)
     error = NULL;
     wFlag = FALSE;
     iFlag = FALSE;
+#ifndef NO_COLOR
     color = COLOR_AUTO;
+#endif /* !NO_COLOR */
     pattern_type = PATTERN_AUTO;
 
     if (0 != atexit(exit_cb)) {
@@ -1314,6 +1360,7 @@ int main(int argc, char **argv)
             case 'x':
                 xFlag = TRUE;
                 break;
+#ifndef NO_COLOR
             case COLOR_OPT:
                 if (!strcmp("never", optarg)) {
                     color = COLOR_NEVER;
@@ -1326,6 +1373,7 @@ int main(int argc, char **argv)
                     return UGREP_EXIT_USAGE;
                 }
                 break;
+#endif /* !NO_COLOR */
             case BINARY_OPT:
                 if (!strcmp("binary", optarg)) {
                     binbehave = BIN_FILE_BIN;
@@ -1368,7 +1416,9 @@ int main(int argc, char **argv)
         line_print = FALSE;
     }
     /* Options overrides, in case of incompatibility between them */
+#ifndef NO_COLOR
     colorize = (COLOR_ALWAYS == color) || (COLOR_AUTO == color && stdout_is_tty());
+#endif /* !NO_COLOR */
     if (binbehave != BIN_FILE_TEXT && (cFlag || lFlag || LFlag)) {
         binbehave = BIN_FILE_TEXT;
     }
@@ -1385,9 +1435,11 @@ int main(int argc, char **argv)
         }
     }
 
+#ifndef NO_COLOR
     if (colorize) {
         parse_userpref();
     }
+#endif /* !NO_COLOR */
 
     //ustr = ustring_new();
     //lines = fixed_circular_list_new(before_context + 1, (func_ctor_t) ustring_new, (func_dtor_t) ustring_destroy);
