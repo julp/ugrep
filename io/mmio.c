@@ -1,4 +1,9 @@
-#include <sys/mman.h>
+#ifdef _MSC_VER
+# include <io.h>
+# include <windows.h>
+#else
+# include <sys/mman.h>
+#endif /* _MSC_VER */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -12,8 +17,16 @@
 #  define SIZE_T_MAX (~((size_t) 0))
 #endif*/ /* !SIZE_T_MAX */
 
+#ifndef S_ISREG
+# define S_ISREG(mode)  (((mode) & S_IFMT) == S_IFREG)
+#endif /* !S_ISREG */
+
 typedef struct {
+#ifdef _MSC_VER
+    HANDLE fd;
+#else
     int fd;
+#endif /* _MSC_VER */
     size_t len;
     char *start, *base, *end, *ptr;
     UConverter *ucnv;
@@ -25,8 +38,7 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
     struct stat st;
 
     mmfd = mem_new(*mmfd);
-    mmfd->fd = fd;
-    if (-1 == (fstat(mmfd->fd, &st))) {
+    if (-1 == (fstat(fd, &st))) {
         error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
         goto free;
     }
@@ -41,12 +53,28 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
     if (0 == (mmfd->len = (size_t) st.st_size)) {
         mmfd->start = NULL;
     } else {
+#ifdef _MSC_VER
+        if (NULL == (mmfd->fd = CreateFileMapping((HANDLE) _get_osfhandle(fd), NULL, PAGE_READONLY, 0, 0, NULL))) {
+            //GetLastError
+            error_set(error, WARN, "CreateFileMapping failed on %s", filename);
+            goto close;
+        }
+        if (NULL == (mmfd->start = MapViewOfFile(mmfd->fd, FILE_MAP_READ, 0, 0, 0))) {
+            //GetLastError
+            CloseHandle(mmfd->fd);
+            error_set(error, WARN, "MapViewOfFile failed on %s", filename);
+            goto close;
+        }
+#else
+        mmfd->fd = fd;
         mmfd->start = mmap(NULL, mmfd->len, PROT_READ, MAP_PRIVATE, mmfd->fd, (off_t) 0);
         if (MAP_FAILED == mmfd->start) {
             error_set(error, WARN, "mmap failed on %s: %s", filename, strerror(errno));
             goto close;
         }
+#endif /* _MSC_VER */
     }
+
     mmfd->ptr = mmfd->base = mmfd->start;
     mmfd->end = mmfd->start + mmfd->len;
     mmfd->ucnv = NULL;
@@ -54,7 +82,11 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
     return mmfd;
 
 close:
+#ifdef _MSC_VER
+    CloseHandle(mmfd->fd);
+#else
     close(mmfd->fd);
+#endif /* _MSC_VER */
 free:
     free(mmfd);
     return NULL;
@@ -67,8 +99,13 @@ static void mmfd_close(void *data)
     if (NULL != mmfd->ucnv) {
         ucnv_close(mmfd->ucnv);
     }
+#ifdef _MSC_VER
+    UnmapViewOfFile(mmfd->start);
+    CloseHandle(mmfd->fd);
+#else
     munmap(mmfd->start, mmfd->len);
     close(mmfd->fd);
+#endif /* _MSC_VER */
 }
 
 static int32_t mmfd_readuchars(error_t **error, void *data, UChar32 *buffer, size_t max_len)

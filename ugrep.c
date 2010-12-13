@@ -7,10 +7,10 @@
 # include <shlobj.h>
 #else
 # include <sys/param.h>
-# include <unistd.h>
 # include <pwd.h>
 # include <fts.h>
 #endif /* _MSC_VER */
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -215,20 +215,12 @@ void report(int type, const char *format, ...)
 #ifndef NO_COLOR
 static UBool stdout_is_tty(void)
 {
-# ifdef _MSC_VER
-    return _isatty(_fileno(stdout));
-# else
     return (1 == isatty(STDOUT_FILENO));
-# endif /* _MSC_VER */
 }
 #endif /* !NO_COLOR */
 
 static UBool stdin_is_tty(void) {
-#ifdef _MSC_VER
-    return _isatty(_fileno(stderr));
-#else
     return (1 == isatty(STDIN_FILENO));
-#endif /* _MSC_VER */
 }
 
 static UBool is_binary_uchar(UChar32 c)

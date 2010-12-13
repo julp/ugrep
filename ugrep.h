@@ -58,8 +58,12 @@
 # endif /* NONNULL */
 
 # ifdef _MSC_VER
+#  define inline _inline
 #  define __func__ __FUNCTION__
 #  define MAXPATHLEN _MAX_PATH
+#  define isatty _isatty
+#  define fileno _fileno
+#  define fdopen _fdopen
 # endif /* _MSC_VER */
 
 # define ensure(expr)                                                                                           \
