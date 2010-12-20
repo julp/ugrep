@@ -2,6 +2,66 @@
 
 #define ERROR_MAX_LEN 596
 
+#ifdef _MSC_VER
+error_t *error_win32_vnew(int type, const char *format, va_list args) /* WARN_UNUSED_RESULT */
+{
+    char *buf = NULL;
+    error_t *error = NULL;
+    int32_t length, buf_len;
+    UChar buffer[ERROR_MAX_LEN + 1];
+
+    FormatMessageA(
+       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+       NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &buf, 0, NULL
+    );
+    if (NULL != buf) {
+        buf_len = strlen(buf);
+        error = mem_new(*error);
+        length = u_vsnprintf(buffer, ERROR_MAX_LEN, format, args);
+        error->type = type;
+        error->message = mem_new_n(*error->message, length + 1 + buf_len * U16_MAX_LENGTH);
+        u_strcpy(error->message, buffer);
+        u_uastrncpy(error->message + length, buf, buf_len);
+        LocalFree(buf);
+    }
+
+    return error;
+}
+
+error_t *error_win32_new(int type, const char *format, ...) /* WARN_UNUSED_RESULT */
+{
+    error_t *error;
+    va_list args;
+
+    va_start(args, format);
+    error = error_win32_vnew(type, format, args);
+    va_end(args);
+
+    return error;
+}
+
+# ifdef DEBUG
+void _error_win32_set(error_t **error, int type, const char *format, ...)
+# else
+void error_wiN32_set(error_t **error, int type, const char *format, ...)
+# endif /* DEBUG */
+{
+    va_list args;
+    error_t *tmp;
+
+    if (NULL != error) {
+        va_start(args, format);
+        tmp = error_win32_vnew(type, format, args);
+        va_end(args);
+        if (NULL == *error) {
+            *error = tmp;
+        } else {
+            debug("overwrite attempt of a previous error: %S\nBy: %S", (*error)->message, tmp->message);
+        }
+    }
+}
+#endif /* _MSC_VER */
+
 error_t *error_vnew(int type, const char *format, va_list args) /* WARN_UNUSED_RESULT */
 {
     int32_t length;

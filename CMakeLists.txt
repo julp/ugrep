@@ -5,7 +5,7 @@ project(ugrep)
 if(MSVC)
     # http://msdn.microsoft.com/en-us/library/19z1t1wy%28v=VS.80%29.aspx
     # /GS /Wall
-    set(CMAKE_C_FLAGS_MAINTAINER "/D DEBUG /Od" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
+    set(CMAKE_C_FLAGS_MAINTAINER "/D REPLACE_GETOPT /D DEBUG /Od" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
 else(MSVC)
     set(CMAKE_C_FLAGS_MAINTAINER "-g -DDEBUG -Wall -Wextra -std=gnu99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wuninitialized -Wunreachable-code -Wno-comment -Wnonnull" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
 endif(MSVC)
@@ -23,7 +23,7 @@ find_package(BZip2)
 
 set(BASE_SOURCES ugrep.c alloc.c ustring.c io/mmio.c io/stdio.c slist.c engines/fixed.c engines/re.c intervals.c error.c fixed_circular_list.c)
 set(EXTRA_SOURCES "")
-set(EXTRA_LIBS)
+set(EXTRA_LIBS "")
 
 option(NO_COLOR "color" OFF)
 if(NO_COLOR)
@@ -64,7 +64,7 @@ if(BZIP2_FOUND)
 endif(BZIP2_FOUND)
 
 if(MSVC)
-    set(EXTRA_SOURCES ${EXTRA_SOURCES} win32/getopt_long.c)
+    file(GLOB EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/win32/*.c)
     include_directories(${CMAKE_SOURCE_DIR}/win32)
 endif(MSVC)
 
@@ -82,7 +82,8 @@ list(REMOVE_DUPLICATES EXTRA_SOURCES)
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
 add_executable(ugrep ${BASE_SOURCES} ${EXTRA_SOURCES})
-target_link_libraries(ugrep icudata icui18n icuio icule iculx icutu ${EXTRA_LIBS})
+#target_link_libraries(ugrep icudata icui18n icuio icule iculx icutu ${EXTRA_LIBS})
+target_link_libraries(ugrep ${ICU_LIBRARIES} ${ICU_I18N_LIBRARIES} ${EXTRA_LIBS} icuio)
 
 install(TARGETS ugrep DESTINATION bin)
 install(CODE "EXEC_PROGRAM(${CMAKE_COMMAND} ARGS -E create_symlink \"${CMAKE_INSTALL_PREFIX}/bin/ugrep\" \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")

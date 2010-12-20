@@ -17,10 +17,6 @@
 #  define SIZE_T_MAX (~((size_t) 0))
 #endif*/ /* !SIZE_T_MAX */
 
-#ifndef S_ISREG
-# define S_ISREG(mode)  (((mode) & S_IFMT) == S_IFREG)
-#endif /* !S_ISREG */
-
 typedef struct {
 #ifdef _MSC_VER
     HANDLE fd;
@@ -62,7 +58,7 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
         if (NULL == (mmfd->start = MapViewOfFile(mmfd->fd, FILE_MAP_READ, 0, 0, 0))) {
             //GetLastError
             CloseHandle(mmfd->fd);
-            error_set(error, WARN, "MapViewOfFile failed on %s", filename);
+            error_win32_set(error, WARN, "MapViewOfFile failed on %s", filename);
             goto close;
         }
 #else

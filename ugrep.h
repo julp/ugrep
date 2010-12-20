@@ -64,6 +64,8 @@
 #  define isatty _isatty
 #  define fileno _fileno
 #  define fdopen _fdopen
+#  define isblank isspace
+#  define snprintf sprintf_s
 # endif /* _MSC_VER */
 
 # define ensure(expr)                                                                                           \
@@ -176,8 +178,16 @@ void error_propagate(error_t **, error_t *);
 # define error_set(error, type, format, ...) \
     _error_set(error, type, "%s:%d:" format " in %s()", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
 void _error_set(error_t **, int, const char *, ...);
+# ifdef _MSC_VER
+# define error_win32_set(error, type, format, ...) \
+    _error_win32_set(error, type, "%s:%d:" format " in %s()", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
+void _error_set(error_t **, int, const char *, ...);
+# endif /* _MSC_VER */
 #else
 void error_set(error_t **, int, const char *, ...);
+# ifdef _MSC_VER
+void error_win32_set(error_t **, int, const char *, ...);
+# endif /* _MSC_VER */
 #endif /* DEBUG */
 error_t *error_vnew(int, const char *, va_list) WARN_UNUSED_RESULT;
 /* </error.c> */
