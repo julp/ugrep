@@ -103,7 +103,6 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
         UBreakIterator *ubrk;
         const char *inherited_loc;
 
-        debug("SEARCH");
         ubrk = NULL;
         inherited_loc = uloc_getDefault();
         if (IS_WORD_BOUNDED(flags)) {
@@ -136,8 +135,6 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
             icu_error_set(error, FATAL, status, "usearch_openFromCollator");
             return NULL;
         }
-    } else {
-        debug("FIXED");
     }
 
     return p;
