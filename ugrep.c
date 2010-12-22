@@ -8,8 +8,8 @@
 #else
 # include <sys/param.h>
 # include <pwd.h>
-# include <fts.h>
 #endif /* _MSC_VER */
+#include <fts.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -27,7 +27,7 @@
 #define SEP_MATCH_UCHAR    0x003a
 #define SEP_NO_MATCH_UCHAR 0x002d
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(_MSC_VER)
 # define RED(str)    "\33[1;31m" str "\33[0m"
 # define GREEN(str)  "\33[1;32m" str "\33[0m"
 # define YELLOW(str) "\33[1;33m" str "\33[0m"
@@ -35,7 +35,7 @@
 # define RED(str)    str
 # define GREEN(str)  str
 # define YELLOW(str) str
-#endif /* DEBUG */
+#endif /* DEBUG && !_MSC_VER */
 
 enum {
     UGREP_EXIT_MATCH = 0,
@@ -379,9 +379,9 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
                     }
                     if (confidence > MIN_CONFIDENCE) {
                         encoding = tmpencoding;
-                        debug("%s, confidence of " GREEN("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
+                        //debug("%s, confidence of " GREEN("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
                     } else {
-                        debug("%s, confidence of " RED("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
+                        //debug("%s, confidence of " RED("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
                         //encoding = "US-ASCII";
                     }
                     ucsdet_close(csd);
@@ -581,6 +581,70 @@ static void pattern_destroy(void *data)
 /* ========== highlighting ========== */
 
 #ifndef NO_COLOR
+
+typedef enum {
+    SINGLE_MATCH,
+    LINE_MATCH,
+    FILE_MATCH,
+    FILE_NO_MATCH,
+    LINE_NUMBER,
+    SEP_MATCH,
+    SEP_NO_MATCH,
+    CONTEXT_SEP
+} color_type_t;
+
+# ifdef _MSC_VER
+
+#  include <Windows.h>
+#  include <Wincon.h>
+
+typedef struct {
+    const char *name;
+    WORD fg;
+    WORD bg;
+} attr_t;
+
+attr_t attrs[] = {
+    {"black",        0,                                                                    0},
+    {"red",          FOREGROUND_RED,                                                       BACKGROUND_RED},
+    {"lightred",     FOREGROUND_RED|FOREGROUND_INTENSITY,                                  BACKGROUND_RED|BACKGROUND_INTENSITY},
+    {"green",        FOREGROUND_GREEN,                                                     BACKGROUND_GREEN},
+    {"lightgreen",   FOREGROUND_GREEN|FOREGROUND_INTENSITY,                                BACKGROUND_GREEN|BACKGROUND_INTENSITY},
+    {"yellow",       FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_INTENSITY,                 BACKGROUND_RED|BACKGROUND_GREEN|BACKGROUND_INTENSITY},
+    {"blue",         FOREGROUND_BLUE,                                                      BACKGROUND_BLUE},
+    {"lightblue",    FOREGROUND_BLUE|FOREGROUND_INTENSITY,                                 BACKGROUND_BLUE|BACKGROUND_INTENSITY},
+    {"magenta",      FOREGROUND_RED|FOREGROUND_BLUE,                                       BACKGROUND_RED|BACKGROUND_BLUE},
+    {"lightmagenta", FOREGROUND_RED|FOREGROUND_BLUE|FOREGROUND_INTENSITY,                  BACKGROUND_RED|BACKGROUND_BLUE|BACKGROUND_INTENSITY},
+    {"cyan",         FOREGROUND_GREEN|FOREGROUND_BLUE,                                     BACKGROUND_GREEN|BACKGROUND_BLUE},
+    {"lightcyan",    FOREGROUND_GREEN|FOREGROUND_BLUE|FOREGROUND_INTENSITY,                BACKGROUND_GREEN|BACKGROUND_BLUE|BACKGROUND_INTENSITY},
+    {"white",        FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_BLUE|FOREGROUND_INTENSITY, BACKGROUND_RED|BACKGROUND_GREEN|BACKGROUND_BLUE|BACKGROUND_INTENSITY},
+    {"default",      FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_BLUE,                      0},
+    {"brown",        FOREGROUND_RED|FOREGROUND_GREEN,                                      BACKGROUND_RED|BACKGROUND_GREEN},
+    {"gray",         FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_BLUE,                      BACKGROUND_RED|BACKGROUND_GREEN|BACKGROUND_BLUE},
+    {NULL,           -1,                                                                   -1}
+};
+
+typedef struct {
+    const char *name;
+    WORD value;
+} color_t;
+
+color_t colors[] = {
+    {"single-match",  FOREGROUND_BLUE},
+    {"line-match",    FOREGROUND_BLUE|FOREGROUND_INTENSITY},
+    {"file-match",    FOREGROUND_GREEN},
+    {"file-no-match", FOREGROUND_RED},
+    {"line-number",   FOREGROUND_RED|FOREGROUND_BLUE},
+    {"sep-match",     FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_INTENSITY},
+    {"sep-no-match",  FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_INTENSITY},
+    {"context-sep",   FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_INTENSITY},
+    {NULL,            0}
+};
+
+static WORD reset = 0;
+
+# else
+
 typedef struct {
     const char *name;
     int fg;
@@ -612,17 +676,6 @@ attr_t attrs[] = {
     {NULL,        -1, -1}
 };
 
-typedef enum {
-    SINGLE_MATCH,
-    LINE_MATCH,
-    FILE_MATCH,
-    FILE_NO_MATCH,
-    LINE_NUMBER,
-    SEP_MATCH,
-    SEP_NO_MATCH,
-    CONTEXT_SEP
-} color_type_t;
-
 # define MAX_ATTRS   8
 # define MAX_SEQ_LEN 64
 
@@ -652,6 +705,30 @@ static UChar *u_stpncpy(UChar *dest, const UChar *src, int32_t length)
     }
 
     return u_strncpy(dest, src, length) + n;
+}
+
+# endif /* _MSC_VER */
+
+void console_colorize(color_type_t c)
+{
+    if (colorize && *colors[c].value) { // TODO: black could not be used on windows!
+# ifdef _MSC_VER
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), colors[c].value);
+# else
+        u_file_write(colors[c].value, -1, ustdout);
+    }
+# endif /* _MSC_VER */
+}
+
+void console_reset(color_type_t c)
+{
+    if (colorize && *colors[c].value) { // TODO: black could not be used on windows!
+# ifdef _MSC_VER
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), reset);
+# else
+        u_file_write(reset, reset_len, ustdout);
+    }
+# endif /* _MSC_VER */
 }
 
 static void parse_userpref(void)
@@ -703,16 +780,52 @@ static void parse_userpref(void)
                         for (c = colors; c->name; c++) {
                             if (!strncmp(c->name, line, strlen(c->name))) {
                                 char *s, *t;
-                                int attrs_count, user_attrs[MAX_ATTRS], colors_count;
+                                int colors_count;
+# ifdef _MSC_VER
+                                WORD attrs;
+# else
+                                int attrs_count, user_attrs[MAX_ATTRS];
+# endif /* _MSC_VER */
 
                                 s = line + strlen(c->name);
+# ifdef _MSC_VER
+                                attrs = colors_count = 0;
+# else
                                 attrs_count = colors_count = 0;
+# endif /* _MSC_VER */
                                 do {
                                     while (isblank(*s) || ispunct(*s)) {
                                         s++;
                                     }
                                     t = s;
-                                    if (isdigit(*s)) {
+                                    if (islower(*s)) {
+                                        while (islower(*++s))
+                                            ;
+                                        if (s > t) {
+                                            attr_t *a;
+
+                                            *s++ = 0; // TODO: is it safe?
+                                            if (!strcmp("none", t)) {
+                                                *c->value = U_NUL;
+                                                break;
+                                            } else {
+                                                for (a = attrs; a->name; a++) {
+                                                    if (!strcmp(a->name, t)) {
+                                                        if (a->bg == a->fg || (a->bg != a->fg && colors_count < 2)) {
+# ifdef _MSC_VER
+                                                            attrs |= (colors_count++ ? a->bg : a->fg);
+# else
+                                                            user_attrs[attrs_count++] = colors_count++ ? a->bg : a->fg;
+# endif /* _MSC_VER */
+                                                        }
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+# ifndef _MSC_VER
+                                    else if (isdigit(*s)) {
                                         while (isdigit(*++s))
                                             ;
                                         if (s > t) {
@@ -737,32 +850,15 @@ static void parse_userpref(void)
                                                 }
                                             }
                                         }
-                                    } else if (islower(*s)) {
-                                        while (islower(*++s))
-                                            ;
-                                        if (s > t) {
-                                            attr_t *a;
-
-                                            *s++ = 0; // TODO: is it safe?
-                                            if (!strcmp("none", t)) {
-                                                *c->value = U_NUL;
-                                                break;
-                                            } else {
-                                                for (a = attrs; a->name; a++) {
-                                                    if (!strcmp(a->name, t)) {
-                                                        if (a->bg == a->fg || (a->bg != a->fg && colors_count < 2)) {
-                                                            user_attrs[attrs_count++] = colors_count++ ? a->bg : a->fg;
-                                                        }
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
                                     }
                                     if (attrs_count >= MAX_ATTRS) {
                                         break;
                                     }
+# endif /* !_MSC_VER */
                                 } while (*s && '\n' != *s);
+# ifdef _MSC_VER
+                                c->value = attrs;
+# else
                                 if (attrs_count > 0) {
                                     UChar prefix[] = {0x001b, 0x005b, U_NUL}, suffix[] = {0x006d, U_NUL}, sep[] = {0x003b, U_NUL};
                                     UChar *ptr, buf[MAX_SEQ_LEN], defval[MAX_SEQ_LEN];
@@ -798,6 +894,7 @@ static void parse_userpref(void)
                                         }
                                     }
                                 }
+# endif /* _MSC_VER */
                             }
                         }
 nextline:
@@ -1208,6 +1305,18 @@ static void exit_cb(void)
     }
 }
 
+#if 0
+void *char_ctor(void)
+{
+    char *x;
+    x = mem_new_n(char, 2);
+    x[0] = 0;
+    x[1] = 0;
+
+    return x;
+}
+#endif
+
 int main(int argc, char **argv)
 {
 #ifndef NO_COLOR
@@ -1248,6 +1357,35 @@ int main(int argc, char **argv)
     default_reader = &mm_reader;
     ustdout = u_finit(stdout, NULL, NULL);
     ustderr = u_finit(stderr, NULL, NULL);
+
+    {
+        UChar string[] = {
+            0xD835, 0xDE3C, // A
+            0xD835, 0xDE3D, // B
+            0xD835, 0xDE3E, // C
+            0xD835, 0xDE3D, // D
+            0xD835, 0xDE3F, // E
+            0
+        };
+        UChar32 string32[] = {
+            0x0001D63C,
+            0x0001D63D,
+            0x0001D63E,
+            0x0001D63D,
+            0x0001D63F,
+            0
+        };
+        UFILE *ufp;
+
+        u_printf("%S\n", string);
+        ufp = u_fopen("test/utf16_2cu.txt", "w", NULL, "UTF-8");
+        //u_file_write(string, 10, ufp);
+        for (int i = 0; i < 5; i++) {
+            u_fputc(string32[i], ufp);
+            u_fputc(string32[i], ustdout);
+        }
+        u_fclose(ufp);
+    }
 
     debug("system locale = " YELLOW("%s"), u_fgetlocale(ustdout));
     debug("system codepage = " YELLOW("%s"), u_fgetcodepage(ustdout));
@@ -1425,6 +1563,12 @@ int main(int argc, char **argv)
 
 #ifndef NO_COLOR
     if (colorize) {
+# ifdef _MSC_VER
+        CONSOLE_SCREEN_BUFFER_INFO info;
+
+        GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
+        reset = info.wAttributes;
+# endif /* _MSC_VER */
         parse_userpref();
     }
 #endif /* !NO_COLOR */
@@ -1433,6 +1577,32 @@ int main(int argc, char **argv)
     //lines = fixed_circular_list_new(before_context + 1, (func_ctor_t) ustring_new, (func_dtor_t) ustring_destroy);
     lines = fixed_circular_list_new(before_context + 1, line_ctor, line_dtor);
     intervals = intervals_new();
+
+#if 0
+    {
+        int i, j;
+        char data[] = "ABCDEFGHIJKLM";
+        flist_element_t *el;
+        fixed_circular_list_t *l;
+
+        l = fixed_circular_list_new(3, char_ctor, free);
+
+        fixed_circular_list_clean(l);
+
+        for (i = 0; i < 5; i++) {
+            FETCH_DATA(fixed_circular_list_fetch(l), x, char);
+            x[0] = data[i];
+        //}
+
+        printf("--\n");
+        printf("%s\n", x);
+        fixed_circular_list_foreach(j, l, el) {
+            FETCH_DATA(el->data, y, char);
+            printf("%d => %s\n", j, y);
+        }
+        }
+    }
+#endif
 
     if (0 == argc) {
         matches = procfile(&fd, "-");
