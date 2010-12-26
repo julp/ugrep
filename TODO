@@ -1,10 +1,14 @@
 TODO:
+  - Very high:
+    * port or rewrite FTS functions for Windows
+    * implement context options (-A, -B, -C, -\d+) - actually buggy
+    * check if ustring_subreplace_len (ustring.c) should work with Code Units (revert needed in this case) or Code Points
+
   - High:
-    * find a (proper) way to get insitive case matching with fixed strings
     * implement recursive option (and exclude options: exclude, exclude-dir, include)
-    * implement -w option
-    * implement context options (-A, -B, -C, -\d+)
+    * implement -w option to RE engine (if leading/trailing \b are absent, add them)
     * improve binary file handling: display (handle non printable characters)
+    * add highlighting on Windows (but, need working contexts **first**)
 
   - Normal:
     * write a man page
@@ -17,35 +21,6 @@ TODO:
     * [HIGH] create distro package source (Debian) / port (*BSD)?
     * [CHECK] mmap already used internaly by icu?
     * fixed string u_str* => u_mem*?
-
-Notes:
-  - ugrep -ERin ap.che /etc/
-    * debug: off, intervals garbage: on
-      real    0m3.307s
-      user    0m3.263s
-      sys     0m0.032s
-    * debug: off, intervals garbage: off
-      real    0m3.291s
-      user    0m3.260s
-      sys     0m0.029s
-  - grep -ERin ap.che /etc/
-      real    0m2.387s
-      user    0m2.354s
-      sys     0m0.032s
-
-  - ugrep -ERin ... /etc/
-    * debug: off, intervals garbage: on
-      real    0m6.228s
-      user    0m4.666s
-      sys     0m0.489s
-    * debug: off, intervals garbage: off
-      real    0m6.309s
-      user    0m4.659s
-      sys     0m0.525s
-  - grep -ERin ... /etc/
-      real    1m57.071s
-      user    0m45.995s
-      sys     0m46.973s
 
 Ideas:
   - write ucat, a cat replacement ?
