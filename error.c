@@ -3,6 +3,8 @@
 #define ERROR_MAX_LEN 596
 
 #ifdef _MSC_VER
+# include <windows.h>
+
 error_t *error_win32_vnew(int type, const char *format, va_list args) /* WARN_UNUSED_RESULT */
 {
     char *buf = NULL;

@@ -9,4 +9,8 @@
 #  define S_ISREG(mode)  (((mode) & S_IFMT) == S_IFREG)
 # endif /* !S_ISREG */
 
+# ifndef S_ISDIR
+#  define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+# endif /* !S_ISDIR */
+
 #endif /* !WIN32_UNISTD_H */

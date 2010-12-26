@@ -4,12 +4,20 @@
 # include <windows.h>
 # include <io.h>
 # include <direct.h>
+# include <Winreg.h>
 # include <shlobj.h>
+# include <psapi.h>
+# pragma comment(lib,"Psapi.lib")
+# define DIRECTORY_SEPARATOR '\\'
+char __progname[_MAX_PATH] = "<unknown>";
 #else
 # include <sys/param.h>
 # include <pwd.h>
+# define DIRECTORY_SEPARATOR '/'
 #endif /* _MSC_VER */
-#include <fts.h>
+#ifndef WITHOUT_FTS
+# include <fts.h>
+#endif /* !WITHOUT_FTS */
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -79,8 +87,6 @@ void line_dtor(void *data) {
 
 /* ========== global variables ========== */
 
-extern char *__progname;
-
 extern reader_t mm_reader;
 extern reader_t stdio_reader;
 #ifdef HAVE_ZLIB
@@ -123,7 +129,9 @@ static slist_t *intervals = NULL;
 static slist_pool_t *intervals = NULL;
 #endif /* OLD_INTERVAL */
 
+#ifndef WITHOUT_FTS
 UBool rFlag = FALSE;
+#endif /* !WITHOUT_FTS */
 UBool xFlag = FALSE;
 UBool nFlag = FALSE;
 UBool vFlag = FALSE;
@@ -147,7 +155,7 @@ const char *ubasename(const char *filename)
 {
     const char *c;
 
-    if (NULL == (c = strrchr(filename, '/'))) {
+    if (NULL == (c = strrchr(filename, DIRECTORY_SEPARATOR))) {
         return filename;
     } else {
         return c + 1;
@@ -319,11 +327,7 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
         }
         fd->filename = "(standard input)";
         fd->reader = &stdio_reader;
-#ifdef _MSC_VER
-        fsfd = _fileno(stdout);
-#else
         fsfd = STDIN_FILENO;
-#endif /* _MSC_VER */
     } else {
         fd->filename = filename;
         if (-1 == (fsfd = open(filename, O_RDONLY))) {
@@ -447,7 +451,11 @@ enum {
     READER_OPT
 };
 
+#ifndef WITHOUT_FTS
 static char optstr[] = "A:B:C:EFHLRVce:f:hilnqrsvwx";
+#else
+static char optstr[] = "A:B:C:EFHLVce:f:hilnqsvwx";
+#endif /* !WITHOUT_FTS */
 
 static struct option long_options[] =
 {
@@ -464,7 +472,9 @@ static struct option long_options[] =
     {"fixed-string",        no_argument,       NULL, 'F'}, // POSIX
     {"with-filename",       no_argument,       NULL, 'H'},
     {"files-without-match", no_argument,       NULL, 'L'},
+#ifndef WITHOUT_FTS
     {"recursive",           no_argument,       NULL, 'R'},
+#endif /* !WITHOUT_FTS */
     {"version",             no_argument,       NULL, 'V'},
     {"count",               no_argument,       NULL, 'c'}, // POSIX
     {"regexp",              required_argument, NULL, 'e'}, // POSIX
@@ -475,7 +485,9 @@ static struct option long_options[] =
     {"line-number",         no_argument,       NULL, 'n'}, // POSIX
     {"quiet",               no_argument,       NULL, 'q'}, // POSIX
     {"silent",              no_argument,       NULL, 'q'}, // POSIX
+#ifndef WITHOUT_FTS
     {"recursive",           no_argument,       NULL, 'r'},
+#endif /* !WITHOUT_FTS */
     {"no-messages",         no_argument,       NULL, 's'}, // POSIX
     {"revert-match",        no_argument,       NULL, 'v'}, // POSIX
     {"word-regexp",         no_argument,       NULL, 'w'},
@@ -709,26 +721,28 @@ static UChar *u_stpncpy(UChar *dest, const UChar *src, int32_t length)
 
 # endif /* _MSC_VER */
 
-void console_colorize(color_type_t c)
+void console_apply_color(color_type_t c)
 {
-    if (colorize && *colors[c].value) { // TODO: black could not be used on windows!
 # ifdef _MSC_VER
+    if (colorize && colors[c].value) { // TODO: black could not be used!
         SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), colors[c].value);
 # else
+    if (colorize && *colors[c].value) {
         u_file_write(colors[c].value, -1, ustdout);
-    }
 # endif /* _MSC_VER */
+    }
 }
 
 void console_reset(color_type_t c)
 {
-    if (colorize && *colors[c].value) { // TODO: black could not be used on windows!
 # ifdef _MSC_VER
+    if (colorize && colors[c].value) { // TODO: black could not be used!
         SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), reset);
 # else
+    if (colorize && *colors[c].value) {
         u_file_write(reset, reset_len, ustdout);
-    }
 # endif /* _MSC_VER */
+    }
 }
 
 static void parse_userpref(void)
@@ -762,7 +776,7 @@ static void parse_userpref(void)
     if (NULL != home) {
         char preffile[MAXPATHLEN];
 
-        if (snprintf(preffile, sizeof(preffile), "%s%c%s", home, '/', ".ugrep") < sizeof(preffile)) {
+        if (snprintf(preffile, sizeof(preffile), "%s%c%s", home, DIRECTORY_SEPARATOR, ".ugrep") < sizeof(preffile)) {
             struct stat st;
 
             if ((-1 != (stat(preffile, &st))) && S_ISREG(st.st_mode)) {
@@ -782,14 +796,14 @@ static void parse_userpref(void)
                                 char *s, *t;
                                 int colors_count;
 # ifdef _MSC_VER
-                                WORD attrs;
+                                WORD user_attrs;
 # else
                                 int attrs_count, user_attrs[MAX_ATTRS];
 # endif /* _MSC_VER */
 
                                 s = line + strlen(c->name);
 # ifdef _MSC_VER
-                                attrs = colors_count = 0;
+                                user_attrs = colors_count = 0;
 # else
                                 attrs_count = colors_count = 0;
 # endif /* _MSC_VER */
@@ -806,14 +820,18 @@ static void parse_userpref(void)
 
                                             *s++ = 0; // TODO: is it safe?
                                             if (!strcmp("none", t)) {
+# ifdef _MSC_VER
+                                                c->value = 0;
+# else
                                                 *c->value = U_NUL;
+# endif /* _MSC_VER */
                                                 break;
                                             } else {
                                                 for (a = attrs; a->name; a++) {
                                                     if (!strcmp(a->name, t)) {
                                                         if (a->bg == a->fg || (a->bg != a->fg && colors_count < 2)) {
 # ifdef _MSC_VER
-                                                            attrs |= (colors_count++ ? a->bg : a->fg);
+                                                            user_attrs |= (colors_count++ ? a->bg : a->fg);
 # else
                                                             user_attrs[attrs_count++] = colors_count++ ? a->bg : a->fg;
 # endif /* _MSC_VER */
@@ -857,7 +875,7 @@ static void parse_userpref(void)
 # endif /* !_MSC_VER */
                                 } while (*s && '\n' != *s);
 # ifdef _MSC_VER
-                                c->value = attrs;
+                                c->value = user_attrs;
 # else
                                 if (attrs_count > 0) {
                                     UChar prefix[] = {0x001b, 0x005b, U_NUL}, suffix[] = {0x006d, U_NUL}, sep[] = {0x003b, U_NUL};
@@ -897,14 +915,17 @@ static void parse_userpref(void)
 # endif /* _MSC_VER */
                             }
                         }
+# ifndef _MSC_VER
 nextline:
                         ;
+# endif /* !_MSC_VER */
                     }
                 }
             }
         }
     }
 }
+
 #endif /* !NO_COLOR */
 
 /* ========== process on file and/or directory helper ========== */
@@ -912,27 +933,19 @@ nextline:
 static void print_file(const char *filename, UBool no_file_match, UBool no_line_match, UBool print_sep, UBool eol)
 {
 #ifndef NO_COLOR
-    if (colorize && *colors[no_file_match ? FILE_NO_MATCH : FILE_MATCH].value) {
-        u_file_write(colors[no_file_match ? FILE_NO_MATCH : FILE_MATCH].value, -1, ustdout);
-    }
+    console_apply_color(no_file_match ? FILE_NO_MATCH : FILE_MATCH);
 #endif /* !NO_COLOR */
     u_fprintf(ustdout, "%s", filename);
 #ifndef NO_COLOR
-    if (colorize && *colors[no_file_match ? FILE_NO_MATCH : FILE_MATCH].value) {
-        u_file_write(reset, reset_len, ustdout);
-    }
+    console_reset(no_file_match ? FILE_NO_MATCH : FILE_MATCH);
 #endif /* !NO_COLOR */
     if (print_sep) {
 #ifndef NO_COLOR
-        if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
-            u_file_write(colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value, -1, ustdout);
-        }
+        console_apply_color(no_line_match ? SEP_NO_MATCH : SEP_MATCH);
 #endif /* !NO_COLOR */
         u_fputc(no_line_match ? SEP_NO_MATCH_UCHAR : SEP_MATCH_UCHAR, ustdout);
 #ifndef NO_COLOR
-        if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
-            u_file_write(reset, reset_len, ustdout);
-        }
+        console_reset(no_line_match ? SEP_NO_MATCH : SEP_MATCH);
 #endif /* !NO_COLOR */
     }
     if (eol) {
@@ -943,27 +956,19 @@ static void print_file(const char *filename, UBool no_file_match, UBool no_line_
 static void print_line(int lineno, UBool no_line_match, UBool print_sep, UBool eol)
 {
 #ifndef NO_COLOR
-    if (colorize && *colors[LINE_NUMBER].value) {
-        u_file_write(colors[LINE_NUMBER].value, -1, ustdout);
-    }
+    console_apply_color(LINE_NUMBER);
 #endif /* !NO_COLOR */
     u_fprintf(ustdout, "%d", lineno);
 #ifndef NO_COLOR
-    if (colorize && *colors[LINE_NUMBER].value) {
-        u_file_write(reset, reset_len, ustdout);
-    }
+    console_reset(LINE_NUMBER);
 #endif /* !NO_COLOR */
     if (print_sep) {
 #ifndef NO_COLOR
-        if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
-            u_file_write(colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value, -1, ustdout);
-        }
+        console_apply_color(no_line_match ? SEP_NO_MATCH : SEP_MATCH);
 #endif /* !NO_COLOR */
         u_fputc(no_line_match ? SEP_NO_MATCH_UCHAR : SEP_MATCH_UCHAR, ustdout);
 #ifndef NO_COLOR
-        if (colorize && *colors[no_line_match ? SEP_NO_MATCH : SEP_MATCH].value) {
-            u_file_write(reset, reset_len, ustdout);
-        }
+        console_reset(no_line_match ? SEP_NO_MATCH : SEP_MATCH);
 #endif /* !NO_COLOR */
     }
     if (eol) {
@@ -1055,6 +1060,7 @@ static int procfile(fd_t *fd, const char *filename)
             line->no_match = !matches; //(!matches && !vFlag) || (matches && vFlag);
             if (_line_print) {
 #ifndef NO_COLOR
+# ifndef _MSC_VER
                 //if (_colorize && matches) {
                 if (_colorize && ((matches && !vFlag) || (!matches && vFlag))) {
                     if (ENGINE_WHOLE_LINE_MATCH == ret) {
@@ -1082,6 +1088,7 @@ static int procfile(fd_t *fd, const char *filename)
                         }
                     }
                 }
+# endif /* !_MSC_VER */
 #endif /* !NO_COLOR */
                 //if ((!vFlag && matches) || (vFlag && !matches)) {
                 if (!line->no_match) {
@@ -1092,15 +1099,11 @@ static int procfile(fd_t *fd, const char *filename)
                         const UChar linesep[] = {SEP_NO_MATCH_UCHAR, SEP_NO_MATCH_UCHAR, U_NUL};
 
 #ifndef NO_COLOR
-                        if (colorize && *colors[CONTEXT_SEP].value) {
-                            u_file_write(colors[CONTEXT_SEP].value, -1, ustdout);
-                        }
+                        console_apply_color(CONTEXT_SEP);
 #endif /* !NO_COLOR */
                         u_fputs(linesep, ustdout);
 #ifndef NO_COLOR
-                        if (colorize && *colors[CONTEXT_SEP].value) {
-                            u_file_write(reset, reset_len, ustdout);
-                        }
+                        console_reset(CONTEXT_SEP);
 #endif /* !NO_COLOR */
                     }
                     fixed_circular_list_foreach(i, lines, el) {
@@ -1244,6 +1247,7 @@ endfile:
     return fd->matches;
 }
 
+#ifndef WITHOUT_FTS
 static int procdir(fd_t *fd, char **dirname)
 {
     FTS *fts;
@@ -1282,6 +1286,7 @@ static int procdir(fd_t *fd, char **dirname)
 
     return matches;
 }
+#endif /* !WITHOUT_FTS */
 
 /* ========== main ========== */
 
@@ -1304,18 +1309,6 @@ static void exit_cb(void)
 #endif /* OLD_INTERVAL */
     }
 }
-
-#if 0
-void *char_ctor(void)
-{
-    char *x;
-    x = mem_new_n(char, 2);
-    x[0] = 0;
-    x[1] = 0;
-
-    return x;
-}
-#endif
 
 int main(int argc, char **argv)
 {
@@ -1355,42 +1348,32 @@ int main(int argc, char **argv)
 
     patterns = slist_new(pattern_destroy);
     default_reader = &mm_reader;
+
+#ifdef _MSC_VER
+    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
+    {
+        HKEY hkey;
+        char cp[30] = "";
+        DWORD cp_len;
+
+        cp_len = sizeof(cp) / sizeof(char);
+        if (ERROR_SUCCESS == RegOpenKeyExA(HKEY_LOCAL_MACHINE, TEXT("SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"), 0, KEY_QUERY_VALUE, &hkey)) {
+            if (ERROR_SUCCESS == RegQueryValueExA(hkey, TEXT("OEMCP"), NULL, NULL, (LPBYTE) &cp, &cp_len)) {
+                cp[cp_len] = '\0';
+            }
+            RegCloseKey(hkey);
+        }
+        ustdout = u_finit(stdout, NULL, cp);
+        ustderr = u_finit(stderr, NULL, cp);
+}
+#else
     ustdout = u_finit(stdout, NULL, NULL);
     ustderr = u_finit(stderr, NULL, NULL);
-
-    {
-        UChar string[] = {
-            0xD835, 0xDE3C, // A
-            0xD835, 0xDE3D, // B
-            0xD835, 0xDE3E, // C
-            0xD835, 0xDE3D, // D
-            0xD835, 0xDE3F, // E
-            0
-        };
-        UChar32 string32[] = {
-            0x0001D63C,
-            0x0001D63D,
-            0x0001D63E,
-            0x0001D63D,
-            0x0001D63F,
-            0
-        };
-        UFILE *ufp;
-
-        u_printf("%S\n", string);
-        ufp = u_fopen("test/utf16_2cu.txt", "w", NULL, "UTF-8");
-        //u_file_write(string, 10, ufp);
-        for (int i = 0; i < 5; i++) {
-            u_fputc(string32[i], ufp);
-            u_fputc(string32[i], ustdout);
-        }
-        u_fclose(ufp);
-    }
+#endif
 
     debug("system locale = " YELLOW("%s"), u_fgetlocale(ustdout));
     debug("system codepage = " YELLOW("%s"), u_fgetcodepage(ustdout));
 
-    // TODO: __progname (platform specific) => basename(argv[0])
     switch (__progname[1]) {
         case 'e':
             pattern_type = PATTERN_REGEXP;
@@ -1434,9 +1417,11 @@ int main(int argc, char **argv)
             case 'L':
                 LFlag = TRUE;
                 break;
+#ifndef WITHOUT_FTS
             case 'R':
                 rFlag = TRUE;
                 break;
+#endif /* !WITHOUT_FTS */
             case 'V':
                 fprintf(stderr, "ugrep version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
@@ -1471,9 +1456,11 @@ int main(int argc, char **argv)
             case 'n':
                 nFlag = TRUE;
                 break;
+#ifndef WITHOUT_FTS
             case 'r':
                 rFlag = TRUE;
                 break;
+#endif /* !WITHOUT_FTS */
             case 's':
                 verbosity = FATAL;
                 break;
@@ -1578,36 +1565,12 @@ int main(int argc, char **argv)
     lines = fixed_circular_list_new(before_context + 1, line_ctor, line_dtor);
     intervals = intervals_new();
 
-#if 0
-    {
-        int i, j;
-        char data[] = "ABCDEFGHIJKLM";
-        flist_element_t *el;
-        fixed_circular_list_t *l;
-
-        l = fixed_circular_list_new(3, char_ctor, free);
-
-        fixed_circular_list_clean(l);
-
-        for (i = 0; i < 5; i++) {
-            FETCH_DATA(fixed_circular_list_fetch(l), x, char);
-            x[0] = data[i];
-        //}
-
-        printf("--\n");
-        printf("%s\n", x);
-        fixed_circular_list_foreach(j, l, el) {
-            FETCH_DATA(el->data, y, char);
-            printf("%d => %s\n", j, y);
-        }
-        }
-    }
-#endif
-
     if (0 == argc) {
         matches = procfile(&fd, "-");
+#ifndef WITHOUT_FTS
     } else if (rFlag) {
         matches = procdir(&fd, argv);
+#endif /* !WITHOUT_FTS */
     } else {
         for ( ; argc--; ++argv) {
             matches += procfile(&fd, *argv);

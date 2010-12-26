@@ -66,6 +66,9 @@
 #  define fdopen _fdopen
 #  define isblank isspace
 #  define snprintf sprintf_s
+extern char __progname[];
+# else
+extern char *__progname;
 # endif /* _MSC_VER */
 
 # define ensure(expr)                                                                                           \

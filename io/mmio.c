@@ -51,14 +51,12 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
     } else {
 #ifdef _MSC_VER
         if (NULL == (mmfd->fd = CreateFileMapping((HANDLE) _get_osfhandle(fd), NULL, PAGE_READONLY, 0, 0, NULL))) {
-            //GetLastError
-            error_set(error, WARN, "CreateFileMapping failed on %s", filename);
+            error_set(error, WARN, "CreateFileMapping failed on %s: ", filename);
             goto close;
         }
         if (NULL == (mmfd->start = MapViewOfFile(mmfd->fd, FILE_MAP_READ, 0, 0, 0))) {
-            //GetLastError
             CloseHandle(mmfd->fd);
-            error_win32_set(error, WARN, "MapViewOfFile failed on %s", filename);
+            error_win32_set(error, WARN, "MapViewOfFile failed on %s: ", filename);
             goto close;
         }
 #else
