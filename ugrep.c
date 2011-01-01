@@ -8,12 +8,10 @@
 # include <shlobj.h>
 # include <psapi.h>
 # pragma comment(lib,"Psapi.lib")
-# define DIRECTORY_SEPARATOR '\\'
 char __progname[_MAX_PATH] = "<unknown>";
 #else
 # include <sys/param.h>
 # include <pwd.h>
-# define DIRECTORY_SEPARATOR '/'
 #endif /* _MSC_VER */
 #ifndef WITHOUT_FTS
 # include <fts.h>
@@ -220,12 +218,10 @@ void report(int type, const char *format, ...)
     }
 }
 
-#ifndef NO_COLOR
 static UBool stdout_is_tty(void)
 {
     return (1 == isatty(STDOUT_FILENO));
 }
-#endif /* !NO_COLOR */
 
 static UBool stdin_is_tty(void) {
     return (1 == isatty(STDIN_FILENO));
@@ -1351,7 +1347,7 @@ int main(int argc, char **argv)
 
 #ifdef _MSC_VER
     GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
-    {
+    if (stdout_is_tty()) {
         HKEY hkey;
         char cp[30] = "";
         DWORD cp_len;
@@ -1365,11 +1361,12 @@ int main(int argc, char **argv)
         }
         ustdout = u_finit(stdout, NULL, cp);
         ustderr = u_finit(stderr, NULL, cp);
-}
-#else
-    ustdout = u_finit(stdout, NULL, NULL);
-    ustderr = u_finit(stderr, NULL, NULL);
-#endif
+    } else
+#endif /* _MSC_VER */
+    {
+        ustdout = u_finit(stdout, NULL, NULL);
+        ustderr = u_finit(stderr, NULL, NULL);
+    }
 
     debug("system locale = " YELLOW("%s"), u_fgetlocale(ustdout));
     debug("system codepage = " YELLOW("%s"), u_fgetcodepage(ustdout));

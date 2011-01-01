@@ -67,7 +67,9 @@
 #  define isblank isspace
 #  define snprintf sprintf_s
 extern char __progname[];
+#  define DIRECTORY_SEPARATOR '\\'
 # else
+#  define DIRECTORY_SEPARATOR '/'
 extern char *__progname;
 # endif /* _MSC_VER */
 

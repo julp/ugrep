@@ -6,11 +6,15 @@
 # define STDIN_FILENO _fileno(stdin)
 
 # ifndef S_ISREG
-#  define S_ISREG(mode)  (((mode) & S_IFMT) == S_IFREG)
+#  define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
 # endif /* !S_ISREG */
 
 # ifndef S_ISDIR
-#  define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#  define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
 # endif /* !S_ISDIR */
+
+# ifndef S_ISLNK
+#  define S_ISLNK(mode) 0
+# endif /* !S_ISLNK */
 
 #endif /* !WIN32_UNISTD_H */
