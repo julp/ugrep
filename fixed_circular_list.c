@@ -1,6 +1,6 @@
 #include "ugrep.h"
 
-fixed_circular_list_t *fixed_circular_list_new(size_t length, func_ctor_t ctor_func, func_dtor_t dtor_func) /* WARN_UNUSED_RESULT NONNULL(1) */
+fixed_circular_list_t *fixed_circular_list_new(size_t length, func_ctor_t ctor_func, func_dtor_t dtor_func) /* WARN_UNUSED_RESULT NONNULL(2) */
 {
     size_t i;
     fixed_circular_list_t *l;

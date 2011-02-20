@@ -26,7 +26,7 @@ void fixed_circular_list_destroy(fixed_circular_list_t *) NONNULL();
 UBool fixed_circular_list_empty(fixed_circular_list_t *) NONNULL();
 void *fixed_circular_list_fetch(fixed_circular_list_t *) NONNULL();
 size_t fixed_circular_list_length(fixed_circular_list_t *) NONNULL();
-fixed_circular_list_t *fixed_circular_list_new(size_t, func_ctor_t, func_dtor_t) WARN_UNUSED_RESULT NONNULL(1);
+fixed_circular_list_t *fixed_circular_list_new(size_t, func_ctor_t, func_dtor_t) WARN_UNUSED_RESULT NONNULL(2);
 size_t fixed_circular_list_size(fixed_circular_list_t *) NONNULL();
 
 #endif /* FIXED_CIRCULAR_LIST_H */
