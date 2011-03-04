@@ -1,0 +1,33 @@
+pkgname=ugrep-git
+_pkgname=ugrep
+pkgver=20110303
+pkgrel=1
+pkgdesc='ICU based implementation of grep to deal with differents codepages/encodings'
+arch=('i686' 'x86_64')
+url='http://github.com/julp/ugrep'
+license=('BSD')
+depends=('icu' 'zlib' 'bzip2')
+makedepends=('git' 'cmake')
+provides=('ugrep')
+conflicts=('ugrep')
+_gitfork='julp'
+_gitname='ugrep'
+_gitroot="git://github.com/${_gitfork}/${_gitname}.git"
+md5sums=()
+
+build() {
+    cd "${srcdir}"
+
+    msg "Connecting to the GIT server..."
+    if [ -d "${_gitname}-${_gitfork}" ]; then
+        cd "${_gitname}-${_gitfork}"
+        git pull origin
+    else
+        git clone "${_gitroot}" "${_gitname}-${_gitfork}"
+        cd "${_gitname}-${_gitfork}"
+    fi
+
+    cmake . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=RELEASE || return 1
+    make VERBOSE=1 || return 1
+    make DESTDIR=$startdir/pkg install || return 1
+}
