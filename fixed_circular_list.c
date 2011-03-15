@@ -91,7 +91,7 @@ size_t fixed_circular_list_length(fixed_circular_list_t *l) /* NONNULL() */
     } else if (l->ptr > l->head) {
         return l->ptr - l->head;
     } else {
-        return l->head - l->ptr;
+        return (l->len - (l->head - l->ptr));
     }
 }
 
