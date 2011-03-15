@@ -24,6 +24,8 @@ static inline size_t nearest_power(size_t requested_length)
     }
 }
 
+/* NOTE: all lengths are in code units not code point */
+
 UString *ustring_new() /* WARN_UNUSED_RESULT */
 {
     return ustring_sized_new(USTRING_INITIAL_LENGTH);
@@ -132,47 +134,31 @@ void ustring_truncate(UString *ustr) /* NONNULL() */
     ustr->len = 0;
 }
 
-/* TODO: CHECK */
-void ustring_subreplace_len(
-    UString *ustr,
-    const UChar *replacement,
-    size_t replacement_length, /* Unit : CU */
-    size_t position,           /* Unit : CP */
-    size_t length              /* Unit : CP */
-) /* NONNULL() */
+/* UNSAFE: code units */
+void ustring_subreplace_len(UString *ustr, const UChar *replacement, size_t replacement_length, size_t position, size_t length) /* NONNULL() */
 {
-    size_t ustr_cp_len; /* Unit : CP */
-    int32_t diff_cu_len, start_cu_pos, end_cu_pos, cu_length; /* Unit : CU */
-
     require_else_return(NULL != ustr);
     require_else_return(NULL != replacement);
+    require_else_return(position <= ustr->len);
 
-    ustr_cp_len = u_countChar32(ustr->ptr, ustr->len);
+    if (position <= ustr->len) {
+        int32_t diff_len;
 
-    require_else_return(position <= ustr_cp_len);
-    require_else_return(position + length <= ustr_cp_len);
-
-    start_cu_pos = 0;
-    U16_FWD_N(ustr->ptr, start_cu_pos, ustr->len, position);
-    end_cu_pos = start_cu_pos;
-    U16_FWD_N(ustr->ptr, end_cu_pos, ustr->len, position + length);
-
-    cu_length = end_cu_pos - start_cu_pos;
-    diff_cu_len = replacement_length - cu_length;
-    if (diff_cu_len > 0) {
-        _ustring_maybe_expand(ustr, diff_cu_len);
-    }
-    printf("start_cu_pos = %d, end_cu_pos = %d, diff_cu_len = %d\n", start_cu_pos, end_cu_pos, diff_cu_len);
-    if (replacement >= ustr->ptr && replacement <= ustr->ptr + ustr->len) {
-        // TODO: overlap
-    } else {
-        if (u_countChar32(replacement, replacement_length) != length) {
-            u_memmove(ustr->ptr + start_cu_pos + cu_length + diff_cu_len, ustr->ptr + start_cu_pos + cu_length, ustr->len - start_cu_pos);
+        diff_len = replacement_length - length;
+        if (diff_len > 0) {
+            _ustring_maybe_expand(ustr, diff_len);
         }
-        u_memcpy(ustr->ptr + start_cu_pos, replacement, replacement_length);
+        if (replacement >= ustr->ptr && replacement <= ustr->ptr + ustr->len) {
+            // TODO: overlap
+        } else {
+            if (replacement_length != length) {
+                memmove(ustr->ptr + position + length + diff_len, ustr->ptr + position + length, ustr->len - position);
+            }
+            memcpy(ustr->ptr + position, replacement, replacement_length);
+        }
+        ustr->len += diff_len;
+        ustr->ptr[ustr->len] = 0;
     }
-    ustr->len += diff_cu_len;
-    ustr->ptr[ustr->len] = 0;
 }
 
 /* TODO: CHECK */
