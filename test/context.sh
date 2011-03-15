@@ -8,7 +8,7 @@
 . test/assert.sh.inc
 
 ARGS='--color=never -HnA 2 -B 3 after_context ugrep.c'
-assertOutputValue "-A 2 -B 3 (without -v)" "LANG=en_US.UTF-8 ./ugrep ${ARGS} 2>/dev/null" "grep ${ARGS}"
-assertOutputValue "-A 2 -B 3 (with -v)" "LANG=en_US.UTF-8 ./ugrep -v ${ARGS} 2>/dev/null" "grep -v ${ARGS}"
+assertOutputValue "-A 2 -B 3 (without -v)" "LC_ALL=C ./ugrep ${ARGS} 2>/dev/null" "grep ${ARGS}"
+assertOutputValue "-A 2 -B 3 (with -v)" "LC_ALL=C ./ugrep -v ${ARGS} 2>/dev/null" "grep -v ${ARGS}"
 
 exit $?
