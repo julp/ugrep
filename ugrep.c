@@ -64,7 +64,7 @@ enum {
 
 typedef struct {
     UString *ustr;
-    UBool no_match;
+    UBool match;
 } line_t;
 
 void *line_ctor(void) {
@@ -117,7 +117,6 @@ engine_t *engines[] = {
 int binbehave = BIN_FILE_SKIP;
 
 UFILE *ustdout = NULL, *ustderr = NULL;
-//UString *ustr = NULL;
 static fixed_circular_list_t *lines = NULL;
 static slist_t *patterns = NULL;
 static reader_t *default_reader = NULL;
@@ -242,7 +241,7 @@ static UBool is_binary(UChar32 *buffer, size_t buffer_len)
         }
     }
 
-    return (p - buffer) < buffer_len;
+    return ((size_t)(p - buffer)) < buffer_len;
 }
 
 static UBool is_pattern(const UChar *pattern)
@@ -421,7 +420,6 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
     return TRUE;
 failed:
     if (NULL != fd->reader_data) {
-        //fd->reader->close(fd->reader_data);
         fd_close(fd);
     }
     return FALSE;
@@ -926,7 +924,7 @@ nextline:
 
 /* ========== process on file and/or directory helper ========== */
 
-static void print_file(const char *filename, UBool no_file_match, UBool no_line_match, UBool print_sep, UBool eol)
+static void print_file(const char *filename, UBool no_file_match, UBool line_match, UBool print_sep, UBool eol)
 {
 #ifndef NO_COLOR
     console_apply_color(no_file_match ? FILE_NO_MATCH : FILE_MATCH);
@@ -937,11 +935,11 @@ static void print_file(const char *filename, UBool no_file_match, UBool no_line_
 #endif /* !NO_COLOR */
     if (print_sep) {
 #ifndef NO_COLOR
-        console_apply_color(no_line_match ? SEP_NO_MATCH : SEP_MATCH);
+        console_apply_color(line_match ? SEP_MATCH : SEP_NO_MATCH);
 #endif /* !NO_COLOR */
-        u_fputc(no_line_match ? SEP_NO_MATCH_UCHAR : SEP_MATCH_UCHAR, ustdout);
+        u_fputc(line_match ? SEP_MATCH_UCHAR : SEP_NO_MATCH_UCHAR, ustdout);
 #ifndef NO_COLOR
-        console_reset(no_line_match ? SEP_NO_MATCH : SEP_MATCH);
+        console_reset(line_match ? SEP_MATCH : SEP_NO_MATCH);
 #endif /* !NO_COLOR */
     }
     if (eol) {
@@ -949,7 +947,7 @@ static void print_file(const char *filename, UBool no_file_match, UBool no_line_
     }
 }
 
-static void print_line(int lineno, UBool no_line_match, UBool print_sep, UBool eol)
+static void print_line(int lineno, UBool line_match, UBool print_sep, UBool eol)
 {
 #ifndef NO_COLOR
     console_apply_color(LINE_NUMBER);
@@ -960,17 +958,33 @@ static void print_line(int lineno, UBool no_line_match, UBool print_sep, UBool e
 #endif /* !NO_COLOR */
     if (print_sep) {
 #ifndef NO_COLOR
-        console_apply_color(no_line_match ? SEP_NO_MATCH : SEP_MATCH);
+        console_apply_color(line_match ? SEP_MATCH : SEP_NO_MATCH);
 #endif /* !NO_COLOR */
-        u_fputc(no_line_match ? SEP_NO_MATCH_UCHAR : SEP_MATCH_UCHAR, ustdout);
+        u_fputc(line_match ? SEP_MATCH_UCHAR : SEP_NO_MATCH_UCHAR, ustdout);
 #ifndef NO_COLOR
-        console_reset(no_line_match ? SEP_NO_MATCH : SEP_MATCH);
+        console_reset(line_match ? SEP_MATCH : SEP_NO_MATCH);
 #endif /* !NO_COLOR */
     }
     if (eol) {
         u_fputc(U_LF, ustdout); // TODO: system dependant
     }
 }
+
+#ifdef DEBUG
+void fixed_circular_list_print(fixed_circular_list_t *l) /* NONNULL() */
+{
+    size_t i;
+
+    require_else_return(NULL != l);
+
+    u_printf("| i |   ADDR   | USED | PTR | HEAD | USTRING\n");
+    u_printf("--------------------------------------------\n");
+    for (i = 0; i < l->len; i++) {
+        FETCH_DATA(l->elts[i].data, x, line_t);
+        u_printf("| %d | %p | %4d | %3d | %4d | %S\n", i, &l->elts[i], l->elts[i].used, &l->elts[i] == l->ptr, &l->elts[i] == l->head, x->ustr->ptr);
+    }
+}
+#endif /* DEBUG */
 
 static int procfile(fd_t *fd, const char *filename)
 {
@@ -1037,13 +1051,7 @@ static int procfile(fd_t *fd, const char *filename)
                     matches++;
                     break; // no need to continue (line level)
                 } else {
-                    //matches += ret;
-                    //matches += (ret && !vFlag) || (!ret && vFlag);
-                    if (!vFlag) {
-                        matches += ret;
-                    } else {
-                        matches += !ret;
-                    }
+                    matches += ret;
                 }
                 //if (matches > 0 && (lFlag || (!vFlag && fd->binary && BIN_FILE_BIN == binbehave))) {
                 if (matches && (lFlag || (fd->binary && BIN_FILE_BIN == binbehave))) {
@@ -1052,13 +1060,16 @@ static int procfile(fd_t *fd, const char *filename)
                     goto endfile; // no need to continue (file level)
                 }
             }
-            fd->matches += /*line->no_match =*/ (matches > 0);
-            line->no_match = !matches; //(!matches && !vFlag) || (matches && vFlag);
+            if (!vFlag) {
+                line->match = !!matches;
+            } else {
+                line->match = !matches;
+            }
+            fd->matches += line->match;
             if (_line_print) {
 #ifndef NO_COLOR
 # ifndef _MSC_VER
-                //if (_colorize && matches) {
-                if (_colorize && ((matches && !vFlag) || (!matches && vFlag))) {
+                if (_colorize && matches) {
                     if (ENGINE_WHOLE_LINE_MATCH == ret) {
                         if (*colors[LINE_MATCH].value) {
                             ustring_prepend_string(ustr, colors[LINE_MATCH].value);
@@ -1086,8 +1097,7 @@ static int procfile(fd_t *fd, const char *filename)
                 }
 # endif /* !_MSC_VER */
 #endif /* !NO_COLOR */
-                //if ((!vFlag && matches) || (vFlag && !matches)) {
-                if (!line->no_match) {
+                if (line->match) {
                     int i;
                     flist_element_t *el;
 
@@ -1102,16 +1112,18 @@ static int procfile(fd_t *fd, const char *filename)
                         console_reset(CONTEXT_SEP);
 #endif /* !NO_COLOR */
                     }
+#if 0
+                    fixed_circular_list_print(lines);
+#endif
                     fixed_circular_list_foreach(i, lines, el) {
-                        //FETCH_DATA(el->data, ustr, UString);
                         FETCH_DATA(el->data, l, line_t);
 
                         if (fd->lineno - i > last_line_print) {
                             if (file_print) {
-                                print_file(fd->filename, FALSE, l->no_match /*vFlag ? l->no_match : !l->no_match*/, TRUE, FALSE);
+                                print_file(fd->filename, FALSE, l->match, TRUE, FALSE);
                             }
                             if (nFlag) {
-                                print_line(fd->lineno - i, l->no_match /*vFlag ? l->no_match : !l->no_match*/, TRUE, FALSE);
+                                print_line(fd->lineno - i, l->match, TRUE, FALSE);
                             }
                             u_fputs(l->ustr->ptr, ustdout);
                         }
@@ -1122,10 +1134,10 @@ static int procfile(fd_t *fd, const char *filename)
                 } else {
                     if (fd->lineno > last_line_print && _after_context > 0) {
                         if (file_print) {
-                            print_file(fd->filename, FALSE, line->no_match /*vFlag ? matches : !matches*/, TRUE, FALSE);
+                            print_file(fd->filename, FALSE, line->match, TRUE, FALSE);
                         }
                         if (nFlag) {
-                            print_line(fd->lineno, line->no_match /*vFlag ? matches : !matches*/, TRUE, FALSE);
+                            print_line(fd->lineno, line->match, TRUE, FALSE);
                         }
                         u_fputs(ustr->ptr, ustdout);
                         last_line_print = fd->lineno;
@@ -1133,92 +1145,6 @@ static int procfile(fd_t *fd, const char *filename)
                     }
                 }
             }
-#if 0
-                if (matches > 0) {
-                    if (!vFlag) {
-                        /*if (file_print) {
-                            print_file(fd->filename, FALSE, TRUE, FALSE);
-                        }
-                        if (nFlag) {
-                            print_line(fd->lineno, TRUE, FALSE);
-                        }*/
-                        if (colorize) {
-                            if (ENGINE_WHOLE_LINE_MATCH == ret) {
-                                if (*colors[LINE_MATCH].value) {
-                                    ustring_prepend_string(ustr, colors[LINE_MATCH].value);
-                                    ustring_append_string_len(ustr, reset, reset_len);
-                                }
-                            } else {
-                                if (*colors[SINGLE_MATCH].value) {
-                                    int32_t decalage;
-                                    slist_element_t *el;
-                                    UChar *before;
-                                    int32_t before_len;
-
-                                    decalage = 0;
-                                    before = colors[SINGLE_MATCH].value;
-                                    before_len = u_strlen(before);
-                                    for (el = intervals->head; el; el = el->next) {
-                                        FETCH_DATA(el->data, i, interval_t);
-
-                                        ustring_insert_len(ustr, i->lower_limit + decalage, before, before_len);
-                                        ustring_insert_len(ustr, i->upper_limit + decalage + before_len, reset, reset_len);
-                                        decalage += before_len + reset_len;
-                                    }
-                                }
-                            }
-                        }
-                        //u_fputs(ustr->ptr, ustdout);
-                        {
-                            flist_element_t *el;
-
-                            fixed_circular_list_foreach(lines, el) {
-                                //FETCH_DATA(el->data, ustr, UString);
-                                FETCH_DATA(el->data, l, line_t);
-
-                                if (file_print) {
-                                    print_file(fd->filename, FALSE, !l->no_match, TRUE, FALSE);
-                                }
-                                if (nFlag) {
-                                    print_line(fd->lineno - _i, !l->no_match, TRUE, FALSE);
-                                }
-                                u_fputs(l->ustr->ptr, ustdout);
-                            }
-                            fixed_circular_list_clean(lines);
-                        }
-                    }
-                } else {
-                    if (fd->binary && BIN_FILE_BIN == binbehave) {
-                        goto endfile; // no need to continue (file level)
-                    } else if (vFlag) {
-                        /*if (file_print) {
-                            print_file(fd->filename, FALSE, FALSE, TRUE, FALSE);
-                        }
-                        if (nFlag) {
-                            print_line(fd->lineno, FALSE, TRUE, FALSE);
-                        }
-                        u_fputs(ustr->ptr, ustdout);*/
-                        {
-                            flist_element_t *el;
-
-                            fixed_circular_list_foreach(lines, el) {
-                                //FETCH_DATA(el->data, ustr, UString);
-                                FETCH_DATA(el->data, l, line_t);
-
-                                if (file_print) {
-                                    print_file(fd->filename, FALSE, l->no_match, TRUE, FALSE);
-                                }
-                                if (nFlag) {
-                                    print_line(fd->lineno - _i, l->no_match, TRUE, FALSE);
-                                }
-                                u_fputs(l->ustr->ptr, ustdout);
-                            }
-                            fixed_circular_list_clean(lines);
-                        }
-                    }
-                }
-            }
-#endif
         }
 endfile:
         if (!_line_print) {
@@ -1520,12 +1446,11 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    //line_print = line_print && !cFlag && !lFlag && !LFlag;
+    /* Options overrides, in case of incompatibility between them */
     if (cFlag || lFlag || LFlag) {
         before_context = after_context = 0;
         line_print = FALSE;
     }
-    /* Options overrides, in case of incompatibility between them */
 #ifndef NO_COLOR
     colorize = (COLOR_ALWAYS == color) || (COLOR_AUTO == color && stdout_is_tty());
 #endif /* !NO_COLOR */
@@ -1557,8 +1482,6 @@ int main(int argc, char **argv)
     }
 #endif /* !NO_COLOR */
 
-    //ustr = ustring_new();
-    //lines = fixed_circular_list_new(before_context + 1, (func_ctor_t) ustring_new, (func_dtor_t) ustring_destroy);
     lines = fixed_circular_list_new(before_context + 1, line_ctor, line_dtor);
     intervals = intervals_new();
 
