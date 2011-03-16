@@ -2,7 +2,6 @@ TODO:
   - Very high:
     * port or rewrite FTS functions for Windows
     * implement context options (-A, -B, -C, -\d+) - actually buggy
-    * check if ustring_subreplace_len (ustring.c) should work with Code Units (revert needed in this case) or Code Points
 
   - High:
     * implement recursive option (and exclude options: exclude, exclude-dir, include)
