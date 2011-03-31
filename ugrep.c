@@ -1101,7 +1101,7 @@ static int procfile(fd_t *fd, const char *filename)
                     int i;
                     flist_element_t *el;
 
-                    if ( (before_context || after_context) && last_line_print > before_context && (fd->lineno - before_context > last_line_print + after_context) ) {
+                    if ( (before_context || after_context) && last_line_print > before_context && (fd->lineno - before_context > last_line_print + 1) ) {
                         const UChar linesep[] = {SEP_NO_MATCH_UCHAR, SEP_NO_MATCH_UCHAR, U_NUL};
 
 #ifndef NO_COLOR
@@ -1118,7 +1118,7 @@ static int procfile(fd_t *fd, const char *filename)
                     fixed_circular_list_foreach(i, lines, el) {
                         FETCH_DATA(el->data, l, line_t);
 
-                        if (fd->lineno - i > last_line_print) {
+                        if (fd->lineno - i > last_line_print) { // this test should not be needed
                             if (file_print) {
                                 print_file(fd->filename, FALSE, l->match, TRUE, FALSE);
                             }
