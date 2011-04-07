@@ -1,5 +1,7 @@
 #include "ugrep.h"
 
+#include <unicode/uregex.h>
+
 // const UChar b[] = {0x005c, 0x0062, U_NUL};
 
 static void *engine_re_compile(error_t **error, const UChar *upattern, int32_t length, uint32_t flags)

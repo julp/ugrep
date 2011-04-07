@@ -25,35 +25,23 @@ char __progname[_MAX_PATH] = "<unknown>";
 #include <ctype.h>
 
 #include "ugrep.h"
+#include "reader_decl.h"
 
-#define MIN_CONFIDENCE  39   // Minimum confidence for a match (in percents)
-#define MAX_ENC_REL_LEN 4096 // Maximum relevant length for encoding analyse (in bytes)
-#define MAX_BIN_REL_LEN 4096 // Maximum relevant length for binary analyse
 
 #define SEP_MATCH_UCHAR    0x003a
 #define SEP_NO_MATCH_UCHAR 0x002d
 
-#if defined(DEBUG) && !defined(_MSC_VER)
-# define RED(str)    "\33[1;31m" str "\33[0m"
-# define GREEN(str)  "\33[1;32m" str "\33[0m"
-# define YELLOW(str) "\33[1;33m" str "\33[0m"
-#else
-# define RED(str)    str
-# define GREEN(str)  str
-# define YELLOW(str) str
-#endif /* DEBUG && !_MSC_VER */
+
+// const UChar EOL[] = {U_CR, U_LF, U_NUL};
+// const UChar EOL[] = {U_LF, U_NUL};
+// const size_t EOL_LEN = ARRAY_SIZE(EOL) - 1;
+
 
 enum {
-    UGREP_EXIT_MATCH = 0,
+    UGREP_EXIT_MATCH    = 0,
     UGREP_EXIT_NO_MATCH = 1,
-    UGREP_EXIT_FAILURE = 2,
+    UGREP_EXIT_FAILURE  = 2,
     UGREP_EXIT_USAGE
-};
-
-enum {
-    BIN_FILE_BIN,
-    BIN_FILE_SKIP,
-    BIN_FILE_TEXT
 };
 
 enum {
@@ -85,15 +73,6 @@ void line_dtor(void *data) {
 
 /* ========== global variables ========== */
 
-extern reader_t mm_reader;
-extern reader_t stdio_reader;
-#ifdef HAVE_ZLIB
-extern reader_t gz_reader;
-#endif /* HAVE_ZLIB */
-#ifdef HAVE_BZIP2
-extern reader_t bz2_reader;
-#endif /* HAVE_BZIP2 */
-
 reader_t *available_readers[] = {
     &mm_reader,
     &stdio_reader,
@@ -114,7 +93,9 @@ engine_t *engines[] = {
     &re_engine
 };
 
-int binbehave = BIN_FILE_SKIP;
+#if 0
+int binbehave = BIN_FILE_SKIP; // TODO
+#endif
 
 UFILE *ustdout = NULL, *ustderr = NULL;
 static fixed_circular_list_t *lines = NULL;
@@ -126,9 +107,6 @@ static slist_t *intervals = NULL;
 static slist_pool_t *intervals = NULL;
 #endif /* OLD_INTERVAL */
 
-#ifndef WITHOUT_FTS
-UBool rFlag = FALSE;
-#endif /* !WITHOUT_FTS */
 UBool xFlag = FALSE;
 UBool nFlag = FALSE;
 UBool vFlag = FALSE;
@@ -146,19 +124,6 @@ UBool colorize = TRUE;
 UBool line_print = TRUE;
 
 /* ========== general helper functions ========== */
-
-#ifdef DEBUG
-const char *ubasename(const char *filename)
-{
-    const char *c;
-
-    if (NULL == (c = strrchr(filename, DIRECTORY_SEPARATOR))) {
-        return filename;
-    } else {
-        return c + 1;
-    }
-}
-#endif /* DEBUG */
 
 #ifdef DEBUG
 int verbosity = INFO;
@@ -222,28 +187,6 @@ static UBool stdout_is_tty(void)
     return (1 == isatty(STDOUT_FILENO));
 }
 
-static UBool stdin_is_tty(void) {
-    return (1 == isatty(STDIN_FILENO));
-}
-
-static UBool is_binary_uchar(UChar32 c)
-{
-    return !u_isprint(c) && !u_isspace(c) && U_BS != c;
-}
-
-static UBool is_binary(UChar32 *buffer, size_t buffer_len)
-{
-    UChar32 *p;
-
-    for (p = buffer; U_NUL != *p; p++) {
-        if (is_binary_uchar(*p)) {
-            return TRUE;
-        }
-    }
-
-    return ((size_t)(p - buffer)) < buffer_len;
-}
-
 static UBool is_pattern(const UChar *pattern)
 {
     // quotemeta : ".\+*?[^]($)"
@@ -277,162 +220,6 @@ static UBool is_pattern(const UChar *pattern)
 static UBool is_patternC(const char *pattern)
 {
     return (NULL != strpbrk(pattern, "\\+*?[^]$(){}=!<>|:-"));
-}
-
-/* ========== fd helper functions ========== */
-
-typedef struct {
-    const char *filename;
-    const char *encoding;
-    reader_t *reader;
-    void *reader_data;
-    size_t filesize;
-    size_t lineno;
-    size_t matches;
-    UBool binary;
-} fd_t;
-
-void fd_close(fd_t *fd)
-{
-    fd->reader->close(fd->reader_data);
-    free(fd->reader_data);
-}
-
-UBool fd_open(error_t **error, fd_t *fd, const char *filename)
-{
-    int fsfd;
-    /*struct stat st;*/
-    UErrorCode status;
-    size_t buffer_len;
-    const char *encoding;
-    int32_t signature_length;
-    char buffer[MAX_ENC_REL_LEN + 1];
-
-    /*if (-1 == (stat(filename, &st))) {
-        error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
-        return FALSE;
-    }*/
-
-    fd->reader_data = NULL;
-
-    if (!strcmp("-", filename)) {
-        if (!stdin_is_tty()) {
-            error_set(error, WARN, "Sorry, can't work with redirected or piped stdin (not seekable, sources can use many codepage). Skip stdin.");
-            goto failed;
-        }
-        fd->filename = "(standard input)";
-        fd->reader = &stdio_reader;
-        fsfd = STDIN_FILENO;
-    } else {
-        fd->filename = filename;
-        if (-1 == (fsfd = open(filename, O_RDONLY))) {
-            error_set(error, WARN, "can't open %s: %s", filename, strerror(errno));
-            goto failed;
-        }
-    }
-
-    if (NULL == (fd->reader_data = fd->reader->open(error, filename, fsfd))) {
-        goto failed;
-    }
-
-    encoding = NULL;
-    signature_length = 0;
-    status = U_ZERO_ERROR;
-    fd->lineno = 0;
-    /*fd->filesize = st.st_size;*/
-    fd->matches = 0;
-    fd->binary = FALSE;
-
-    if (fd->reader->seekable(fd->reader_data)) {
-        if (0 != (buffer_len = fd->reader->readbytes(fd->reader_data, buffer, MAX_ENC_REL_LEN))) {
-            buffer[buffer_len] = '\0';
-            encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &signature_length, &status);
-            if (U_SUCCESS(status)) {
-                if (NULL == encoding) {
-                    int32_t confidence;
-                    UCharsetDetector *csd;
-                    const char *tmpencoding;
-                    const UCharsetMatch *ucm;
-
-                    csd = ucsdet_open(&status);
-                    if (U_FAILURE(status)) {
-                        icu_error_set(error, WARN, status, "ucsdet_open");
-                        goto failed;
-                    }
-                    ucsdet_setText(csd, buffer, buffer_len, &status);
-                    if (U_FAILURE(status)) {
-                        icu_error_set(error, WARN, status, "ucsdet_setText");
-                        goto failed;
-                    }
-                    ucm = ucsdet_detect(csd, &status);
-                    if (U_FAILURE(status)) {
-                        icu_error_set(error, WARN, status, "ucsdet_detect");
-                        goto failed;
-                    }
-                    confidence = ucsdet_getConfidence(ucm, &status);
-                    tmpencoding = ucsdet_getName(ucm, &status);
-                    if (U_FAILURE(status)) {
-                        icu_error_set(error, WARN, status, "ucsdet_getName");
-                        ucsdet_close(csd);
-                        goto failed;
-                    }
-                    if (confidence > MIN_CONFIDENCE) {
-                        encoding = tmpencoding;
-                        //debug("%s, confidence of " GREEN("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
-                    } else {
-                        //debug("%s, confidence of " RED("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
-                        //encoding = "US-ASCII";
-                    }
-                    ucsdet_close(csd);
-                } else {
-                    fd->reader->set_signature_length(fd->reader_data, signature_length);
-                }
-                debug("%s, file encoding = %s", filename, encoding);
-                fd->encoding = encoding;
-                if (!fd->reader->set_encoding(error, fd->reader_data, encoding)) {
-                    goto failed;
-                }
-                fd->reader->rewind(fd->reader_data);
-                if (BIN_FILE_TEXT != binbehave) {
-                    int32_t ubuffer_len;
-                    UChar32 ubuffer[MAX_BIN_REL_LEN + 1];
-
-                    if (-1 == (ubuffer_len = fd->reader->readuchars(error, fd->reader_data, ubuffer, MAX_BIN_REL_LEN))) {
-                        goto failed;
-                    }
-                    ubuffer[ubuffer_len] = U_NUL;
-                    fd->binary = is_binary(ubuffer, ubuffer_len);
-                    debug("%s, binary file : %s", filename, fd->binary ? RED("yes") : GREEN("no"));
-                    if (fd->binary) {
-                        if (BIN_FILE_SKIP == binbehave) {
-                            goto failed;
-                        }
-                    }
-                    fd->reader->rewind(fd->reader_data);
-                }
-            } else {
-                icu_error_set(error, WARN, status, "ucnv_detectUnicodeSignature");
-                goto failed;
-            }
-        }
-    }
-
-    return TRUE;
-failed:
-    if (NULL != fd->reader_data) {
-        fd_close(fd);
-    }
-    return FALSE;
-}
-
-UBool fd_eof(fd_t *fd) {
-    return fd->reader->eof(fd->reader_data);
-}
-
-UBool fd_readline(error_t **error, fd_t *fd, UString *ustr)
-{
-    ustring_truncate(ustr);
-    return fd->reader->readline(error, fd->reader_data, ustr);
 }
 
 /* ========== getopt stuff ========== */
@@ -658,7 +445,7 @@ typedef struct {
 } attr_t;
 
 static const UChar reset[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
-static int32_t reset_len = ARRAY_SIZE(reset) - 1;
+static const int32_t reset_len = ARRAY_SIZE(reset) - 1;
 
 attr_t attrs[] = {
     {"bright",     1,  1},
@@ -770,7 +557,7 @@ static void parse_userpref(void)
     if (NULL != home) {
         char preffile[MAXPATHLEN];
 
-        if (snprintf(preffile, sizeof(preffile), "%s%c%s", home, DIRECTORY_SEPARATOR, ".ugrep") < sizeof(preffile)) {
+        if (snprintf(preffile, sizeof(preffile), "%s%c%s", home, DIRECTORY_SEPARATOR, ".ugrep") < (int) sizeof(preffile)) {
             struct stat st;
 
             if ((-1 != (stat(preffile, &st))) && S_ISREG(st.st_mode)) {
@@ -1118,7 +905,7 @@ static int procfile(fd_t *fd, const char *filename)
                     fixed_circular_list_foreach(i, lines, el) {
                         FETCH_DATA(el->data, l, line_t);
 
-                        if (fd->lineno - i > last_line_print) { // this test should not be needed
+                        if (fd->lineno - i > last_line_print) { // without this test, lines in both, after and before, contexts will be printed twice
                             if (file_print) {
                                 print_file(fd->filename, FALSE, l->match, TRUE, FALSE);
                             }
@@ -1214,9 +1001,6 @@ static int procdir(fd_t *fd, char **dirname)
 
 static void exit_cb(void)
 {
-    /*if (NULL != ustr) {
-        ustring_destroy(ustr);
-    }*/
     if (NULL != lines) {
         fixed_circular_list_destroy(lines);
     }
@@ -1250,6 +1034,9 @@ int main(int argc, char **argv)
     int matches;
     UBool iFlag;
     UBool wFlag;
+#ifndef WITHOUT_FTS
+    UBool rFlag = FALSE;
+#endif /* !WITHOUT_FTS */
     uint32_t flags;
     error_t *error;
     int pattern_type; // -E/F

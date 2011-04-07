@@ -56,7 +56,7 @@ static void stdiofd_close(void *data)
 
 static int32_t stdiofd_readuchars(error_t **UNUSED(error), void *data, UChar32 *buffer, size_t max_len)
 {
-    int32_t i;
+    size_t i;
     UChar32 c;
     FETCH_DATA(data, stdiofd, stdiofd_t);
 

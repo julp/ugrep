@@ -1,5 +1,10 @@
 #include "ugrep.h"
 
+#include <unicode/uloc.h>
+#include <unicode/ucol.h>
+#include <unicode/ubrk.h>
+#include <unicode/usearch.h>
+
 static UChar _USEARCH_FAKE_USTR[] = { 0, 0 };
 #define USEARCH_FAKE_USTR _USEARCH_FAKE_USTR, 1 // empty stings refused by usearch
 
@@ -246,7 +251,7 @@ static engine_return_t engine_fixed_whole_line_match(error_t **error, void *data
         }
 
         // TODO: is it safe ? (because of case, the length could be different)
-        return (ret != USEARCH_DONE && usearch_getMatchedLength(p->usearch) == subject->len ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
+        return (ret != USEARCH_DONE && ((size_t) usearch_getMatchedLength(p->usearch)) == subject->len ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
     } else {
         if (IS_CASE_INSENSITIVE(p->flags)) {
             return (0 == u_strcasecmp(p->pattern->ptr, subject->ptr, 0) ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);

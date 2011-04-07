@@ -1,4 +1,4 @@
-#include "ugrep.h"
+#include "common.h"
 
 void *_mem_alloc(size_t size) /* MALLOC ALLOC_SIZE(1) */
 {

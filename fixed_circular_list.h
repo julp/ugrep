@@ -15,9 +15,14 @@ typedef struct flist_element_t {
 
 typedef struct {
     size_t len;
+    // union {
+    //   struct { // size > 1
     flist_element_t *ptr;
     flist_element_t *head;
     flist_element_t *elts;
+    //   } s;
+    //   void *x; // size = 1
+    // } u;
     func_dtor_t dtor_func;
 } fixed_circular_list_t;
 

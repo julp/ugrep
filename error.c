@@ -1,6 +1,19 @@
-#include "ugrep.h"
+#include "common.h"
 
 #define ERROR_MAX_LEN 596
+
+#ifdef DEBUG
+const char *ubasename(const char *filename)
+{
+    const char *c;
+
+    if (NULL == (c = strrchr(filename, DIRECTORY_SEPARATOR))) {
+        return filename;
+    } else {
+        return c + 1;
+    }
+}
+#endif /* DEBUG */
 
 #ifdef _MSC_VER
 # include <windows.h>

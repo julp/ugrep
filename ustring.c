@@ -1,5 +1,7 @@
 #include <limits.h>
 
+#include <unicode/uchar.h>
+
 #include "ugrep.h"
 
 #ifdef DEBUG

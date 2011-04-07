@@ -13,7 +13,7 @@ mark_as_advanced(CMAKE_C_FLAGS_MAINTAINER)
 set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES} Maintainer")
 
 set(UGREP_VERSION_MAJOR 0)
-set(UGREP_VERSION_MINOR 3)
+set(UGREP_VERSION_MINOR 4)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
 
@@ -21,7 +21,9 @@ find_package(ICU REQUIRED)
 find_package(ZLIB)
 find_package(BZip2)
 
-set(BASE_SOURCES ugrep.c alloc.c ustring.c io/mmio.c io/stdio.c slist.c engines/fixed.c engines/re.c intervals.c error.c fixed_circular_list.c)
+set(COMMON_BASE_SOURCES alloc.c ustring.c io/mmio.c io/stdio.c error.c fd.c)
+set(UGREP_BASE_SOURCES ugrep.c slist.c engines/fixed.c engines/re.c intervals.c fixed_circular_list.c)
+set(UCAT_BASE_SOURCES ucat.c)
 set(EXTRA_SOURCES "")
 set(EXTRA_LIBS "")
 
@@ -81,11 +83,14 @@ list(REMOVE_DUPLICATES EXTRA_SOURCES)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
-add_executable(ugrep ${BASE_SOURCES} ${EXTRA_SOURCES})
+add_executable(ugrep ${UGREP_BASE_SOURCES} ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
+add_executable(ucat ${UCAT_BASE_SOURCES} ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
 #target_link_libraries(ugrep icudata icui18n icuio icule iculx icutu ${EXTRA_LIBS})
 target_link_libraries(ugrep ${ICU_LIBRARIES} ${ICU_I18N_LIBRARIES} ${EXTRA_LIBS} icuio)
+target_link_libraries(ucat ${ICU_LIBRARIES} ${ICU_I18N_LIBRARIES} ${EXTRA_LIBS} icuio)
 
 install(TARGETS ugrep DESTINATION bin)
+install(TARGETS ucat DESTINATION bin)
 #install(CODE "EXEC_PROGRAM(${CMAKE_COMMAND} ARGS -E create_symlink \"${CMAKE_INSTALL_PREFIX}/bin/ugrep\" \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
 #list(APPEND CMAKE_INSTALL_MANIFEST_FILES \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
 #")
