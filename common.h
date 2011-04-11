@@ -141,9 +141,6 @@ typedef void (*func_dtor_t)(void *); /* Destructor callback */
 # include "ustring.h"
 # include "reader.h"
 # include "fd.h"
-
-/* <ugrep.c> */
-void report(int type, const char *format, ...);
-/* </ugrep.c> */
+# include "util.h"
 
 #endif /* !COMMON_H */

@@ -59,8 +59,4 @@ void error_win32_set(error_t **, int, const char *, ...);
 # endif /* DEBUG */
 error_t *error_vnew(int, const char *, va_list) WARN_UNUSED_RESULT;
 
-/* <ugrep.c> */
-//void report(int type, const char *format, ...);
-/* </ugrep.c> */
-
 #endif /* !ERROR_H */

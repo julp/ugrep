@@ -1,15 +1,5 @@
 #include <limits.h>
-#ifdef _MSC_VER
-# define STRICT
-# include <windows.h>
-# include <io.h>
-# include <direct.h>
-# include <Winreg.h>
-# include <shlobj.h>
-# include <psapi.h>
-# pragma comment(lib,"Psapi.lib")
-char __progname[_MAX_PATH] = "<unknown>";
-#else
+#ifndef _MSC_VER
 # include <sys/param.h>
 # include <pwd.h>
 #endif /* _MSC_VER */
@@ -93,11 +83,7 @@ engine_t *engines[] = {
     &re_engine
 };
 
-#if 0
-int binbehave = BIN_FILE_SKIP; // TODO
-#endif
 
-UFILE *ustdout = NULL, *ustderr = NULL;
 static fixed_circular_list_t *lines = NULL;
 static slist_t *patterns = NULL;
 static reader_t *default_reader = NULL;
@@ -124,63 +110,6 @@ UBool colorize = TRUE;
 UBool line_print = TRUE;
 
 /* ========== general helper functions ========== */
-
-#ifdef DEBUG
-int verbosity = INFO;
-#else
-int verbosity = WARN;
-#endif /* DEBUG */
-
-void print_error(error_t *error)
-{
-    if (NULL != error && error->type >= verbosity) {
-        int type;
-
-        type = error->type;
-        switch (type) {
-            case WARN:
-                u_fprintf(ustderr, "[ " YELLOW("WARN") " ] ");
-                break;
-            case FATAL:
-                u_fprintf(ustderr, "[ " RED("ERR ") " ] ");
-                break;
-            default:
-                type = FATAL;
-                u_fprintf(ustderr, "[ " RED("BUG ") " ] Unknown error type for:\n");
-                break;
-        }
-        u_fputs(error->message, ustderr);
-        error_destroy(error);
-        if (type == FATAL) {
-            exit(UGREP_EXIT_FAILURE);
-        }
-    }
-}
-
-void report(int type, const char *format, ...)
-{
-    if (type >= verbosity) {
-        va_list args;
-
-        switch (type) {
-            case INFO:
-                fprintf(stderr, "[ " GREEN("INFO") " ] ");
-                break;
-            case WARN:
-                fprintf(stderr, "[ " YELLOW("WARN") " ] ");
-                break;
-            case FATAL:
-                fprintf(stderr, "[ " RED("ERR ") " ] ");
-                break;
-        }
-        va_start(args, format);
-        u_vfprintf(ustderr, format, args);
-        va_end(args);
-        if (type == FATAL) {
-            exit(UGREP_EXIT_FAILURE);
-        }
-    }
-}
 
 static UBool stdout_is_tty(void)
 {
@@ -1055,34 +984,11 @@ int main(int argc, char **argv)
         return UGREP_EXIT_FAILURE;
     }
 
-    patterns = slist_new(pattern_destroy);
     default_reader = &mm_reader;
+    patterns = slist_new(pattern_destroy);
+    exit_failure_value = UGREP_EXIT_FAILURE;
 
-#ifdef _MSC_VER
-    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
-    if (stdout_is_tty()) {
-        HKEY hkey;
-        char cp[30] = "";
-        DWORD cp_len;
-
-        cp_len = sizeof(cp) / sizeof(char);
-        if (ERROR_SUCCESS == RegOpenKeyExA(HKEY_LOCAL_MACHINE, TEXT("SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"), 0, KEY_QUERY_VALUE, &hkey)) {
-            if (ERROR_SUCCESS == RegQueryValueExA(hkey, TEXT("OEMCP"), NULL, NULL, (LPBYTE) &cp, &cp_len)) {
-                cp[cp_len] = '\0';
-            }
-            RegCloseKey(hkey);
-        }
-        ustdout = u_finit(stdout, NULL, cp);
-        ustderr = u_finit(stderr, NULL, cp);
-    } else
-#endif /* _MSC_VER */
-    {
-        ustdout = u_finit(stdout, NULL, NULL);
-        ustderr = u_finit(stderr, NULL, NULL);
-    }
-
-    debug("system locale = " YELLOW("%s"), u_fgetlocale(ustdout));
-    debug("system codepage = " YELLOW("%s"), u_fgetcodepage(ustdout));
+    ustdio_init();
 
     switch (__progname[1]) {
         case 'e':
