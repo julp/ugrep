@@ -49,7 +49,7 @@ void _error_set(error_t **, int, const char *, ...);
 #  ifdef _MSC_VER
 #   define error_win32_set(error, type, format, ...) \
         _error_win32_set(error, type, "%s:%d:" format " in %s()", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
-void _error_set(error_t **, int, const char *, ...);
+void _error_win32_set(error_t **, int, const char *, ...);
 #  endif /* _MSC_VER */
 # else
 void error_set(error_t **, int, const char *, ...);
