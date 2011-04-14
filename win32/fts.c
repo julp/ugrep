@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "ugrep.h"
+#include "common.h"
 
 //#define _open(path, omode, x) win32_open(sp->fts_priv, path, omode)
 //#define _close(fd) win32_close(sp->fts_priv, fd)

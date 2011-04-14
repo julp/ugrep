@@ -1,4 +1,4 @@
-#include "ugrep.h"
+#include "common.h"
 #include "hash.h"
 
 #define HASH_DELETED ((int32_t) 0x80000000)

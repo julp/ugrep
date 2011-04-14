@@ -7,7 +7,7 @@
 #include <unicode/uchar.h>
 #include <unicode/ucsdet.h>
 
-#include "ugrep.h"
+#include "common.h"
 #include "reader_decl.h"
 
 #define MIN_CONFIDENCE  39   // Minimum confidence for a match (in percents)

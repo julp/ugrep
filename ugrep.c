@@ -1,5 +1,7 @@
 #include <limits.h>
-#ifndef _MSC_VER
+#ifdef _MSC_VER
+# include <shlobj.h>
+#else
 # include <sys/param.h>
 # include <pwd.h>
 #endif /* _MSC_VER */
@@ -14,6 +16,7 @@
 #include <errno.h>
 #include <ctype.h>
 
+#define BINARY 1
 #include "ugrep.h"
 #include "reader_decl.h"
 
@@ -110,11 +113,6 @@ UBool colorize = TRUE;
 UBool line_print = TRUE;
 
 /* ========== general helper functions ========== */
-
-static UBool stdout_is_tty(void)
-{
-    return (1 == isatty(STDOUT_FILENO));
-}
 
 static UBool is_pattern(const UChar *pattern)
 {
@@ -988,7 +986,7 @@ int main(int argc, char **argv)
     patterns = slist_new(pattern_destroy);
     exit_failure_value = UGREP_EXIT_FAILURE;
 
-    ustdio_init();
+    //ustdio_init();
 
     switch (__progname[1]) {
         case 'e':

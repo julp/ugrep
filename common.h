@@ -47,6 +47,29 @@
 #  define NONNULL(...)
 # endif /* NONNULL */
 
+# if GCC_VERSION >= 2003
+#  define FORMAT(archetype, string_index, first_to_check) __attribute__((format(archetype, string_index, first_to_check)))
+#  define PRINTF(string_index, first_to_check) FORMAT(__printf__, string_index, first_to_check)
+# else
+#  define FORMAT(archetype, string_index, first_to_check)
+#  define PRINTF(string_index, first_to_check)
+# endif /* FORMAT,PRINTF */
+
+# ifdef _MSC_VER
+#  define CCALL __cdecl
+#  pragma section(".CRT$XCU",read)
+#  define INITIALIZER_DECL(f) \
+    void __cdecl f(void); \
+    __declspec(allocate(".CRT$XCU")) void (__cdecl*f##_)(void) = f
+# elif defined(__GNUC__)
+#  define CCALL
+#  define INITIALIZER_DECL(f) \
+    void f(void) __attribute__((constructor))
+# endif /* INITIALIZER_DECL */
+
+# define INITIALIZER_P(f) \
+    void CCALL f(void)
+
 
 # ifdef _MSC_VER
 #  define inline _inline

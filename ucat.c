@@ -9,8 +9,8 @@
 #include <getopt.h>
 #include <errno.h>
 
+#define BINARY 1
 #include "common.h"
-
 #include "reader_decl.h"
 
 
@@ -60,7 +60,7 @@ enum {
 #ifndef WITHOUT_FTS
 static char optstr[] = "AEHRTVbehnqrstuv";
 #else
-static char optstr[] = "";
+static char optstr[] = "TODO";
 #endif /* !WITHOUT_FTS */
 
 static struct option long_options[] =
@@ -205,7 +205,7 @@ int main(int argc, char **argv)
 
     default_reader = &mm_reader;
     exit_failure_value = UCAT_EXIT_FAILURE;
-    ustdio_init();
+    //ustdio_init();
 
 #if defined(HAVE_BZIP2) || defined(HAVE_ZLIB)
     switch (__progname[0]) {

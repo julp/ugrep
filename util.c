@@ -1,10 +1,9 @@
+#include <unistd.h>
 #ifdef _MSC_VER
 # define STRICT
 # include <windows.h>
-# include <io.h>
 # include <direct.h>
 # include <Winreg.h>
-# include <shlobj.h>
 # include <psapi.h>
 # pragma comment(lib,"Psapi.lib")
 char __progname[_MAX_PATH] = "<unknown>";
@@ -22,6 +21,11 @@ int verbosity = WARN;
 #endif /* DEBUG */
 
 int exit_failure_value = 0;
+
+UBool stdout_is_tty(void)
+{
+    return (1 == isatty(STDOUT_FILENO));
+}
 
 void print_error(error_t *error)
 {
@@ -74,7 +78,7 @@ void report(int type, const char *format, ...)
     }
 }
 
-void ustdio_init(void)
+INITIALIZER_P(ustdio_init)
 {
 #ifdef _MSC_VER
     GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));

@@ -4,7 +4,7 @@
 
 # include <sys/types.h>
 # include <sys/stat.h>
-# include "ugrep.h"
+# include "common.h"
 
 # define DT_UNKNOWN 0
 # define DT_FIFO    1

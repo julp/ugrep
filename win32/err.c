@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "ugrep.h"
+#include "common.h"
 #include "err.h"
 
 void warnx(const char *fmt, ...)

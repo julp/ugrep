@@ -2,6 +2,8 @@
 
 # define WIN32_UNISTD_H
 
+# include <io.h>
+
 # define STDOUT_FILENO _fileno(stdout)
 # define STDIN_FILENO _fileno(stdin)
 
