@@ -160,9 +160,9 @@ enum {
 };
 
 #ifndef WITHOUT_FTS
-static char optstr[] = "A:B:C:EFHLRVce:f:hilnqrsvwx";
+static char optstr[] = "0123456789A:B:C:EFHLRVce:f:hilnqrsvwx";
 #else
-static char optstr[] = "A:B:C:EFHLVce:f:hilnqsvwx";
+static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilnqsvwx";
 #endif /* !WITHOUT_FTS */
 
 static struct option long_options[] =
@@ -207,7 +207,7 @@ static void usage(void)
 {
     fprintf(
         stderr,
-        "usage: %s [-EFHLRVchilnqrsvwx] [-A num] [-B num]\n"
+        "usage: %s [-0123456789EFHLRVchilnqrsvwx] [-A num] [-B num]\n"
         "\t[-e pattern] [-f file] [--binary-files=value]\n"
         "\t[pattern] [file ...]\n",
         __progname
@@ -954,6 +954,9 @@ int main(int argc, char **argv)
 #endif /* !NO_COLOR */
 
     int c;
+    int lastc;
+    UBool newarg;
+    int prevoptind;
     fd_t fd = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #ifndef NO_COLOR
     int color;
@@ -997,8 +1000,26 @@ int main(int argc, char **argv)
             break;
     }
 
+    lastc = '\0';
+    newarg = TRUE;
+    prevoptind = 1;
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                if (newarg || !isdigit(lastc)) {
+                    after_context = before_context = 0;
+                }
+                after_context = before_context = after_context * 10 + (c - '0');
+                break;
             case 'A':
             case 'B':
             case 'C':
@@ -1133,6 +1154,9 @@ int main(int argc, char **argv)
                 usage();
                 break;
         }
+        lastc = c;
+        newarg = optind != prevoptind;
+        prevoptind = optind;
     }
     argc -= optind;
     argv += optind;
