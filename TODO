@@ -1,7 +1,7 @@
 TODO:
   - Very high:
     * port or rewrite FTS functions for Windows
-    * implement context options (-A, -B, -C, -\d+) - actually buggy
+    * implement context options (-A, -B, -C, -\d+) => check
 
   - High:
     * implement recursive option (and exclude options: exclude, exclude-dir, include)
@@ -23,6 +23,8 @@ TODO:
 
 Ideas:
   - write ucat, a cat replacement ?
+  - write utail, a tail replacement ?
+  - write uhead, a head replacement ?
 
 Known bugs:
   - ICU is unable to guess default codepage when it doesn't appear in LANG environment variable
