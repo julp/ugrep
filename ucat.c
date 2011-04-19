@@ -46,6 +46,7 @@ reader_t *available_readers[] = {
 static reader_t *default_reader = NULL;
 
 UString *ustr = NULL;
+UBool EFlag = FALSE;
 UBool nFlag = FALSE;
 UBool file_print = FALSE;
 UBool line_print = TRUE;
@@ -125,6 +126,9 @@ static int procfile(fd_t *fd, const char *filename)
             ustring_chomp(ustr);
             if (BIN_FILE_TEXT == binbehave) {
                 ustring_dump(ustr);
+            }
+            if (EFlag) {
+                ustring_append_char(ustr, 0x0024);
             }
             u_fputs(ustr->ptr, ustdout);
         }
@@ -226,8 +230,8 @@ int main(int argc, char **argv)
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
-            case 'u': // POSIX
-                // NOP, ignored
+            case 'E':
+                EFlag = TRUE;
                 break;
             case 'H':
                 file_print = TRUE;
@@ -246,6 +250,9 @@ int main(int argc, char **argv)
                 rFlag = TRUE;
                 break;
 #endif /* !WITHOUT_FTS */
+            case 'u': // POSIX
+                // NOP, ignored
+                break;
             case BINARY_OPT:
                 if (!strcmp("binary", optarg)) {
                     binbehave = BIN_FILE_BIN;
