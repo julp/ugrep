@@ -49,7 +49,6 @@ UString *ustr = NULL;
 UBool EFlag = FALSE;
 UBool nFlag = FALSE;
 UBool file_print = FALSE;
-UBool line_print = TRUE;
 
 /* ========== getopt stuff ========== */
 
@@ -99,14 +98,6 @@ static void usage(void)
     exit(UCAT_EXIT_USAGE);
 }
 
-/*static void print_line(int lineno, UBool eol)
-{
-    u_fprintf(ustdout, "%d", lineno);
-    if (eol) {
-        u_fputc(U_LF, ustdout); // TODO: system dependant
-    }
-}*/
-
 static int procfile(fd_t *fd, const char *filename)
 {
     error_t *error;
@@ -115,9 +106,8 @@ static int procfile(fd_t *fd, const char *filename)
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
 
     if (fd_open(&error, fd, filename)) {
-        UBool _line_print; /* line_print local override */
 
-        _line_print = line_print && (!fd->binary || (fd->binary && BIN_FILE_BIN != binbehave));
+        /* !fd->binary || (fd->binary && BIN_FILE_BIN != binbehave) */
         while (!fd_eof(fd)) {
             if (!fd_readline(&error, fd, ustr)) {
                 print_error(error);
@@ -129,6 +119,9 @@ static int procfile(fd_t *fd, const char *filename)
             }
             if (EFlag) {
                 ustring_append_char(ustr, 0x0024);
+            }
+            if (nFlag) {
+                u_fprintf(ustdout, "%6d  ", fd->lineno);
             }
             u_fputs(ustr->ptr, ustdout);
         }
@@ -250,6 +243,9 @@ int main(int argc, char **argv)
                 rFlag = TRUE;
                 break;
 #endif /* !WITHOUT_FTS */
+            case 'n':
+                nFlag = TRUE;
+                break;
             case 'u': // POSIX
                 // NOP, ignored
                 break;
