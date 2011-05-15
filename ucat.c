@@ -48,6 +48,7 @@ static reader_t *default_reader = NULL;
 UString *ustr = NULL;
 UBool EFlag = FALSE;
 UBool nFlag = FALSE;
+UBool vFlag = FALSE;
 UBool file_print = FALSE;
 
 /* ========== getopt stuff ========== */
@@ -114,7 +115,7 @@ static int procfile(fd_t *fd, const char *filename)
             }
             fd->lineno++;
             ustring_chomp(ustr);
-            if (BIN_FILE_TEXT == binbehave) {
+            if (BIN_FILE_TEXT == binbehave || vFlag) {
                 ustring_dump(ustr);
             }
             if (EFlag) {
@@ -238,16 +239,19 @@ int main(int argc, char **argv)
                 fprintf(stderr, "ucat version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
                 break;
+            case 'n':
+                nFlag = TRUE;
+                break;
 #ifndef WITHOUT_FTS
             case 'r':
                 rFlag = TRUE;
                 break;
 #endif /* !WITHOUT_FTS */
-            case 'n':
-                nFlag = TRUE;
-                break;
             case 'u': // POSIX
                 // NOP, ignored
+                break;
+            case 'v':
+                vFlag = TRUE;
                 break;
             case BINARY_OPT:
                 if (!strcmp("binary", optarg)) {
