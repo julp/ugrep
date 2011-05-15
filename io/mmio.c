@@ -30,10 +30,16 @@ typedef struct {
 
 static void *mmfd_open(error_t **error, const char *filename, int fd)
 {
-    mmfd_t *mmfd;
+    mmfd_t *mmfd = NULL;
     struct stat st;
 
     mmfd = mem_new(*mmfd);
+
+    mmfd->ptr = mmfd->base = mmfd->start = NULL;
+    mmfd->len = 0;
+    mmfd->ucnv = NULL;
+    mmfd->fd = -1;
+
     if (-1 == (fstat(fd, &st))) {
         error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
         goto free;
