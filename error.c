@@ -58,7 +58,7 @@ error_t *error_win32_new(int type, const char *format, ...) /* WARN_UNUSED_RESUL
 # ifdef DEBUG
 void _error_win32_set(error_t **error, int type, const char *format, ...)
 # else
-void error_wiN32_set(error_t **error, int type, const char *format, ...)
+void error_win32_set(error_t **error, int type, const char *format, ...)
 # endif /* DEBUG */
 {
     va_list args;
