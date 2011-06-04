@@ -15,12 +15,12 @@ extern reader_t bz2_reader;
 reader_t *available_readers[] = {
     &mm_reader,
     &stdio_reader,
-    #ifdef HAVE_ZLIB
+#  ifdef HAVE_ZLIB
     &gz_reader,
-    #endif /* HAVE_ZLIB */
-    #ifdef HAVE_BZIP2
+#  endif /* HAVE_ZLIB */
+#  ifdef HAVE_BZIP2
     &bz2_reader,
-    #endif /* HAVE_BZIP2 */
+#  endif /* HAVE_BZIP2 */
     NULL
 };
 # endif /* BINARY */
