@@ -78,8 +78,9 @@ static void usage(void)
 {
     fprintf(
         stderr,
-        "usage: %s [-AEHRTVbehnqrstuv] [file ...]\n",
-        __progname
+        "usage: %s [-%s] [file ...]\n",
+        __progname,
+        optstr
     );
     exit(UCAT_EXIT_USAGE);
 }
@@ -200,9 +201,6 @@ int main(int argc, char **argv)
 #ifndef WITHOUT_FTS
     UBool rFlag = FALSE;
 #endif /* !WITHOUT_FTS */
-    error_t *error;
-
-    error = NULL;
 
     if (0 != atexit(exit_cb)) {
         fputs("can't register atexit() callback", stderr);
