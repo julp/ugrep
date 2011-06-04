@@ -14,13 +14,6 @@
 #include "reader_decl.h"
 
 
-/**
-TODO:
-* factoriser en général
-* options communes en macro dans binary.h ?
-***/
-
-
 // =0: all input files were output successfully
 // >0: an error occurred
 enum {
@@ -84,7 +77,7 @@ static void usage(void)
 {
     fprintf(
         stderr,
-        "usage: %s TODO\n",
+        "usage: %s [-AEHRTVbehnqrstuv] [file ...]\n",
         __progname
     );
     exit(UCAT_EXIT_USAGE);
@@ -142,20 +135,21 @@ static int procfile(fd_t *fd, const char *filename)
         fd_close(fd);
     } else {
         print_error(error);
+        return 1;
     }
 
-    return fd->matches;
+    return 0;
 }
 
 #ifndef WITHOUT_FTS
 static int procdir(fd_t *fd, char **dirname)
 {
+    int ret;
     FTS *fts;
     FTSENT *p;
-    int matches;
     int ftsflags;
 
-    matches = 0;
+    ret = 0;
     /*ftsflags = 0;
     if (Hflag)
         ftsflags = FTS_COMFOLLOW;
@@ -178,14 +172,13 @@ static int procdir(fd_t *fd, char **dirname)
             case FTS_DP:
                 break;
             default:
-                /* matches += */ procfile(fd, p->fts_path);
+                ret |= procfile(fd, p->fts_path);
                 break;
         }
     }
     fts_close(fts);
 
-    /*return matches;*/
-    return 0;
+    return ret;
 }
 #endif /* !WITHOUT_FTS */
 
@@ -200,7 +193,7 @@ static void exit_cb(void)
 
 int main(int argc, char **argv)
 {
-    int c;
+    int c, ret;
     fd_t fd = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #ifndef WITHOUT_FTS
     UBool rFlag = FALSE;
@@ -214,6 +207,7 @@ int main(int argc, char **argv)
         return UCAT_EXIT_FAILURE;
     }
 
+    ret = 0;
     default_reader = &mm_reader;
     exit_failure_value = UCAT_EXIT_FAILURE;
     //ustdio_init();
@@ -275,6 +269,9 @@ int main(int argc, char **argv)
                 bFlag = FALSE;
                 nFlag = TRUE;
                 break;
+            case 'q':
+                verbosity = FATAL;
+                break;
 #ifndef WITHOUT_FTS
             case 'r':
                 rFlag = TRUE;
@@ -332,16 +329,16 @@ int main(int argc, char **argv)
     ustr = ustring_new();
 
     if (0 == argc) {
-        /* x = */ procfile(&fd, "-");
+        ret |= procfile(&fd, "-");
 #ifndef WITHOUT_FTS
     } else if (rFlag) {
-        /* x = */ procdir(&fd, argv);
+        ret |= procdir(&fd, argv);
 #endif /* !WITHOUT_FTS */
     } else {
         for ( ; argc--; ++argv) {
-            /* x = */ procfile(&fd, *argv);
+            ret |= procfile(&fd, *argv);
         }
     }
 
-    return UCAT_EXIT_SUCCESS;
+    return (0 == ret ? UCAT_EXIT_SUCCESS : UCAT_EXIT_FAILURE);
 }
