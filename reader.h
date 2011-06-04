@@ -11,9 +11,8 @@ typedef struct {
     UBool (*readline)(error_t **error, void *, UString *);
     size_t (*readbytes)(void *, char *, size_t);
     int32_t (*readuchars)(error_t **error, void *, UChar32 *, size_t);
-    void (*set_signature_length)(void *, size_t);
     UBool (*set_encoding)(error_t **, void *, const char *);
-    void (*rewind)(void *);
+    void (*rewind)(void *, int32_t);
 } reader_t;
 
 #endif /* READER_H */

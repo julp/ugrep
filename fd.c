@@ -16,6 +16,8 @@
 
 int binbehave = BIN_FILE_SKIP;
 
+const fd_t NULL_FD = { NULL, NULL, NULL, NULL, 0, 0, 0, 0, FALSE };
+
 static UBool stdin_is_tty(void) {
     return (1 == isatty(STDIN_FILENO));
 }
@@ -40,7 +42,9 @@ static UBool is_binary(UChar32 *buffer, size_t buffer_len)
 
 void fd_close(fd_t *fd)
 {
-    fd->reader->close(fd->reader_data);
+    if (NULL != fd->reader->close) {
+        fd->reader->close(fd->reader_data);
+    }
     free(fd->reader_data);
 }
 
@@ -51,7 +55,6 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
     UErrorCode status;
     size_t buffer_len;
     const char *encoding;
-    int32_t signature_length;
     char buffer[MAX_ENC_REL_LEN + 1];
 
     /*if (-1 == (stat(filename, &st))) {
@@ -82,17 +85,17 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
     }
 
     encoding = NULL;
-    signature_length = 0;
     status = U_ZERO_ERROR;
     fd->lineno = 0;
-    /*fd->filesize = st.st_size;*/
-    fd->matches = 0;
     fd->binary = FALSE;
+    /*fd->filesize = st.st_size;*/
+    fd->matches = 0; // TODO: private field?
+    fd->signature_length = 0;
 
-    if (fd->reader->seekable(fd->reader_data)) {
+    if (fd->reader->seekable(fd->reader_data)) { // TODO: make it optionnal (by adding a UBool parameter ?)
         if (0 != (buffer_len = fd->reader->readbytes(fd->reader_data, buffer, MAX_ENC_REL_LEN))) {
             buffer[buffer_len] = '\0';
-            encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &signature_length, &status);
+            encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &fd->signature_length, &status);
             if (U_SUCCESS(status)) {
                 if (NULL == encoding) {
                     int32_t confidence;
@@ -130,15 +133,13 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
                         //encoding = "US-ASCII";
                     }
                     ucsdet_close(csd);
-                } else {
-                    fd->reader->set_signature_length(fd->reader_data, signature_length);
                 }
                 debug("%s, file encoding = %s", filename, encoding);
                 fd->encoding = encoding;
                 if (!fd->reader->set_encoding(error, fd->reader_data, encoding)) {
                     goto failed;
                 }
-                fd->reader->rewind(fd->reader_data);
+                fd->reader->rewind(fd->reader_data, fd->signature_length);
                 if (BIN_FILE_TEXT != binbehave) {
                     int32_t ubuffer_len;
                     UChar32 ubuffer[MAX_BIN_REL_LEN + 1];
@@ -154,7 +155,7 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
                             goto failed;
                         }
                     }
-                    fd->reader->rewind(fd->reader_data);
+                    fd->reader->rewind(fd->reader_data, fd->signature_length);
                 }
             } else {
                 icu_error_set(error, WARN, status, "ucnv_detectUnicodeSignature");

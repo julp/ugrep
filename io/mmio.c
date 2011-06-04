@@ -24,7 +24,7 @@ typedef struct {
     int fd;
 #endif /* _MSC_VER */
     size_t len;
-    char *start, *base, *end, *ptr;
+    char *start, *end, *ptr;
     UConverter *ucnv;
 } mmfd_t;
 
@@ -35,7 +35,7 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
 
     mmfd = mem_new(*mmfd);
 
-    mmfd->ptr = mmfd->base = mmfd->start = NULL;
+    mmfd->ptr = mmfd->start = NULL;
     mmfd->len = 0;
     mmfd->ucnv = NULL;
     mmfd->fd = -1;
@@ -75,7 +75,7 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
 #endif /* _MSC_VER */
     }
 
-    mmfd->ptr = mmfd->base = mmfd->start;
+    mmfd->ptr = mmfd->start;
     mmfd->end = mmfd->start + mmfd->len;
     mmfd->ucnv = NULL;
 
@@ -134,11 +134,11 @@ static int32_t mmfd_readuchars(error_t **error, void *data, UChar32 *buffer, siz
     return i;
 }
 
-static void mmfd_rewind(void *data)
+static void mmfd_rewind(void *data, int32_t signature_length)
 {
     FETCH_DATA(data, mmfd, mmfd_t);
 
-    mmfd->ptr = mmfd->base;
+    mmfd->ptr = mmfd->start + signature_length;
 }
 
 static UBool mmfd_readline(error_t **error, void *data, UString *ustr)
@@ -199,14 +199,6 @@ static UBool mmfd_set_encoding(error_t **error, void *data, const char *encoding
     return U_SUCCESS(status);
 }
 
-static void mmfd_set_signature_length(void *data, size_t signature_length)
-{
-    FETCH_DATA(data, mmfd, mmfd_t);
-
-    mmfd->len -= signature_length;
-    mmfd->ptr = mmfd->base = mmfd->start + signature_length;
-}
-
 static UBool mmfd_eof(void *data)
 {
     FETCH_DATA(data, mmfd, mmfd_t);
@@ -229,7 +221,6 @@ reader_t mm_reader =
     mmfd_readline,
     mmfd_readbytes,
     mmfd_readuchars,
-    mmfd_set_signature_length,
     mmfd_set_encoding,
     mmfd_rewind
 };

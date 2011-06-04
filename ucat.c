@@ -197,7 +197,7 @@ static void exit_cb(void)
 int main(int argc, char **argv)
 {
     int c, ret;
-    fd_t fd = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    fd_t fd = NULL_FD;
 #ifndef WITHOUT_FTS
     UBool rFlag = FALSE;
 #endif /* !WITHOUT_FTS */

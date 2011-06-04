@@ -945,7 +945,7 @@ int main(int argc, char **argv)
     int lastc;
     UBool newarg;
     int prevoptind;
-    fd_t fd = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    fd_t fd = NULL_FD;
 #ifndef NO_COLOR
     int color;
 #endif /* !NO_COLOR */

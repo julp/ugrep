@@ -13,7 +13,6 @@
 typedef struct {
     FILE *fp;
     UFILE *ufp;
-    size_t signature_length;
 } stdiofd_t;
 
 static void *stdiofd_open(error_t **error, const char *filename, int fd)
@@ -36,7 +35,6 @@ static void *stdiofd_open(error_t **error, const char *filename, int fd)
             goto failed;
         }
     }
-    stdiofd->signature_length = 0;
     //stdiofd->ufp = NULL;
     stdiofd->fp = u_fgetfile(stdiofd->ufp);
 
@@ -69,11 +67,11 @@ static int32_t stdiofd_readuchars(error_t **UNUSED(error), void *data, UChar32 *
     return i;
 }
 
-static void stdiofd_rewind(void *data)
+static void stdiofd_rewind(void *data, int32_t signature_length)
 {
     FETCH_DATA(data, stdiofd, stdiofd_t);
 
-    fseek(stdiofd->fp, (long) stdiofd->signature_length, SEEK_SET);
+    fseek(stdiofd->fp, signature_length, SEEK_SET);
 }
 
 static UBool stdiofd_readline(error_t **UNUSED(error), void *data, UString *ustr)
@@ -113,13 +111,6 @@ static UBool stdiofd_set_encoding(error_t **UNUSED(error), void *data, const cha
     return (0 == u_fsetcodepage(encoding, stdiofd->ufp));
 }
 
-static void stdiofd_set_signature_length(void *data, size_t signature_length)
-{
-    FETCH_DATA(data, stdiofd, stdiofd_t);
-
-    stdiofd->signature_length = signature_length;
-}
-
 static UBool stdiofd_eof(void *data)
 {
     FETCH_DATA(data, stdiofd, stdiofd_t);
@@ -144,7 +135,6 @@ reader_t stdio_reader =
     stdiofd_readline,
     stdiofd_readbytes,
     stdiofd_readuchars,
-    stdiofd_set_signature_length,
     stdiofd_set_encoding,
     stdiofd_rewind
 };

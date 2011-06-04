@@ -11,7 +11,7 @@
 
 typedef struct {
     UConverter *ucnv;
-    char *start, *base, *ptr, *end;
+    char *start, *ptr, *end;
     size_t len;
 } compressedfd_t;
 
@@ -57,7 +57,7 @@ static void *compressedfdgz_open(error_t **error, const char *filename, int fd)
         goto free;
     }
     gzclose(zfp);
-    compressedfd->base = compressedfd->start = compressedfd->ptr = dst;
+    compressedfd->start = compressedfd->ptr = dst;
     compressedfd->len = ret;
     compressedfd->end = compressedfd->start + compressedfd->len;
     compressedfd->ucnv = NULL;
@@ -107,7 +107,7 @@ static void *compressedfdbz2_open(error_t **error, const char *filename, int fd)
         goto free;
     }
     BZ2_bzReadClose(&bzerror, jfp);
-    compressedfd->base = compressedfd->start = compressedfd->ptr = dst;
+    compressedfd->start = compressedfd->ptr = dst;
     compressedfd->len = ret;
     compressedfd->end = compressedfd->start + compressedfd->len;
     compressedfd->ucnv = NULL;
@@ -159,11 +159,11 @@ static int32_t compressedfd_readuchars(error_t **error, void *data, UChar32 *buf
     return i;
 }
 
-static void compressedfd_rewind(void *data)
+static void compressedfd_rewind(void *data, int32_t signature_length)
 {
     FETCH_DATA(data, compressedfd, compressedfd_t);
 
-    compressedfd->ptr = compressedfd->base;
+    compressedfd->ptr = compressedfd->start + signature_length;
 }
 
 static UBool compressedfd_readline(error_t **error, void *data, UString *ustr)
@@ -224,14 +224,6 @@ static UBool compressedfd_set_encoding(error_t **error, void *data, const char *
     return U_SUCCESS(status);
 }
 
-static void compressedfd_set_signature_length(void *data, size_t signature_length)
-{
-    FETCH_DATA(data, compressedfd, compressedfd_t);
-
-    compressedfd->len -= signature_length;
-    compressedfd->base += signature_length;
-}
-
 static UBool compressedfd_eof(void *data)
 {
     FETCH_DATA(data, compressedfd, compressedfd_t);
@@ -255,7 +247,6 @@ reader_t gz_reader =
     compressedfd_readline,
     compressedfd_readbytes,
     compressedfd_readuchars,
-    compressedfd_set_signature_length,
     compressedfd_set_encoding,
     compressedfd_rewind
 };
@@ -272,9 +263,7 @@ reader_t bz2_reader =
     compressedfd_readline,
     compressedfd_readbytes,
     compressedfd_readuchars,
-    compressedfd_set_signature_length,
     compressedfd_set_encoding,
     compressedfd_rewind
 };
 #endif /* HAVE_BZIP2 */
-
