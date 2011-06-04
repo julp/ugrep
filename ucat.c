@@ -31,25 +31,16 @@ enum {
 
 /* ========== global variables ========== */
 
-reader_t *available_readers[] = {
-    &mm_reader,
-    &stdio_reader,
-#ifdef HAVE_ZLIB
-    &gz_reader,
-#endif /* HAVE_ZLIB */
-#ifdef HAVE_BZIP2
-    &bz2_reader,
-#endif /* HAVE_BZIP2 */
-    NULL
-};
-
 static reader_t *default_reader = NULL;
 
 UString *ustr = NULL;
 UBool EFlag = FALSE;
+UBool TFlag = FALSE;
+UBool bFlag = FALSE;
 UBool nFlag = FALSE;
+UBool sFlag = FALSE;
 UBool vFlag = FALSE;
-UBool file_print = FALSE;
+UBool file_print = FALSE; // -H/h
 
 /* ========== getopt stuff ========== */
 
@@ -61,7 +52,7 @@ enum {
 #ifndef WITHOUT_FTS
 static char optstr[] = "AEHRTVbehnqrstuv";
 #else
-static char optstr[] = "TODO";
+static char optstr[] = "AEHTVbehnqstuv";
 #endif /* !WITHOUT_FTS */
 
 static struct option long_options[] =
@@ -101,27 +92,49 @@ static void usage(void)
 
 static int procfile(fd_t *fd, const char *filename)
 {
+    UBool numbered, count, prev_was_blank;
     error_t *error;
 
     error = NULL;
     fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
+    count = TRUE;
+    numbered = nFlag;
+    prev_was_blank = FALSE;
 
     if (fd_open(&error, fd, filename)) {
-
+        if (file_print) {
+            u_fprintf(ustdout, "%s:\n", filename);
+        }
         /* !fd->binary || (fd->binary && BIN_FILE_BIN != binbehave) */
         while (!fd_eof(fd)) {
             if (!fd_readline(&error, fd, ustr)) {
                 print_error(error);
             }
-            fd->lineno++;
             ustring_chomp(ustr);
+            if (bFlag || sFlag) {
+                UBool blank;
+
+                blank = ustring_empty(ustr);
+                if (bFlag) {
+                    numbered = count = !blank;
+                }
+                if (sFlag) {
+                    if (prev_was_blank && (prev_was_blank = blank)) {
+                        continue;
+                    }
+                    prev_was_blank = blank;
+                }
+            }
+            if (count) {
+                fd->lineno++;
+            }
             if (BIN_FILE_TEXT == binbehave || vFlag) {
                 ustring_dump(ustr);
             }
             if (EFlag) {
                 ustring_append_char(ustr, 0x0024);
             }
-            if (nFlag) {
+            if (numbered) {
                 u_fprintf(ustdout, "%6d  ", fd->lineno);
             }
             u_fputs(ustr->ptr, ustdout);
@@ -224,6 +237,11 @@ int main(int argc, char **argv)
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
+            case 'A':
+                vFlag = TRUE;
+                EFlag = TRUE;
+                TFlag = TRUE;
+                break;
             case 'E':
                 EFlag = TRUE;
                 break;
@@ -235,11 +253,26 @@ int main(int argc, char **argv)
                 rFlag = TRUE;
                 break;
 #endif /* !WITHOUT_FTS */
+            case 'T':
+                fprintf(stderr, "TODO: T\n");
+                break;
             case 'V':
                 fprintf(stderr, "ucat version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
                 break;
+            case 'b':
+                bFlag = TRUE;
+                nFlag = FALSE;
+                break;
+            case 'e':
+                vFlag = TRUE;
+                EFlag = TRUE;
+                break;
+            case 'h':
+                file_print = FALSE;
+                break;
             case 'n':
+                bFlag = FALSE;
                 nFlag = TRUE;
                 break;
 #ifndef WITHOUT_FTS
@@ -247,6 +280,13 @@ int main(int argc, char **argv)
                 rFlag = TRUE;
                 break;
 #endif /* !WITHOUT_FTS */
+            case 's':
+                sFlag = TRUE;
+                break;
+            case 't':
+                vFlag = TRUE;
+                TFlag = TRUE;
+                break;
             case 'u': // POSIX
                 // NOP, ignored
                 break;

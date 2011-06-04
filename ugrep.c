@@ -66,18 +66,6 @@ void line_dtor(void *data) {
 
 /* ========== global variables ========== */
 
-reader_t *available_readers[] = {
-    &mm_reader,
-    &stdio_reader,
-#ifdef HAVE_ZLIB
-    &gz_reader,
-#endif /* HAVE_ZLIB */
-#ifdef HAVE_BZIP2
-    &bz2_reader,
-#endif /* HAVE_BZIP2 */
-    NULL
-};
-
 extern engine_t fixed_engine;
 extern engine_t re_engine;
 
