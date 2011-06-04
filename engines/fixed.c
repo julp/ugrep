@@ -94,13 +94,8 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
     p = mem_new(*p);
     p->flags = flags;
     p->usearch = NULL;
-    p->pattern = ustring_sized_new(len * ucnv_getMaxCharSize(ucnv) + 1);
-    p->pattern->len = ucnv_toUChars(ucnv, p->pattern->ptr, p->pattern->allocated, pattern, len, &status);
-    p->pattern->ptr[p->pattern->len] = U_NUL;
-    ucnv_close(ucnv);
-    if (U_FAILURE(status)) {
+    if (NULL == (p->pattern = ustr_convert_argv_from_local(pattern, error))) {
         pattern_destroy(p);
-        icu_error_set(error, FATAL, status, "ucnv_toUChars");
         return NULL;
     }
     if (IS_WORD_BOUNDED(flags) || (IS_CASE_INSENSITIVE(flags) && !IS_WHOLE_LINE(flags))) {

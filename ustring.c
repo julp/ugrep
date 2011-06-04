@@ -46,6 +46,35 @@ UString *ustring_sized_new(size_t requested) /* WARN_UNUSED_RESULT */
     return ustr;
 }
 
+UString *ustr_convert_argv_from_local(const char *cargv, error_t **error)
+{
+    UString *ustr;
+    UConverter *ucnv;
+    UErrorCode status;
+    int32_t cargv_length;
+
+    status = U_ZERO_ERROR;
+    ucnv = ucnv_open(NULL, &status);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "ucnv_open");
+        return NULL;
+    }
+    cargv_length = strlen(cargv);
+    ustr = mem_new(*ustr);
+    ustr->allocated = nearest_power(cargv_length * ucnv_getMaxCharSize(ucnv));
+    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
+    ustr->len = ucnv_toUChars(ucnv, ustr->ptr, ustr->allocated, cargv, cargv_length, &status);
+    ucnv_close(ucnv);
+    if (U_FAILURE(status)) {
+        ustring_destroy(ustr);
+        icu_error_set(error, FATAL, status, "ucnv_toUChars");
+        return NULL;
+    }
+    ustr->ptr[ustr->len] = 0;
+
+    return ustr;
+}
+
 static void _ustring_maybe_expand(UString *ustr, size_t length) /* NONNULL() */
 {
     require_else_return(NULL != ustr);

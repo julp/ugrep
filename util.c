@@ -27,6 +27,39 @@ UBool stdout_is_tty(void)
     return (1 == isatty(STDOUT_FILENO));
 }
 
+UChar *convert_argv_from_local(const char *cargv, int32_t *uargv_length, error_t **error)
+{
+    UChar *uargv;
+    UConverter *ucnv;
+    UErrorCode status;
+    int32_t cargv_length;
+    int32_t _uargv_length;
+    int32_t allocated;
+
+    status = U_ZERO_ERROR;
+    ucnv = ucnv_open(NULL, &status);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "ucnv_open");
+        return NULL;
+    }
+    cargv_length = strlen(cargv);
+    allocated = cargv_length * ucnv_getMaxCharSize(ucnv);
+    uargv = mem_new_n(*uargv, allocated + 1);
+    _uargv_length = ucnv_toUChars(ucnv, uargv, allocated, cargv, cargv_length, &status);
+    ucnv_close(ucnv);
+    if (U_FAILURE(status)) {
+        free(uargv);
+        icu_error_set(error, FATAL, status, "ucnv_toUChars");
+        return NULL;
+    }
+    uargv[_uargv_length] = 0;
+    if (NULL != uargv_length) {
+        *uargv_length = _uargv_length;
+    }
+
+    return uargv;
+}
+
 void print_error(error_t *error)
 {
     if (NULL != error && error->type >= verbosity) {

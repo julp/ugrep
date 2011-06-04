@@ -9,6 +9,7 @@ extern int verbosity;
 extern int exit_failure_value;
 
 UBool stdout_is_tty(void);
+UChar *convert_argv_from_local(const char *, int32_t *, error_t **);
 void print_error(error_t *error);
 void report(int type, const char *format, ...);
 //void ustdio_init(void);

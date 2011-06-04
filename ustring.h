@@ -8,6 +8,7 @@ typedef struct {
     size_t allocated;
 } UString;
 
+UString *ustr_convert_argv_from_local(const char *, error_t **);
 UString *ustring_adopt_string(UChar *) NONNULL();
 UString *ustring_adopt_string_len(UChar *, size_t);
 void ustring_append_char(UString *, UChar) NONNULL();
