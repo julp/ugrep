@@ -12,6 +12,9 @@
 
 #define SIZE_MAX_2 (SIZE_MAX << (sizeof(size_t) * CHAR_BIT - 1))
 
+
+/* NOTE: /!\ all lengths are in code units not code point /!\ */
+
 static inline size_t nearest_power(size_t requested_length)
 {
     if (requested_length > SIZE_MAX_2) {
@@ -25,8 +28,6 @@ static inline size_t nearest_power(size_t requested_length)
         return (1UL << i);
     }
 }
-
-/* NOTE: all lengths are in code units not code point */
 
 UString *ustring_new() /* WARN_UNUSED_RESULT */
 {
@@ -165,7 +166,6 @@ void ustring_truncate(UString *ustr) /* NONNULL() */
     ustr->len = 0;
 }
 
-/* UNSAFE: code units */
 void ustring_subreplace_len(UString *ustr, const UChar *replacement, size_t replacement_length, size_t position, size_t length) /* NONNULL() */
 {
     require_else_return(NULL != ustr);
@@ -192,7 +192,6 @@ void ustring_subreplace_len(UString *ustr, const UChar *replacement, size_t repl
     }
 }
 
-/* TODO: CHECK */
 void ustring_dump(UString *ustr) /* NONNULL() */
 {
     UChar *p;
@@ -250,7 +249,6 @@ void ustring_dump(UString *ustr) /* NONNULL() */
     }
 }
 
-/* UNSAFE: code units */
 void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t length) /* NONNULL() */
 {
     require_else_return(c != NULL);
@@ -287,7 +285,6 @@ void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t l
     ustr->ptr[ustr->len] = U_NUL;
 }
 
-/* UNSAFE: code units */
 UString *ustring_dup_string_len(const UChar *from, size_t length) /* NONNULL() */
 {
     UString *ustr;
