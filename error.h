@@ -32,6 +32,9 @@ const char *ubasename(const char *);
 # define icu_error_set(error, type, status, function) \
     error_set(error, type, "ICU Error \"%s\" from " function "()", u_errorName(status))
 
+# define icu_msg(type, status, function) \
+    msg(type, "ICU Error \"%s\" from " function "()", u_errorName(status))
+
 
 typedef struct {
     int type;
