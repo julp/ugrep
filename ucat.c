@@ -27,6 +27,7 @@ enum {
 static reader_t *default_reader = NULL;
 
 UString *ustr = NULL;
+size_t lineno = 0;
 UBool EFlag = FALSE;
 UBool TFlag = FALSE;
 UBool bFlag = FALSE;
@@ -96,6 +97,7 @@ static int procfile(fd_t *fd, const char *filename)
 
     if (fd_open(&error, fd, filename)) {
         if (file_print) {
+            lineno = 0;
             u_fprintf(ustdout, "%s:\n", filename);
         }
         /* !fd->binary || (fd->binary && BIN_FILE_BIN != binbehave) */
@@ -119,7 +121,7 @@ static int procfile(fd_t *fd, const char *filename)
                 }
             }
             if (count) {
-                fd->lineno++;
+                lineno++;
             }
             if (BIN_FILE_TEXT == binbehave || vFlag) {
                 ustring_dump(ustr);
@@ -128,7 +130,7 @@ static int procfile(fd_t *fd, const char *filename)
                 ustring_append_char(ustr, 0x0024);
             }
             if (numbered) {
-                u_fprintf(ustdout, "%6d  ", fd->lineno);
+                u_fprintf(ustdout, "%6d  ", lineno);
             }
             u_fputs(ustr->ptr, ustdout);
         }
