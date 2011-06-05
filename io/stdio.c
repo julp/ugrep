@@ -15,84 +15,83 @@ typedef struct {
     UFILE *ufp;
 } stdiofd_t;
 
-static void *stdiofd_open(error_t **error, const char *filename, int fd)
+static void *stdio_open(error_t **error, const char *filename, int fd)
 {
-    stdiofd_t *stdiofd;
+    stdiofd_t *this;
 
-    stdiofd = mem_new(*stdiofd);
-    //if (NULL == (stdiofd->fp = fopen(filename, "r"))) {
-    //if (NULL == (stdiofd->ufp = u_fopen(filename, "r", NULL, NULL))) {
-    if (NULL == (stdiofd->fp = fdopen(fd, "r"))) {
+    this = mem_new(*this);
+    //if (NULL == (this->fp = fopen(filename, "r"))) {
+    //if (NULL == (this->ufp = u_fopen(filename, "r", NULL, NULL))) {
+    if (NULL == (this->fp = fdopen(fd, "r"))) {
         error_set(error, WARN, "can't open %s: %s", filename, strerror(errno));
         goto failed;
     }
     if (fd == STDIN_FILENO) {
-        if (NULL == (stdiofd->ufp = u_finit(stdiofd->fp, NULL, NULL))) {
+        if (NULL == (this->ufp = u_finit(this->fp, NULL, NULL))) {
             goto failed;
         }
     } else {
-        if (NULL == (stdiofd->ufp = u_fadopt(stdiofd->fp, NULL, NULL))) {
+        if (NULL == (this->ufp = u_fadopt(this->fp, NULL, NULL))) {
             goto failed;
         }
     }
-    //stdiofd->ufp = NULL;
-    stdiofd->fp = u_fgetfile(stdiofd->ufp);
+    //this->ufp = NULL;
+    this->fp = u_fgetfile(this->ufp);
 
-    return stdiofd;
+    return this;
 
 failed:
-    free(stdiofd);
+    free(this);
     return NULL;
 }
 
-static void stdiofd_close(void *data)
+static void stdio_close(void *data)
 {
-    FETCH_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, this, stdiofd_t);
 
-    u_fclose(stdiofd->ufp);
+    u_fclose(this->ufp);
 }
 
-static int32_t stdiofd_readuchars(error_t **UNUSED(error), void *data, UChar32 *buffer, size_t max_len)
+static int32_t stdio_readuchars32(error_t **UNUSED(error), void *data, UChar32 *buffer, size_t max_len)
 {
     size_t i;
     UChar32 c;
-    FETCH_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, this, stdiofd_t);
 
-    //return u_file_read(buffer, max_len, stdiofd->ufp);
-    for (i = 0; U_EOF != (c = u_fgetcx(stdiofd->ufp)) && i < max_len; i++) {
+    //return u_file_read(buffer, max_len, this->ufp);
+    for (i = 0; U_EOF != (c = u_fgetcx(this->ufp)) && i < max_len; i++) {
         buffer[i] = c;
     }
-    //buffer[i + 1] = U_NUL;
 
     return i;
 }
 
-static void stdiofd_rewind(void *data, int32_t signature_length)
+static void stdio_rewind(void *data, int32_t signature_length)
 {
-    FETCH_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, this, stdiofd_t);
 
-    fseek(stdiofd->fp, signature_length, SEEK_SET);
+    fseek(this->fp, signature_length, SEEK_SET);
 }
 
-static UBool stdiofd_readline(error_t **UNUSED(error), void *data, UString *ustr)
+static UBool stdio_readline(error_t **UNUSED(error), void *data, UString *ustr)
 {
     UChar c;
-    FETCH_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, this, stdiofd_t);
 
-    while (U_EOF != (c = u_fgetc(stdiofd->ufp)) && U_LF != c) {
+    while (U_EOF != (c = u_fgetc(this->ufp)) && U_LF != c) {
         ustring_append_char(ustr, c);
     }
 
     return TRUE;
 }
 
-static size_t stdiofd_readbytes(void *data, char *buffer, size_t max_len)
+static size_t stdio_readbytes(void *data, char *buffer, size_t max_len)
 {
     /*int fd;
     struct stat st;*/
-    FETCH_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, this, stdiofd_t);
 
-    /*if (-1 == (fd = fileno(stdiofd->fp))) {
+    /*if (-1 == (fd = fileno(this->fp))) {
         fprintf(stderr, "fileno %s: %s\n", "TODO: filename", strerror(errno));
         return 0;
     }
@@ -100,41 +99,64 @@ static size_t stdiofd_readbytes(void *data, char *buffer, size_t max_len)
         fprintf(stderr, "can't stat %s: %s\n", "TODO: filename", strerror(errno));
         return 0;
     }*/
-    return fread(buffer, sizeof(*buffer), max_len/*st.st_size < max_len ? st.st_size : max_len*/, stdiofd->fp);
+    return fread(buffer, sizeof(*buffer), max_len/*st.st_size < max_len ? st.st_size : max_len*/, this->fp);
 }
 
-static UBool stdiofd_set_encoding(error_t **UNUSED(error), void *data, const char *encoding)
+static UBool stdio_has_encoding(void *UNUSED(data))
 {
-    FETCH_DATA(data, stdiofd, stdiofd_t);
-
-    //stdiofd->ufp = u_fadopt(stdiofd->fp, NULL, encoding);
-    return (0 == u_fsetcodepage(encoding, stdiofd->ufp));
+    return TRUE; // Each UFILE has it's own converter which is system default codepage by default
 }
 
-static UBool stdiofd_eof(void *data)
+static const char *stdio_get_encoding(void *data)
 {
-    FETCH_DATA(data, stdiofd, stdiofd_t);
+    UErrorCode status;
+    const char *encoding;
+    FETCH_DATA(data, this, stdiofd_t);
 
-    return u_feof(stdiofd->ufp);
+    status = U_ZERO_ERROR;
+    encoding = ucnv_getName(u_fgetConverter(this->ufp), &status);
+    if (U_SUCCESS(status)) {
+        return encoding;
+    } else {
+        //icu_error_set(error, FATAL, status, "ucnv_getName");
+        return "ucnv_getName() failed";
+    }
 }
 
-static UBool stdiofd_seekable(void *data)
+static UBool stdio_set_encoding(error_t **UNUSED(error), void *data, const char *encoding)
 {
-    FETCH_DATA(data, stdiofd, stdiofd_t);
+    FETCH_DATA(data, this, stdiofd_t);
 
-    return STDIN_FILENO != fileno(stdiofd->fp);
+    //this->ufp = u_fadopt(this->fp, NULL, encoding);
+    return (0 == u_fsetcodepage(encoding, this->ufp));
+}
+
+static UBool stdio_eof(void *data)
+{
+    FETCH_DATA(data, this, stdiofd_t);
+
+    return u_feof(this->ufp);
+}
+
+static UBool stdio_seekable(void *data)
+{
+    FETCH_DATA(data, this, stdiofd_t);
+
+    return STDIN_FILENO != fileno(this->fp);
 }
 
 reader_t stdio_reader =
 {
     "stdio",
-    stdiofd_open,
-    stdiofd_close,
-    stdiofd_eof,
-    stdiofd_seekable,
-    stdiofd_readline,
-    stdiofd_readbytes,
-    stdiofd_readuchars,
-    stdiofd_set_encoding,
-    stdiofd_rewind
+    stdio_open,
+    stdio_close,
+    stdio_eof,
+    stdio_seekable,
+    stdio_readline,
+    stdio_readbytes,
+    stdio_readuchars32,
+    stdio_has_encoding,
+    stdio_get_encoding,
+    stdio_set_encoding,
+    stdio_rewind
 };

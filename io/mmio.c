@@ -28,17 +28,17 @@ typedef struct {
     UConverter *ucnv;
 } mmfd_t;
 
-static void *mmfd_open(error_t **error, const char *filename, int fd)
+static void *mmap_open(error_t **error, const char *filename, int fd)
 {
-    mmfd_t *mmfd = NULL;
+    mmfd_t *this = NULL;
     struct stat st;
 
-    mmfd = mem_new(*mmfd);
+    this = mem_new(*this);
 
-    mmfd->ptr = mmfd->start = NULL;
-    mmfd->len = 0;
-    mmfd->ucnv = NULL;
-    mmfd->fd = -1;
+    this->ptr = this->start = NULL;
+    this->len = 0;
+    this->ucnv = NULL;
+    this->fd = -1;
 
     if (-1 == (fstat(fd, &st))) {
         error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
@@ -52,73 +52,73 @@ static void *mmfd_open(error_t **error, const char *filename, int fd)
         error_set(error, WARN, "%s is not a regular file", filename);
         goto close;
     }
-    if (0 == (mmfd->len = (size_t) st.st_size)) {
-        mmfd->start = NULL;
+    if (0 == (this->len = (size_t) st.st_size)) {
+        this->start = NULL;
     } else {
 #ifdef _MSC_VER
-        if (NULL == (mmfd->fd = CreateFileMapping((HANDLE) _get_osfhandle(fd), NULL, PAGE_READONLY, 0, 0, NULL))) {
+        if (NULL == (this->fd = CreateFileMapping((HANDLE) _get_osfhandle(fd), NULL, PAGE_READONLY, 0, 0, NULL))) {
             error_set(error, WARN, "CreateFileMapping failed on %s: ", filename);
             goto close;
         }
-        if (NULL == (mmfd->start = MapViewOfFile(mmfd->fd, FILE_MAP_READ, 0, 0, 0))) {
-            CloseHandle(mmfd->fd);
+        if (NULL == (this->start = MapViewOfFile(this->fd, FILE_MAP_READ, 0, 0, 0))) {
+            CloseHandle(this->fd);
             error_win32_set(error, WARN, "MapViewOfFile failed on %s: ", filename);
             goto close;
         }
 #else
-        mmfd->fd = fd;
-        mmfd->start = mmap(NULL, mmfd->len, PROT_READ, MAP_PRIVATE, mmfd->fd, (off_t) 0);
-        if (MAP_FAILED == mmfd->start) {
+        this->fd = fd;
+        this->start = mmap(NULL, this->len, PROT_READ, MAP_PRIVATE, this->fd, (off_t) 0);
+        if (MAP_FAILED == this->start) {
             error_set(error, WARN, "mmap failed on %s: %s", filename, strerror(errno));
             goto close;
         }
 #endif /* _MSC_VER */
     }
 
-    mmfd->ptr = mmfd->start;
-    mmfd->end = mmfd->start + mmfd->len;
-    mmfd->ucnv = NULL;
+    this->ptr = this->start;
+    this->end = this->start + this->len;
+    this->ucnv = NULL;
 
-    return mmfd;
+    return this;
 
 close:
 #ifdef _MSC_VER
-    CloseHandle(mmfd->fd);
+    CloseHandle(this->fd);
 #else
-    close(mmfd->fd);
+    close(this->fd);
 #endif /* _MSC_VER */
 free:
-    free(mmfd);
+    free(this);
     return NULL;
 }
 
-static void mmfd_close(void *data)
+static void mmap_close(void *data)
 {
-    FETCH_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, this, mmfd_t);
 
-    if (NULL != mmfd->ucnv) {
-        ucnv_close(mmfd->ucnv);
+    if (NULL != this->ucnv) {
+        ucnv_close(this->ucnv);
     }
 #ifdef _MSC_VER
-    UnmapViewOfFile(mmfd->start);
-    CloseHandle(mmfd->fd);
+    UnmapViewOfFile(this->start);
+    CloseHandle(this->fd);
 #else
-    munmap(mmfd->start, mmfd->len);
-    close(mmfd->fd);
+    munmap(this->start, this->len);
+    close(this->fd);
 #endif /* _MSC_VER */
 }
 
-static int32_t mmfd_readuchars(error_t **error, void *data, UChar32 *buffer, size_t max_len)
+static int32_t mmap_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
 {
     UChar32 c;
     int32_t i, len;
     UErrorCode status;
-    FETCH_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, this, mmfd_t);
 
     status = U_ZERO_ERROR;
-    len = mmfd->len > max_len ? max_len : mmfd->len;
+    len = this->len > max_len ? max_len : this->len;
     for (i = 0; i < len; i++) {
-        c = ucnv_getNextUChar(mmfd->ucnv, (const char **) &mmfd->ptr, mmfd->end, &status);
+        c = ucnv_getNextUChar(this->ucnv, (const char **) &this->ptr, this->end, &status);
         if (U_FAILURE(status)) {
             if (U_INDEX_OUTOFBOUNDS_ERROR == status) {
                 break;
@@ -129,27 +129,26 @@ static int32_t mmfd_readuchars(error_t **error, void *data, UChar32 *buffer, siz
         }
         buffer[i] = c;
     }
-    //buffer[i + 1] = U_NUL;
 
     return i;
 }
 
-static void mmfd_rewind(void *data, int32_t signature_length)
+static void mmap_rewind(void *data, int32_t signature_length)
 {
-    FETCH_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, this, mmfd_t);
 
-    mmfd->ptr = mmfd->start + signature_length;
+    this->ptr = this->start + signature_length;
 }
 
-static UBool mmfd_readline(error_t **error, void *data, UString *ustr)
+static UBool mmap_readline(error_t **error, void *data, UString *ustr)
 {
     UChar32 c;
     UErrorCode status;
-    FETCH_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, this, mmfd_t);
 
     status = U_ZERO_ERROR;
     do {
-        c = ucnv_getNextUChar(mmfd->ucnv, (const char **) &mmfd->ptr, mmfd->end, &status);
+        c = ucnv_getNextUChar(this->ucnv, (const char **) &this->ptr, this->end, &status);
         if (U_FAILURE(status)) {
             if (U_INDEX_OUTOFBOUNDS_ERROR == status) { // c == U_EOF
                 /*if (!ustring_empty(ustr)) {
@@ -169,29 +168,51 @@ static UBool mmfd_readline(error_t **error, void *data, UString *ustr)
     return TRUE;
 }
 
-static size_t mmfd_readbytes(void *data, char *buffer, size_t max_len)
+static size_t mmap_readbytes(void *data, char *buffer, size_t max_len)
 {
     size_t n;
-    FETCH_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, this, mmfd_t);
 
-    if (mmfd->len > max_len) {
+    if (this->len > max_len) {
         n = max_len;
     } else {
-        n = mmfd->len;
+        n = this->len;
     }
-    memcpy(buffer, mmfd->ptr, n);
-    buffer[n + 1] = '\0';
+    memcpy(buffer, this->ptr, n);
 
     return n;
 }
 
-static UBool mmfd_set_encoding(error_t **error, void *data, const char *encoding)
+static UBool mmap_has_encoding(void *data)
+{
+    FETCH_DATA(data, this, mmfd_t);
+
+    return NULL != this->ucnv;
+}
+
+static const char *mmap_get_encoding(void *data)
 {
     UErrorCode status;
-    FETCH_DATA(data, mmfd, mmfd_t);
+    const char *encoding;
+    FETCH_DATA(data, this, mmfd_t);
 
     status = U_ZERO_ERROR;
-    mmfd->ucnv = ucnv_open(encoding, &status);
+    encoding = ucnv_getName(this->ucnv, &status);
+    if (U_SUCCESS(status)) {
+        return encoding;
+    } else {
+        //icu_error_set(error, FATAL, status, "ucnv_getName");
+        return "ucnv_getName() failed";
+    }
+}
+
+static UBool mmap_set_encoding(error_t **error, void *data, const char *encoding)
+{
+    UErrorCode status;
+    FETCH_DATA(data, this, mmfd_t);
+
+    status = U_ZERO_ERROR;
+    this->ucnv = ucnv_open(encoding, &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ucnv_open");
     }
@@ -199,14 +220,14 @@ static UBool mmfd_set_encoding(error_t **error, void *data, const char *encoding
     return U_SUCCESS(status);
 }
 
-static UBool mmfd_eof(void *data)
+static UBool mmap_eof(void *data)
 {
-    FETCH_DATA(data, mmfd, mmfd_t);
+    FETCH_DATA(data, this, mmfd_t);
 
-    return mmfd->ptr >= mmfd->end;
+    return this->ptr >= this->end;
 }
 
-static UBool mmfd_seekable(void *UNUSED(data))
+static UBool mmap_seekable(void *UNUSED(data))
 {
     return TRUE;
 }
@@ -214,13 +235,15 @@ static UBool mmfd_seekable(void *UNUSED(data))
 reader_t mm_reader =
 {
     "mmap",
-    mmfd_open,
-    mmfd_close,
-    mmfd_eof,
-    mmfd_seekable,
-    mmfd_readline,
-    mmfd_readbytes,
-    mmfd_readuchars,
-    mmfd_set_encoding,
-    mmfd_rewind
+    mmap_open,
+    mmap_close,
+    mmap_eof,
+    mmap_seekable,
+    mmap_readline,
+    mmap_readbytes,
+    mmap_readuchars32,
+    mmap_has_encoding,
+    mmap_get_encoding,
+    mmap_set_encoding,
+    mmap_rewind
 };

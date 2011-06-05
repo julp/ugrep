@@ -18,7 +18,8 @@ int binbehave = BIN_FILE_SKIP;
 
 const fd_t NULL_FD = { NULL, NULL, NULL, NULL, 0, 0, 0, 0, FALSE };
 
-static UBool stdin_is_tty(void) {
+static UBool stdin_is_tty(void)
+{
     return (1 == isatty(STDIN_FILENO));
 }
 
@@ -144,7 +145,7 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
                     int32_t ubuffer_len;
                     UChar32 ubuffer[MAX_BIN_REL_LEN + 1];
 
-                    if (-1 == (ubuffer_len = fd->reader->readuchars(error, fd->reader_data, ubuffer, MAX_BIN_REL_LEN))) {
+                    if (-1 == (ubuffer_len = fd->reader->readuchars32(error, fd->reader_data, ubuffer, MAX_BIN_REL_LEN))) {
                         goto failed;
                     }
                     ubuffer[ubuffer_len] = U_NUL;

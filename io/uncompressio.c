@@ -19,16 +19,16 @@ typedef struct {
 
 # include <zlib.h>
 
-static void *compressedfdgz_open(error_t **error, const char *filename, int fd)
+static void *compressedgz_open(error_t **error, const char *filename, int fd)
 {
     int ret;
     gzFile zfp;
     char *dst;
     size_t dst_len;
     struct stat st;
-    compressedfd_t *compressedfd;
+    compressedfd_t *this;
 
-    compressedfd = mem_new(*compressedfd);
+    this = mem_new(*this);
     if (-1 == (fstat(fd, &st))) {
         error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
         goto close;
@@ -57,17 +57,17 @@ static void *compressedfdgz_open(error_t **error, const char *filename, int fd)
         goto free;
     }
     gzclose(zfp);
-    compressedfd->start = compressedfd->ptr = dst;
-    compressedfd->len = ret;
-    compressedfd->end = compressedfd->start + compressedfd->len;
-    compressedfd->ucnv = NULL;
+    this->start = this->ptr = dst;
+    this->len = ret;
+    this->end = this->start + this->len;
+    this->ucnv = NULL;
 
-    return compressedfd;
+    return this;
 
 close:
     close(fd);
 free:
-    free(compressedfd);
+    free(this);
     return NULL;
 }
 
@@ -77,16 +77,16 @@ free:
 
 # include <bzlib.h>
 
-static void *compressedfdbz2_open(error_t **error, const char *filename, int fd)
+static void *compressedbz2_open(error_t **error, const char *filename, int fd)
 {
     char *dst;
     BZFILE *jfp;
     size_t dst_len;
     struct stat st;
     int ret, bzerror;
-    compressedfd_t *compressedfd;
+    compressedfd_t *this;
 
-    compressedfd = mem_new(*compressedfd);
+    this = mem_new(*this);
     if (-1 == (fstat(fd, &st))) {
         error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
         goto close;
@@ -107,43 +107,43 @@ static void *compressedfdbz2_open(error_t **error, const char *filename, int fd)
         goto free;
     }
     BZ2_bzReadClose(&bzerror, jfp);
-    compressedfd->start = compressedfd->ptr = dst;
-    compressedfd->len = ret;
-    compressedfd->end = compressedfd->start + compressedfd->len;
-    compressedfd->ucnv = NULL;
+    this->start = this->ptr = dst;
+    this->len = ret;
+    this->end = this->start + this->len;
+    this->ucnv = NULL;
 
-    return compressedfd;
+    return this;
 
 close:
     close(fd);
 free:
-    free(compressedfd);
+    free(this);
     return NULL;
 }
 
 #endif /* HAVE_BZLIP2 */
 
-static void compressedfd_close(void *data)
+static void compressed_close(void *data)
 {
-    FETCH_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, this, compressedfd_t);
 
-    if (NULL != compressedfd->ucnv) {
-        ucnv_close(compressedfd->ucnv);
+    if (NULL != this->ucnv) {
+        ucnv_close(this->ucnv);
     }
-    free(compressedfd->start);
+    free(this->start);
 }
 
-static int32_t compressedfd_readuchars(error_t **error, void *data, UChar32 *buffer, size_t max_len)
+static int32_t compressed_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
 {
     UChar32 c;
     int32_t i, len;
     UErrorCode status;
-    FETCH_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, this, compressedfd_t);
 
     status = U_ZERO_ERROR;
-    len = compressedfd->len > max_len ? max_len : compressedfd->len;
+    len = this->len > max_len ? max_len : this->len;
     for (i = 0; i < len; i++) {
-        c = ucnv_getNextUChar(compressedfd->ucnv, (const char **) &compressedfd->ptr, compressedfd->end, &status);
+        c = ucnv_getNextUChar(this->ucnv, (const char **) &this->ptr, this->end, &status);
         if (U_FAILURE(status)) {
             if (U_INDEX_OUTOFBOUNDS_ERROR == status) {
                 break;
@@ -154,27 +154,26 @@ static int32_t compressedfd_readuchars(error_t **error, void *data, UChar32 *buf
         }
         buffer[i] = c;
     }
-    //buffer[i + 1] = U_NUL;
 
     return i;
 }
 
-static void compressedfd_rewind(void *data, int32_t signature_length)
+static void compressed_rewind(void *data, int32_t signature_length)
 {
-    FETCH_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, this, compressedfd_t);
 
-    compressedfd->ptr = compressedfd->start + signature_length;
+    this->ptr = this->start + signature_length;
 }
 
-static UBool compressedfd_readline(error_t **error, void *data, UString *ustr)
+static UBool compressed_readline(error_t **error, void *data, UString *ustr)
 {
     UChar32 c;
     UErrorCode status;
-    FETCH_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, this, compressedfd_t);
 
     status = U_ZERO_ERROR;
     do {
-        c = ucnv_getNextUChar(compressedfd->ucnv, (const char **) &compressedfd->ptr, compressedfd->end, &status);
+        c = ucnv_getNextUChar(this->ucnv, (const char **) &this->ptr, this->end, &status);
         if (U_FAILURE(status)) {
             if (U_INDEX_OUTOFBOUNDS_ERROR == status) { // c == U_EOF
                 /*if (!ustring_empty(ustr)) {
@@ -194,29 +193,51 @@ static UBool compressedfd_readline(error_t **error, void *data, UString *ustr)
     return TRUE;
 }
 
-static size_t compressedfd_readbytes(void *data, char *buffer, size_t max_len)
+static size_t compressed_readbytes(void *data, char *buffer, size_t max_len)
 {
     size_t n;
-    FETCH_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, this, compressedfd_t);
 
-    if (compressedfd->len > max_len) {
+    if (this->len > max_len) {
         n = max_len;
     } else {
-        n = compressedfd->len;
+        n = this->len;
     }
-    memcpy(buffer, compressedfd->ptr, n);
-    buffer[n + 1] = '\0';
+    memcpy(buffer, this->ptr, n);
 
     return n;
 }
 
-static UBool compressedfd_set_encoding(error_t **error, void *data, const char *encoding)
+static UBool compressed_has_encoding(void *data)
+{
+    FETCH_DATA(data, this, compressedfd_t);
+
+    return NULL != this->ucnv;
+}
+
+static const char *compressed_get_encoding(void *data)
 {
     UErrorCode status;
-    FETCH_DATA(data, compressedfd, compressedfd_t);
+    const char *encoding;
+    FETCH_DATA(data, this, compressedfd_t);
 
     status = U_ZERO_ERROR;
-    compressedfd->ucnv = ucnv_open(encoding, &status);
+    encoding = ucnv_getName(this->ucnv, &status);
+    if (U_SUCCESS(status)) {
+        return encoding;
+    } else {
+        //icu_error_set(error, FATAL, status, "ucnv_getName");
+        return "ucnv_getName() failed";
+    }
+}
+
+static UBool compressed_set_encoding(error_t **error, void *data, const char *encoding)
+{
+    UErrorCode status;
+    FETCH_DATA(data, this, compressedfd_t);
+
+    status = U_ZERO_ERROR;
+    this->ucnv = ucnv_open(encoding, &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ucnv_open");
     }
@@ -224,14 +245,14 @@ static UBool compressedfd_set_encoding(error_t **error, void *data, const char *
     return U_SUCCESS(status);
 }
 
-static UBool compressedfd_eof(void *data)
+static UBool compressed_eof(void *data)
 {
-    FETCH_DATA(data, compressedfd, compressedfd_t);
+    FETCH_DATA(data, this, compressedfd_t);
 
-    return compressedfd->ptr >= compressedfd->end;
+    return this->ptr >= this->end;
 }
 
-static UBool compressedfd_seekable(void *UNUSED(data))
+static UBool compressed_seekable(void *UNUSED(data))
 {
     return TRUE;
 }
@@ -240,15 +261,17 @@ static UBool compressedfd_seekable(void *UNUSED(data))
 reader_t gz_reader =
 {
     "gzip",
-    compressedfdgz_open,
-    compressedfd_close,
-    compressedfd_eof,
-    compressedfd_seekable,
-    compressedfd_readline,
-    compressedfd_readbytes,
-    compressedfd_readuchars,
-    compressedfd_set_encoding,
-    compressedfd_rewind
+    compressedgz_open,
+    compressed_close,
+    compressed_eof,
+    compressed_seekable,
+    compressed_readline,
+    compressed_readbytes,
+    compressed_readuchars32,
+    compressed_has_encoding,
+    compressed_get_encoding,
+    compressed_set_encoding,
+    compressed_rewind
 };
 #endif /* HAVE_ZLIB */
 
@@ -256,14 +279,16 @@ reader_t gz_reader =
 reader_t bz2_reader =
 {
     "bzip2",
-    compressedfdbz2_open,
-    compressedfd_close,
-    compressedfd_eof,
-    compressedfd_seekable,
-    compressedfd_readline,
-    compressedfd_readbytes,
-    compressedfd_readuchars,
-    compressedfd_set_encoding,
-    compressedfd_rewind
+    compressedbz2_open,
+    compressed_close,
+    compressed_eof,
+    compressed_seekable,
+    compressed_readline,
+    compressed_readbytes,
+    compressed_readuchars32,
+    compressed_has_encoding,
+    compressed_get_encoding,
+    compressed_set_encoding,
+    compressed_rewind
 };
 #endif /* HAVE_BZIP2 */
