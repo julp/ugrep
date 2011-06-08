@@ -133,6 +133,24 @@ static void compressed_close(void *data)
     free(this->start);
 }
 
+static int32_t compressed_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
+{
+    int32_t count;
+    UErrorCode status;
+    FETCH_DATA(data, this, compressedfd_t);
+
+    status = U_ZERO_ERROR;
+    count = ucnv_toUChars(this->ucnv, buffer, max_len, this->ptr, MIN(this->end - this->ptr, max_len), &status);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "ucnv_toUChars");
+        count = -1;
+    } else {
+        this->ptr += count;
+    }
+
+    return count;
+}
+
 static int32_t compressed_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
 {
     UChar32 c;
@@ -269,6 +287,7 @@ reader_imp_t gz_reader_imp =
     compressed_seekable,
     compressed_readline,
     compressed_readbytes,
+    compressed_readuchars,
     compressed_readuchars32,
     compressed_has_encoding,
     compressed_get_encoding,
@@ -288,6 +307,7 @@ reader_imp_t bz2_reader_imp =
     compressed_seekable,
     compressed_readline,
     compressed_readbytes,
+    compressed_readuchars,
     compressed_readuchars32,
     compressed_has_encoding,
     compressed_get_encoding,

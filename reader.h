@@ -10,7 +10,8 @@ typedef struct {
     UBool (*eof)(void *);
     UBool (*seekable)(void *);
     UBool (*readline)(error_t **error, void *, UString *);
-    size_t (*readbytes)(void *, char *, size_t); /* Caller must append trailing \0 */
+    size_t (*readbytes)(void *, char *, size_t);                         /* Caller must append trailing \0 */
+    int32_t (*readuchars)(error_t **error, void *, UChar *, size_t);     /* Caller must append trailing \0 */
     int32_t (*readuchars32)(error_t **error, void *, UChar32 *, size_t); /* Caller must append trailing \0 */
     UBool (*has_encoding)(void *);
     const char *(*get_encoding)(void *); /* /!\ Don't call it without assuming a previous: TRUE == has_encoding /!\ */

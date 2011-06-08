@@ -15,6 +15,7 @@
 
 extern reader_imp_t mmap_reader_imp;
 extern reader_imp_t stdio_reader_imp;
+extern reader_imp_t string_reader_imp;
 # ifdef HAVE_ZLIB
 extern reader_imp_t gz_reader_imp;
 # endif /* HAVE_ZLIB */
@@ -119,6 +120,11 @@ UBool reader_eof(reader_t *this)
     return this->imp->eof(this->priv_imp);
 }
 
+int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t max_len)
+{
+    return this->imp->readuchars(error, this->priv_imp, buffer, max_len);
+}
+
 UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
 {
     ustring_truncate(ustr);
@@ -142,6 +148,28 @@ void *reader_get_user_data(reader_t *this)
 void reader_set_user_data(reader_t *this, void *data)
 {
     this->priv_user = data;
+}
+
+UBool reader_open_stdin(reader_t *this)
+{
+    reader_init(this, "stdio");
+    return reader_open(this, NULL, "-");
+}
+
+UBool reader_open_string(reader_t *this, const char *string)
+{
+    reader_init(this, NULL);
+    this->imp = &string_reader_imp;
+    if (NULL == (this->priv_imp = this->imp->open(NULL, string, -1))) {
+        // TODO: error
+        return FALSE;
+    }
+    if (!this->imp->set_encoding(NULL, this->priv_imp, NULL)) {
+        // TODO: error
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 UBool reader_open(reader_t *this, error_t **error, const char *filename)

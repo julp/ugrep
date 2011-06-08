@@ -108,6 +108,24 @@ static void mmap_close(void *data)
 #endif /* _MSC_VER */
 }
 
+static int32_t mmap_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
+{
+    int32_t count;
+    UErrorCode status;
+    FETCH_DATA(data, this, mmfd_t);
+
+    status = U_ZERO_ERROR;
+    count = ucnv_toUChars(this->ucnv, buffer, max_len, this->ptr, MIN(this->end - this->ptr, max_len), &status);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "ucnv_toUChars");
+        count = -1;
+    } else {
+        this->ptr += count;
+    }
+
+    return count;
+}
+
 static int32_t mmap_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
 {
     UChar32 c;
@@ -243,6 +261,7 @@ reader_imp_t mmap_reader_imp =
     mmap_seekable,
     mmap_readline,
     mmap_readbytes,
+    mmap_readuchars,
     mmap_readuchars32,
     mmap_has_encoding,
     mmap_get_encoding,

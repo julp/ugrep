@@ -52,6 +52,13 @@ static void stdio_close(void *data)
     u_fclose(this->ufp);
 }
 
+static int32_t stdio_readuchars(error_t **UNUSED(error), void *data, UChar *buffer, size_t max_len)
+{
+    FETCH_DATA(data, this, stdiofd_t);
+
+    return u_file_read(buffer, max_len, this->ufp);
+}
+
 static int32_t stdio_readuchars32(error_t **UNUSED(error), void *data, UChar32 *buffer, size_t max_len)
 {
     size_t i;
@@ -156,6 +163,7 @@ reader_imp_t stdio_reader_imp =
     stdio_seekable,
     stdio_readline,
     stdio_readbytes,
+    stdio_readuchars,
     stdio_readuchars32,
     stdio_has_encoding,
     stdio_get_encoding,
