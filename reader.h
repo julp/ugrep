@@ -3,6 +3,7 @@
 # define READER_H
 
 typedef struct {
+    UBool internal;
     const char *name;
     void *(*open)(error_t **, const char *, int);
     void (*close)(void *);
@@ -15,6 +16,6 @@ typedef struct {
     const char *(*get_encoding)(void *); /* /!\ Don't call it without assuming a previous: TRUE == has_encoding /!\ */
     UBool (*set_encoding)(error_t **, void *, const char *);
     void (*rewind)(void *, int32_t); /* Caller must provide BOM length (as 2nd argument) */
-} reader_t;
+} reader_imp_t;
 
 #endif /* READER_H */

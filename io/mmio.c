@@ -232,8 +232,10 @@ static UBool mmap_seekable(void *UNUSED(data))
     return TRUE;
 }
 
-reader_t mm_reader =
+
+reader_imp_t mmap_reader_imp =
 {
+    FALSE,
     "mmap",
     mmap_open,
     mmap_close,

@@ -9,9 +9,7 @@
 #include <getopt.h>
 #include <errno.h>
 
-#define BINARY 1
 #include "common.h"
-#include "reader_decl.h"
 
 
 // =0: all input files were output successfully
@@ -24,8 +22,6 @@ enum {
 
 /* ========== global variables ========== */
 
-static reader_t *default_reader = NULL;
-
 UString *ustr = NULL;
 size_t lineno = 0;
 UBool EFlag = FALSE;
@@ -35,11 +31,13 @@ UBool nFlag = FALSE;
 UBool sFlag = FALSE;
 UBool vFlag = FALSE;
 UBool file_print = FALSE; // -H/h
+int binbehave = BIN_FILE_SKIP;
 
 /* ========== getopt stuff ========== */
 
 enum {
     BINARY_OPT = CHAR_MAX + 1,
+    INPUT_OPT,
     READER_OPT
 };
 
@@ -52,6 +50,7 @@ static char optstr[] = "AEHTVbehnqstuv";
 static struct option long_options[] =
 {
     {"binary-files",        required_argument, NULL, BINARY_OPT}, // grep
+    {"input",               required_argument, NULL, INPUT_OPT}, // grep
     {"reader",              required_argument, NULL, READER_OPT}, // grep
     {"show-all",            no_argument,       NULL, 'A'},
     {"show-ends",           no_argument,       NULL, 'E'},
@@ -85,25 +84,24 @@ static void usage(void)
     exit(UCAT_EXIT_USAGE);
 }
 
-static int procfile(fd_t *fd, const char *filename)
+static int procfile(reader_t *reader, const char *filename)
 {
     UBool numbered, count, prev_was_blank;
     error_t *error;
 
     error = NULL;
-    fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
     count = TRUE;
     numbered = nFlag;
     prev_was_blank = FALSE;
 
-    if (fd_open(&error, fd, filename)) {
+    if (reader_open(reader, &error, filename)) {
         if (file_print) {
             lineno = 0;
             u_fprintf(ustdout, "%s:\n", filename);
         }
         /* !fd->binary || (fd->binary && BIN_FILE_BIN != binbehave) */
-        while (!fd_eof(fd)) {
-            if (!fd_readline(&error, fd, ustr)) {
+        while (!reader_eof(reader)) {
+            if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
             }
             ustring_chomp(ustr);
@@ -135,7 +133,7 @@ static int procfile(fd_t *fd, const char *filename)
             }
             u_fputs(ustr->ptr, ustdout);
         }
-        fd_close(fd);
+        reader_close(reader);
     } else {
         print_error(error);
         return 1;
@@ -145,7 +143,7 @@ static int procfile(fd_t *fd, const char *filename)
 }
 
 #ifndef WITHOUT_FTS
-static int procdir(fd_t *fd, char **dirname)
+static int procdir(reader_t *reader, char **dirname)
 {
     int ret;
     FTS *fts;
@@ -175,7 +173,7 @@ static int procdir(fd_t *fd, char **dirname)
             case FTS_DP:
                 break;
             default:
-                ret |= procfile(fd, p->fts_path);
+                ret |= procfile(reader, p->fts_path);
                 break;
         }
     }
@@ -197,7 +195,7 @@ static void exit_cb(void)
 int main(int argc, char **argv)
 {
     int c, ret;
-    fd_t fd = NULL_FD;
+    reader_t reader;
 #ifndef WITHOUT_FTS
     UBool rFlag = FALSE;
 #endif /* !WITHOUT_FTS */
@@ -208,7 +206,7 @@ int main(int argc, char **argv)
     }
 
     ret = 0;
-    default_reader = &mm_reader;
+    reader_init(&reader, "mmap");
     exit_failure_value = UCAT_EXIT_FAILURE;
     //ustdio_init();
 
@@ -217,13 +215,13 @@ int main(int argc, char **argv)
 # ifdef HAVE_BZIP2
         case 'b':
             if ('z' == __progname[1]) {
-                default_reader = &bz2_reader;
+                reader_set_imp_by_name(&reader, "bzip2");
             }
             break;
 # endif /* HAVE_BZIP2 */
 # ifdef HAVE_ZLIB
         case 'z':
-            default_reader = &gz_reader;
+            reader_set_imp_by_name(&reader, "gzip");
             break;
 # endif /* HAVE_ZLIB */
     }
@@ -303,20 +301,13 @@ int main(int argc, char **argv)
                 }
                 break;
             case READER_OPT:
-                {
-                    reader_t **r;
-
-                    for (r = available_readers, default_reader = NULL; *r; r++) {
-                        if (!strcmp((*r)->name, optarg)) {
-                            default_reader = *r;
-                            break;
-                        }
-                    }
-                    if (NULL == default_reader) {
-                        fprintf(stderr, "Unknown reader\n");
-                        return UCAT_EXIT_USAGE;
-                    }
+                if (!reader_set_imp_by_name(&reader, optarg)) {
+                    fprintf(stderr, "Unknown reader\n");
+                    return UCAT_EXIT_USAGE;
                 }
+                break;
+            case INPUT_OPT:
+                reader_set_default_encoding(&reader, optarg);
                 break;
             default:
                 usage();
@@ -326,17 +317,19 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
+    reader_set_binary_behavior(&reader, binbehave);
+
     ustr = ustring_new();
 
     if (0 == argc) {
-        ret |= procfile(&fd, "-");
+        ret |= procfile(&reader, "-");
 #ifndef WITHOUT_FTS
     } else if (rFlag) {
-        ret |= procdir(&fd, argv);
+        ret |= procdir(&reader, argv);
 #endif /* !WITHOUT_FTS */
     } else {
         for ( ; argc--; ++argv) {
-            ret |= procfile(&fd, *argv);
+            ret |= procfile(&reader, *argv);
         }
     }
 

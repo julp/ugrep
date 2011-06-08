@@ -16,14 +16,11 @@
 #include <errno.h>
 #include <ctype.h>
 
-#define BINARY 1
 #include "ugrep.h"
-#include "reader_decl.h"
 
 
 #define SEP_MATCH_UCHAR    0x003a
 #define SEP_NO_MATCH_UCHAR 0x002d
-
 
 // const UChar EOL[] = {U_CR, U_LF, U_NUL};
 // const UChar EOL[] = {U_LF, U_NUL};
@@ -77,7 +74,7 @@ engine_t *engines[] = {
 
 static fixed_circular_list_t *lines = NULL;
 static slist_t *patterns = NULL;
-static reader_t *default_reader = NULL;
+int binbehave = BIN_FILE_SKIP;
 #ifdef OLD_INTERVAL
 static slist_t *intervals = NULL;
 #else
@@ -141,6 +138,7 @@ static UBool is_patternC(const char *pattern)
 
 enum {
     BINARY_OPT = CHAR_MAX + 1,
+    INPUT_OPT,
 #ifndef NO_COLOR
     COLOR_OPT,
 #endif /* !NO_COLOR */
@@ -160,6 +158,7 @@ static struct option long_options[] =
     {"colour",              required_argument, NULL, COLOR_OPT},
 #endif /* !NO_COLOR */
     {"binary-files",        required_argument, NULL, BINARY_OPT},
+    {"input",               required_argument, NULL, INPUT_OPT},
     {"reader",              required_argument, NULL, READER_OPT},
     {"after-context",       required_argument, NULL, 'A'},
     {"before-context",      required_argument, NULL, 'B'},
@@ -253,18 +252,18 @@ UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern
 
 UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pattern_type, uint32_t flags)
 {
-    fd_t fd;
+    reader_t reader;
     UBool retval;
     UString *ustr;
 
     retval = TRUE;
-    fd.reader = &stdio_reader;
-    if (!fd_open(error, &fd, filename)) {
+    reader_set_imp_by_name(&reader, "stdio");
+    if (!reader_open(&reader, error, filename)) {
         return FALSE;
     }
     ustr = ustring_new();
-    while (retval && !fd_eof(&fd)) {
-        if(!fd_readline(error, &fd, ustr)) {
+    while (retval && !reader_eof(&reader)) {
+        if (!reader_readline(&reader, error, ustr)) {
             retval = FALSE;
         } else {
             ustring_chomp(ustr);
@@ -273,7 +272,7 @@ UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pat
             }
         }
     }
-    fd_close(&fd);
+    reader_close(&reader);
     ustring_destroy(ustr);
 
     return retval;
@@ -688,40 +687,42 @@ void fixed_circular_list_print(fixed_circular_list_t *l) /* NONNULL() */
 }
 #endif /* DEBUG */
 
-static int procfile(fd_t *fd, const char *filename)
+static int procfile(reader_t *reader, const char *filename)
 {
     UString *ustr;
     error_t *error;
 #ifndef NO_COLOR
     UBool _colorize;
 #endif /* !NO_COLOR */
-    size_t last_line_print = 0;
+    size_t last_line_print;
+    int arg_matches; // matches (for the current file) against command arguments (-v)
     int _after_context;
 
     error = NULL;
+    arg_matches = 0;
     _after_context = 0;
-    fd->reader = default_reader; // Restore default (stdin requires a switch on stdio)
+    last_line_print = 0;
 #ifndef NO_COLOR
     _colorize = colorize && (before_context || after_context || !vFlag);
 #endif /* !NO_COLOR */
 
     fixed_circular_list_clean(lines);
-    if (fd_open(&error, fd, filename)) {
+    if (reader_open(reader, &error, filename)) {
         UBool _line_print; /* line_print local override */
 
-        _line_print = line_print && (!fd->binary || (fd->binary && BIN_FILE_BIN != binbehave));
-        while (!fd_eof(fd)) {
-            int matches;
+        _line_print = line_print && (!reader->binary || (reader->binary && BIN_FILE_BIN != binbehave));
+        while (!reader_eof(reader)) {
+            int pattern_matches; // matches (for the current line) against pattern(s), doesn't take care of arguments (-v)
             slist_element_t *p;
             engine_return_t ret;
             FETCH_DATA(fixed_circular_list_fetch(lines), line, line_t);
 
             ustr = line->ustr;
-            if (!fd_readline(&error, fd, ustr)) {
+            if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
             }
-            matches = 0;
-            fd->lineno++;
+            pattern_matches = 0;
+            reader->lineno++;
             ustring_chomp(ustr);
             if (BIN_FILE_TEXT == binbehave) {
                 ustring_dump(ustr);
@@ -750,28 +751,28 @@ static int procfile(fd_t *fd, const char *filename)
                 if (ENGINE_FAILURE == ret) {
                     print_error(error);
                 } else if (ENGINE_WHOLE_LINE_MATCH == ret) {
-                    matches++;
+                    pattern_matches++;
                     break; // no need to continue (line level)
                 } else {
-                    matches += ret;
+                    pattern_matches += ret;
                 }
-                //if (matches > 0 && (lFlag || (!vFlag && fd->binary && BIN_FILE_BIN == binbehave))) {
-                if (matches && (lFlag || (fd->binary && BIN_FILE_BIN == binbehave))) {
+                //if (pattern_matches > 0 && (lFlag || (!vFlag && fd->binary && BIN_FILE_BIN == binbehave))) {
+                if (pattern_matches && (lFlag || (reader->binary && BIN_FILE_BIN == binbehave))) {
                     debug("file skipping");
-                    fd->matches = 1;
+                    arg_matches = 1;
                     goto endfile; // no need to continue (file level)
                 }
             }
             if (!vFlag) {
-                line->match = !!matches;
+                line->match = !!pattern_matches;
             } else {
-                line->match = !matches;
+                line->match = !pattern_matches;
             }
-            fd->matches += line->match;
+            arg_matches += line->match;
             if (_line_print) {
 #ifndef NO_COLOR
 # ifndef _MSC_VER
-                if (_colorize && matches) {
+                if (_colorize && pattern_matches) {
                     if (ENGINE_WHOLE_LINE_MATCH == ret) {
                         if (*colors[LINE_MATCH].value) {
                             ustring_prepend_string(ustr, colors[LINE_MATCH].value);
@@ -803,7 +804,7 @@ static int procfile(fd_t *fd, const char *filename)
                     int i;
                     flist_element_t *el;
 
-                    if ( (before_context || after_context) && last_line_print > before_context && (fd->lineno - before_context > last_line_print + 1) ) {
+                    if ( (before_context || after_context) && last_line_print > before_context && (reader->lineno - before_context > last_line_print + 1) ) {
                         const UChar linesep[] = {SEP_NO_MATCH_UCHAR, SEP_NO_MATCH_UCHAR, U_NUL};
 
 #ifndef NO_COLOR
@@ -820,29 +821,29 @@ static int procfile(fd_t *fd, const char *filename)
                     fixed_circular_list_foreach(i, lines, el) {
                         FETCH_DATA(el->data, l, line_t);
 
-                        if (fd->lineno - i > last_line_print) { // without this test, lines in both, after and before, contexts will be printed twice
+                        if (reader->lineno - i > last_line_print) { // without this test, lines in both, after and before, contexts will be printed twice
                             if (file_print) {
-                                print_file(fd->filename, FALSE, l->match, TRUE, FALSE);
+                                print_file(reader->sourcename, FALSE, l->match, TRUE, FALSE);
                             }
                             if (nFlag) {
-                                print_line(fd->lineno - i, l->match, TRUE, FALSE);
+                                print_line(reader->lineno - i, l->match, TRUE, FALSE);
                             }
                             u_fputs(l->ustr->ptr, ustdout);
                         }
                     }
-                    last_line_print = fd->lineno;
+                    last_line_print = reader->lineno;
                     _after_context = after_context;
                     fixed_circular_list_clean(lines);
                 } else {
-                    if (fd->lineno > last_line_print && _after_context > 0) {
+                    if (reader->lineno > last_line_print && _after_context > 0) {
                         if (file_print) {
-                            print_file(fd->filename, FALSE, line->match, TRUE, FALSE);
+                            print_file(reader->sourcename, FALSE, line->match, TRUE, FALSE);
                         }
                         if (nFlag) {
-                            print_line(fd->lineno, line->match, TRUE, FALSE);
+                            print_line(reader->lineno, line->match, TRUE, FALSE);
                         }
                         u_fputs(ustr->ptr, ustdout);
-                        last_line_print = fd->lineno;
+                        last_line_print = reader->lineno;
                         _after_context--;
                     }
                 }
@@ -852,27 +853,27 @@ endfile:
         if (!_line_print) {
             if (cFlag) {
                 if (file_print) {
-                    print_file(fd->filename, fd->matches == 0, FALSE, TRUE, FALSE);
+                    print_file(reader->sourcename, arg_matches == 0, FALSE, TRUE, FALSE);
                 }
-                u_fprintf(ustdout, "%d\n", fd->matches);
-            } else if (lFlag && fd->matches) {
-                print_file(fd->filename, FALSE, FALSE, FALSE, TRUE);
-            } else if (LFlag && !fd->matches) {
-                print_file(fd->filename, TRUE, FALSE, FALSE, TRUE);
-            } else if (fd->binary && BIN_FILE_BIN == binbehave && fd->matches/*((!vFlag && fd->matches) || (vFlag && !fd->matches))*/) {
-                u_fprintf(ustdout, "Binary file %s matches\n", fd->filename);
+                u_fprintf(ustdout, "%d\n", arg_matches);
+            } else if (lFlag && arg_matches) {
+                print_file(reader->sourcename, FALSE, FALSE, FALSE, TRUE);
+            } else if (LFlag && !arg_matches) {
+                print_file(reader->sourcename, TRUE, FALSE, FALSE, TRUE);
+            } else if (reader->binary && BIN_FILE_BIN == binbehave && arg_matches/*((!vFlag && fd->matches) || (vFlag && !fd->matches))*/) {
+                u_fprintf(ustdout, "Binary file %s matches\n", reader->sourcename);
             }
         }
-        fd_close(fd);
+        reader_close(reader);
     } else {
         print_error(error);
     }
 
-    return fd->matches;
+    return arg_matches;
 }
 
 #ifndef WITHOUT_FTS
-static int procdir(fd_t *fd, char **dirname)
+static int procdir(reader_t *reader, char **dirname)
 {
     FTS *fts;
     FTSENT *p;
@@ -902,7 +903,7 @@ static int procdir(fd_t *fd, char **dirname)
             case FTS_DP:
                 break;
             default:
-                matches += procfile(fd, p->fts_path);
+                matches += procfile(reader, p->fts_path);
                 break;
         }
     }
@@ -945,7 +946,7 @@ int main(int argc, char **argv)
     int lastc;
     UBool newarg;
     int prevoptind;
-    fd_t fd = NULL_FD;
+    reader_t reader;
 #ifndef NO_COLOR
     int color;
 #endif /* !NO_COLOR */
@@ -973,7 +974,7 @@ int main(int argc, char **argv)
         return UGREP_EXIT_FAILURE;
     }
 
-    default_reader = &mm_reader;
+    reader_init(&reader, "mmap");
     patterns = slist_new(pattern_destroy);
     exit_failure_value = UGREP_EXIT_FAILURE;
 
@@ -1123,20 +1124,13 @@ int main(int argc, char **argv)
                 }
                 break;
             case READER_OPT:
-                {
-                    reader_t **r;
-
-                    for (r = available_readers, default_reader = NULL; *r; r++) {
-                        if (!strcmp((*r)->name, optarg)) {
-                            default_reader = *r;
-                            break;
-                        }
-                    }
-                    if (NULL == default_reader) {
-                        fprintf(stderr, "Unknown reader\n");
-                        return UGREP_EXIT_USAGE;
-                    }
+                if (!reader_set_imp_by_name(&reader, optarg)) {
+                    fprintf(stderr, "Unknown reader\n");
+                    return UGREP_EXIT_USAGE;
                 }
+                break;
+            case INPUT_OPT:
+                reader_set_default_encoding(&reader, optarg);
                 break;
             default:
                 usage();
@@ -1148,6 +1142,8 @@ int main(int argc, char **argv)
     }
     argc -= optind;
     argv += optind;
+
+    reader_set_binary_behavior(&reader, binbehave);
 
     /* Options overrides, in case of incompatibility between them */
     if (cFlag || lFlag || LFlag) {
@@ -1189,14 +1185,14 @@ int main(int argc, char **argv)
     intervals = intervals_new();
 
     if (0 == argc) {
-        matches = procfile(&fd, "-");
+        matches = procfile(&reader, "-");
 #ifndef WITHOUT_FTS
     } else if (rFlag) {
-        matches = procdir(&fd, argv);
+        matches = procdir(&reader, argv);
 #endif /* !WITHOUT_FTS */
     } else {
         for ( ; argc--; ++argv) {
-            matches += procfile(&fd, *argv);
+            matches += procfile(&reader, *argv);
         }
     }
 

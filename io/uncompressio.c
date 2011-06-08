@@ -257,9 +257,11 @@ static UBool compressed_seekable(void *UNUSED(data))
     return TRUE;
 }
 
+
 #ifdef HAVE_ZLIB
-reader_t gz_reader =
+reader_imp_t gz_reader_imp =
 {
+    FALSE,
     "gzip",
     compressedgz_open,
     compressed_close,
@@ -276,8 +278,9 @@ reader_t gz_reader =
 #endif /* HAVE_ZLIB */
 
 #ifdef HAVE_BZIP2
-reader_t bz2_reader =
+reader_imp_t bz2_reader_imp =
 {
+    FALSE,
     "bzip2",
     compressedbz2_open,
     compressed_close,

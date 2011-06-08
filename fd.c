@@ -8,20 +8,31 @@
 #include <unicode/ucsdet.h>
 
 #include "common.h"
-#include "reader_decl.h"
 
 #define MIN_CONFIDENCE  39   // Minimum confidence for a match (in percents)
 #define MAX_ENC_REL_LEN 4096 // Maximum relevant length for encoding analyse (in bytes)
 #define MAX_BIN_REL_LEN 4096 // Maximum relevant length for binary analyse
 
-int binbehave = BIN_FILE_SKIP;
+extern reader_imp_t mmap_reader_imp;
+extern reader_imp_t stdio_reader_imp;
+# ifdef HAVE_ZLIB
+extern reader_imp_t gz_reader_imp;
+# endif /* HAVE_ZLIB */
+# ifdef HAVE_BZIP2
+extern reader_imp_t bz2_reader_imp;
+# endif /* HAVE_BZIP2 */
 
-const fd_t NULL_FD = { NULL, NULL, NULL, NULL, 0, 0, 0, 0, FALSE };
-
-static UBool stdin_is_tty(void)
-{
-    return (1 == isatty(STDIN_FILENO));
-}
+reader_imp_t *available_readers[] = {
+    &mmap_reader_imp,
+    &stdio_reader_imp,
+#  ifdef HAVE_ZLIB
+    &gz_reader_imp,
+#  endif /* HAVE_ZLIB */
+#  ifdef HAVE_BZIP2
+    &bz2_reader_imp,
+#  endif /* HAVE_BZIP2 */
+    NULL
+};
 
 static UBool is_binary_uchar(UChar32 c)
 {
@@ -41,15 +52,99 @@ static UBool is_binary(UChar32 *buffer, size_t buffer_len)
     return ((size_t)(p - buffer)) < buffer_len;
 }
 
-void fd_close(fd_t *fd)
+void reader_init(reader_t *this, const char *name)
 {
-    if (NULL != fd->reader->close) {
-        fd->reader->close(fd->reader_data);
+    this->sourcename = NULL;
+    this->default_encoding = NULL;
+    if (NULL != name) {
+        reader_set_imp_by_name(this, name);
+    } else {
+        this->default_imp = this->imp = NULL;
     }
-    free(fd->reader_data);
+    this->priv_imp = NULL;
+    this->priv_user = NULL;
+    this->binbehave = 0;
+    this->signature_length = 0;
+    this->size = 0;
+    this->lineno = 0;
+    this->binary = FALSE;
 }
 
-UBool fd_open(error_t **error, fd_t *fd, const char *filename)
+reader_imp_t *reader_get_by_name(const char *name)
+{
+    reader_imp_t **imp;
+
+    for (imp = available_readers; *imp; imp++) {
+        if (!(*imp)->internal && !strcmp((*imp)->name, name)) {
+            return *imp;
+        }
+    }
+
+    return NULL;
+}
+
+UBool reader_set_imp_by_name(reader_t *this, const char *name)
+{
+    reader_imp_t **imp;
+
+    for (imp = available_readers; *imp; imp++) {
+        if (!(*imp)->internal && !strcmp((*imp)->name, name)) {
+            this->default_imp = this->imp = *imp;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+void reader_set_binary_behavior(reader_t *this, int binbehave)
+{
+    require_else_return(binbehave >= BIN_FILE_BIN && binbehave <= BIN_FILE_TEXT);
+
+    this->binbehave = binbehave;
+}
+
+UBool reader_set_encoding(reader_t *this, error_t **error, const char *encoding)
+{
+    return this->imp->set_encoding(error, this->priv_imp, encoding);
+}
+
+void reader_set_default_encoding(reader_t *this, const char *encoding)
+{
+    this->default_encoding = encoding;
+}
+
+UBool reader_eof(reader_t *this)
+{
+    return this->imp->eof(this->priv_imp);
+}
+
+UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
+{
+    ustring_truncate(ustr);
+    return this->imp->readline(error, this->priv_imp, ustr);
+}
+
+void reader_close(reader_t *this)
+{
+    if (NULL != this->imp->close) {
+        this->imp->close(this->priv_imp);
+    }
+    free(this->priv_imp);
+    this->priv_imp = NULL;
+}
+
+void *reader_get_user_data(reader_t *this)
+{
+    return this->priv_user;
+}
+
+void reader_set_user_data(reader_t *this, void *data)
+{
+    this->priv_user = data;
+}
+
+UBool reader_open(reader_t *this, error_t **error, const char *filename)
 {
     int fsfd;
     /*struct stat st;*/
@@ -63,40 +158,35 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
         return FALSE;
     }*/
 
-    fd->reader_data = NULL;
-
     if (!strcmp("-", filename)) {
-        if (!stdin_is_tty()) {
-            error_set(error, WARN, "Sorry, can't work with redirected or piped stdin (not seekable, sources can use many codepage). Skip stdin.");
-            goto failed;
-        }
-        fd->filename = "(standard input)";
-        fd->reader = &stdio_reader;
+        this->sourcename = "(standard input)";
+        this->imp = &stdio_reader_imp;
         fsfd = STDIN_FILENO;
     } else {
-        fd->filename = filename;
+        this->imp = this->default_imp;
+        this->sourcename = filename;
         if (-1 == (fsfd = open(filename, O_RDONLY))) {
             error_set(error, WARN, "can't open %s: %s", filename, strerror(errno));
             goto failed;
         }
     }
 
-    if (NULL == (fd->reader_data = fd->reader->open(error, filename, fsfd))) {
+    if (NULL == (this->priv_imp = this->imp->open(error, filename, fsfd))) {
         goto failed;
     }
 
-    encoding = NULL;
+    //encoding = NULL;
+    encoding = this->default_encoding;
     status = U_ZERO_ERROR;
-    fd->lineno = 0;
-    fd->binary = FALSE;
-    /*fd->filesize = st.st_size;*/
-    fd->matches = 0; // TODO: private field?
-    fd->signature_length = 0;
+    this->lineno = 0;
+    this->binary = FALSE;
+    /*this->filesize = st.st_size;*/
+    this->signature_length = 0;
 
-    if (fd->reader->seekable(fd->reader_data)) { // TODO: make it optionnal (by adding a UBool parameter ?)
-        if (0 != (buffer_len = fd->reader->readbytes(fd->reader_data, buffer, MAX_ENC_REL_LEN))) {
+    if (this->imp->seekable(this->priv_imp)) {
+        if (0 != (buffer_len = this->imp->readbytes(this->priv_imp, buffer, MAX_ENC_REL_LEN))) {
             buffer[buffer_len] = '\0';
-            encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &fd->signature_length, &status);
+            encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &this->signature_length, &status);
             if (U_SUCCESS(status)) {
                 if (NULL == encoding) {
                     int32_t confidence;
@@ -136,49 +226,42 @@ UBool fd_open(error_t **error, fd_t *fd, const char *filename)
                     ucsdet_close(csd);
                 }
                 debug("%s, file encoding = %s", filename, encoding);
-                fd->encoding = encoding;
-                if (!fd->reader->set_encoding(error, fd->reader_data, encoding)) {
-                    goto failed;
-                }
-                fd->reader->rewind(fd->reader_data, fd->signature_length);
-                if (BIN_FILE_TEXT != binbehave) {
-                    int32_t ubuffer_len;
-                    UChar32 ubuffer[MAX_BIN_REL_LEN + 1];
-
-                    if (-1 == (ubuffer_len = fd->reader->readuchars32(error, fd->reader_data, ubuffer, MAX_BIN_REL_LEN))) {
-                        goto failed;
-                    }
-                    ubuffer[ubuffer_len] = U_NUL;
-                    fd->binary = is_binary(ubuffer, ubuffer_len);
-                    debug("%s, binary file : %s", filename, fd->binary ? RED("yes") : GREEN("no"));
-                    if (fd->binary) {
-                        if (BIN_FILE_SKIP == binbehave) {
-                            goto failed;
-                        }
-                    }
-                    fd->reader->rewind(fd->reader_data, fd->signature_length);
-                }
+                //this->encoding = encoding;
             } else {
                 icu_error_set(error, WARN, status, "ucnv_detectUnicodeSignature");
                 goto failed;
             }
         }
     }
+    if (!this->imp->set_encoding(error, this->priv_imp, encoding)) {
+        goto failed;
+    }
+    debug("%s, file encoding = %s", filename, this->imp->get_encoding(this->priv_imp));
+    if (this->imp->seekable(this->priv_imp)) {
+        this->imp->rewind(this->priv_imp, this->signature_length);
+        if (BIN_FILE_TEXT != this->binbehave) {
+            int32_t ubuffer_len;
+            UChar32 ubuffer[MAX_BIN_REL_LEN + 1];
+
+            if (-1 == (ubuffer_len = this->imp->readuchars32(error, this->priv_imp, ubuffer, MAX_BIN_REL_LEN))) {
+                goto failed;
+            }
+            ubuffer[ubuffer_len] = U_NUL;
+            this->binary = is_binary(ubuffer, ubuffer_len);
+            debug("%s, binary file : %s", filename, this->binary ? RED("yes") : GREEN("no"));
+            if (this->binary) {
+                if (BIN_FILE_SKIP == this->binbehave) {
+                    goto failed;
+                }
+            }
+            this->imp->rewind(this->priv_imp, this->signature_length);
+        }
+    }
 
     return TRUE;
 failed:
-    if (NULL != fd->reader_data) {
-        fd_close(fd);
+    if (NULL != this->priv_imp) {
+        reader_close(this);
     }
     return FALSE;
-}
-
-UBool fd_eof(fd_t *fd) {
-    return fd->reader->eof(fd->reader_data);
-}
-
-UBool fd_readline(error_t **error, fd_t *fd, UString *ustr)
-{
-    ustring_truncate(ustr);
-    return fd->reader->readline(error, fd->reader_data, ustr);
 }

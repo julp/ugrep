@@ -145,8 +145,10 @@ static UBool stdio_seekable(void *data)
     return STDIN_FILENO != fileno(this->fp);
 }
 
-reader_t stdio_reader =
+
+reader_imp_t stdio_reader_imp =
 {
+    FALSE,
     "stdio",
     stdio_open,
     stdio_close,
