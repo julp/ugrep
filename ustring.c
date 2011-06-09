@@ -5,7 +5,7 @@
 #include "ugrep.h"
 
 #ifdef DEBUG
-# define USTRING_INITIAL_LENGTH 8 /* Voluntarily small for development/test */
+# define USTRING_INITIAL_LENGTH 1 /* Voluntarily small for development/test */
 #else
 # define USTRING_INITIAL_LENGTH 4096
 #endif /* DEBUG */
@@ -29,7 +29,7 @@ static inline size_t nearest_power(size_t requested_length)
     }
 }
 
-UString *ustring_new() /* WARN_UNUSED_RESULT */
+UString *ustring_new(void) /* WARN_UNUSED_RESULT */
 {
     return ustring_sized_new(USTRING_INITIAL_LENGTH);
 }
