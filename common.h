@@ -129,6 +129,8 @@ extern char *__progname;
 # endif /* DEBUG */
 
 # define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
+# define STR_LEN(str)      (sizeof(str) - 1)
+# define STR_SIZE(str)     sizeof(str)
 
 # define U_BS  0x0008 /* backspace */
 # define U_CR  0x000D /* \r */
