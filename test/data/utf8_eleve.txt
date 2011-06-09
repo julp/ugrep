@@ -1,6 +1,6 @@
 élève
 abc
-UTF-8 sans BOM
+
 def
 élÈve
 ghi

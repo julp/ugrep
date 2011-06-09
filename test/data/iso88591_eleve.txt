@@ -1,6 +1,6 @@
 élève
 abc
-ISO-8859-1
+
 def
 élÈve
 ghi

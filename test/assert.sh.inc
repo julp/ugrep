@@ -57,3 +57,25 @@ assertOutputValueEx() {
 
     return $?
 }
+
+assertOutputValueExIgnoreBlanks() {
+    local tmp1 tmp2
+
+    if [ $# -ne 3 ]; then
+        echo "ArgumentError: ${FUNCNAME[0]}(message, command1, command2)"
+        return $FALSE
+    fi
+
+    tmp1=`mktemp`
+    tmp2=`mktemp`
+    eval "\`$2 > $tmp1\`"
+    eval "\`$3 > $tmp2\`"
+
+    assertExitValue "$1" "diff -bquN ${tmp1} ${tmp2} > /dev/null" $TRUE
+
+#    if [ $? -ne $TRUE ]; then
+#        diff -uN ${tmp1} ${tmp2}
+#    fi
+
+    return $?
+}
