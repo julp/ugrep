@@ -1,10 +1,9 @@
-#include "ugrep.h"
-
 #include <unistd.h>
 #include <stdio.h>
 #include <unicode/ustdio.h>
-
 #include <errno.h>
+
+#include "common.h"
 
 typedef struct {
     size_t length;
@@ -12,7 +11,7 @@ typedef struct {
     char *start, *end, *ptr;
 } string_input_t;
 
-static void *string_open(error_t **error, const char *buffer, int length)
+static void *string_open(error_t **error, const char *buffer, int length) // "hack" for now
 {
     string_input_t *this;
 

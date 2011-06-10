@@ -150,22 +150,20 @@ void reader_set_user_data(reader_t *this, void *data)
     this->priv_user = data;
 }
 
-UBool reader_open_stdin(reader_t *this)
+UBool reader_open_stdin(reader_t *this, error_t **error)
 {
     reader_init(this, "stdio");
-    return reader_open(this, NULL, "-");
+    return reader_open(this, error, "-");
 }
 
-UBool reader_open_string(reader_t *this, const char *string)
+UBool reader_open_string(reader_t *this, error_t **error, const char *string)
 {
     reader_init(this, NULL);
     this->imp = &string_reader_imp;
-    if (NULL == (this->priv_imp = this->imp->open(NULL, string, -1))) {
-        // TODO: error
+    if (NULL == (this->priv_imp = this->imp->open(error, string, -1))) {
         return FALSE;
     }
-    if (!this->imp->set_encoding(NULL, this->priv_imp, NULL)) {
-        // TODO: error
+    if (!this->imp->set_encoding(error, this->priv_imp, NULL)) {
         return FALSE;
     }
 

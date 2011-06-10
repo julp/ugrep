@@ -11,7 +11,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "ugrep.h"
+#include "common.h"
 
 /*#ifndef SIZE_T_MAX
 #  define SIZE_T_MAX (~((size_t) 0))

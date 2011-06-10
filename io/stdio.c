@@ -1,14 +1,13 @@
-#include "ugrep.h"
-
 #include <unistd.h>
 #include <stdio.h>
+#include <errno.h>
 #include <unicode/ustdio.h>
 
 /*#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>*/
 
-#include <errno.h>
+#include "common.h"
 
 typedef struct {
     FILE *fp;
