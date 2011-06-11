@@ -246,7 +246,8 @@ int main(int argc, char **argv)
                 break;
 #endif /* !WITHOUT_FTS */
             case 'T':
-                fprintf(stderr, "TODO: T\n");
+                vFlag = TRUE; // TODO?
+                TFlag = TRUE;
                 break;
             case 'V':
                 fprintf(stderr, "ucat version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
@@ -291,8 +292,6 @@ int main(int argc, char **argv)
             case BINARY_OPT:
                 if (!strcmp("binary", optarg)) {
                     binbehave = BIN_FILE_BIN;
-                } else if (!strcmp("without-match", optarg)) {
-                    binbehave = BIN_FILE_SKIP;
                 } else if (!strcmp("text", optarg)) {
                     binbehave = BIN_FILE_TEXT;
                 } else {
