@@ -10,6 +10,7 @@
 # include <stdarg.h>
 
 # include <unicode/utypes.h>
+# include <unicode/uchar.h>
 # include <unicode/ucnv.h>
 # include <unicode/ustdio.h>
 # include <unicode/ustring.h>

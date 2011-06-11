@@ -4,7 +4,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include <unicode/uchar.h>
 #include <unicode/ucsdet.h>
 
 #include "common.h"

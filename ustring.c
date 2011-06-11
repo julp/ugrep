@@ -1,8 +1,6 @@
 #include <limits.h>
 
-#include <unicode/uchar.h>
-
-#include "ugrep.h"
+#include "common.h"
 
 #ifdef DEBUG
 # define USTRING_INITIAL_LENGTH 1 /* Voluntarily small for development/test */
@@ -325,4 +323,25 @@ UString *ustring_adopt_string(UChar *from) /* NONNULL() */
     require_else_return_null(NULL != from);
 
     return ustring_adopt_string_len(from, (size_t) u_strlen(from));
+}
+
+void ustring_trim(UString *ustr) /* NONNULL() */
+{
+    require_else_return(NULL != ustr);
+
+    ustr->len = u_trim(ustr->ptr, ustr->len, NULL, -1);
+}
+
+void ustring_ltrim(UString *ustr) /* NONNULL() */
+{
+    require_else_return(NULL != ustr);
+
+    ustr->len = u_ltrim(ustr->ptr, ustr->len, NULL, -1);
+}
+
+void ustring_rtrim(UString *ustr) /* NONNULL() */
+{
+    require_else_return(NULL != ustr);
+
+    ustr->len = u_rtrim(ustr->ptr, ustr->len, NULL, -1);
 }
