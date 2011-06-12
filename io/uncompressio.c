@@ -134,20 +134,21 @@ static void compressed_close(void *data)
 
 static int32_t compressed_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
 {
-    int32_t count;
     UErrorCode status;
+    const UChar *uend;
+    const char *prev_pos;
     FETCH_DATA(data, this, compressedfd_t);
 
     status = U_ZERO_ERROR;
-    count = ucnv_toUChars(this->ucnv, buffer, max_len, this->ptr, MIN(this->end - this->ptr, max_len), &status);
+    uend = buffer + max_len;
+    prev_pos = this->ptr;
+    ucnv_toUnicode(this->ucnv, &buffer, uend, &this->ptr, this->end, NULL, FALSE, &status);
     if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ucnv_toUChars");
-        count = -1;
-    } else {
-        this->ptr += count;
+        icu_error_set(error, FATAL, status, "ucnv_toUnicode");
+        return -1;
     }
 
-    return count;
+    return this->ptr - prev_pos;
 }
 
 static int32_t compressed_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
