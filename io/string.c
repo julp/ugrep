@@ -11,7 +11,8 @@ typedef struct {
     char *start, *end, *ptr;
 } string_input_t;
 
-static void *string_open(error_t **error, const char *buffer, int length) // "hack" for now
+
+static void *string_open(error_t **UNUSED(error), const char *buffer, int length) // "hack" for now
 {
     string_input_t *this;
 
@@ -26,20 +27,9 @@ static void *string_open(error_t **error, const char *buffer, int length) // "ha
 
 static int32_t string_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
 {
-    int32_t count;
-    UErrorCode status;
     FETCH_DATA(data, this, string_input_t);
 
-    status = U_ZERO_ERROR;
-    count = ucnv_toUChars(this->ucnv, buffer, max_len, this->ptr, MIN(this->end - this->ptr, max_len), &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ucnv_toUChars");
-        count = -1;
-    } else {
-        this->ptr += count;
-    }
-
-    return count;
+    STRING_READUCHARS(error, this->ptr, this->end, this->ucnv, buffer, max_len);
 }
 
 static int32_t string_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
@@ -125,20 +115,11 @@ static UBool string_has_encoding(void *data)
     return NULL != this->ucnv;
 }
 
-static const char *string_get_encoding(void *data)
+static const char *string_get_encoding(error_t **error, void *data)
 {
-    UErrorCode status;
-    const char *encoding;
     FETCH_DATA(data, this, string_input_t);
 
-    status = U_ZERO_ERROR;
-    encoding = ucnv_getName(this->ucnv, &status);
-    if (U_SUCCESS(status)) {
-        return encoding;
-    } else {
-        //icu_error_set(error, FATAL, status, "ucnv_getName");
-        return "ucnv_getName() failed";
-    }
+    STRING_GET_ENCODING(error, this->ucnv);
 }
 
 static UBool string_set_encoding(error_t **error, void *data, const char *encoding)
