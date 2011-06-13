@@ -22,19 +22,19 @@ typedef struct {
 # define STRING_READUCHARS(error, ptr, end, ucnv, buffer, max_len)                            \
     do {                                                                                      \
         UErrorCode status;                                                                    \
+        UChar *dest;                                                                          \
         const UChar *uend;                                                                    \
-        const char *prev_pos;                                                                 \
                                                                                               \
         status = U_ZERO_ERROR;                                                                \
+        dest = buffer;                                                                        \
         uend = buffer + max_len;                                                              \
-        prev_pos = ptr;                                                                       \
-        ucnv_toUnicode(ucnv, &buffer, uend, (const char **) &ptr, end, NULL, FALSE, &status); \
+        ucnv_toUnicode(ucnv, &dest, uend, (const char **) &ptr, end, NULL, FALSE, &status);   \
         if (U_FAILURE(status)) {                                                              \
             icu_error_set(error, FATAL, status, "ucnv_toUnicode");                            \
             return -1;                                                                        \
         }                                                                                     \
                                                                                               \
-        return ptr - prev_pos;                                                                \
+        return dest - buffer;                                                                 \
     } while (0);
 
 # define STRING_GET_ENCODING(error, ucnv)                        \
