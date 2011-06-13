@@ -1,6 +1,10 @@
 #include "ugrep.h"
 
+#ifdef OLD_RING
+fixed_circular_list_t *fixed_circular_list_new(size_t length, func_ctor_t ctor_func, func_dtor_t dtor_func, func_dtor_t clean_func) /* WARN_UNUSED_RESULT NONNULL(2) */
+#else
 fixed_circular_list_t *fixed_circular_list_new(size_t length, func_ctor_t ctor_func, func_dtor_t dtor_func) /* WARN_UNUSED_RESULT NONNULL(2) */
+#endif /* OLD_RING */
 {
     size_t i;
     fixed_circular_list_t *l;
@@ -12,9 +16,11 @@ fixed_circular_list_t *fixed_circular_list_new(size_t length, func_ctor_t ctor_f
     l->len = length;
     l->dtor_func = dtor_func;
     l->elts = mem_new_n(*l->elts, l->len);
-#ifndef OLD_RING
+#ifdef OLD_RING
+    l->clean_func = clean_func;
+#else
     l->used = mem_new_n(*l->used, l->len);
-#endif /* !OLD_RING */
+#endif /* OLD_RING */
     for (i = 0; i < l->len; i++) {
         //l->elts[i].prev = &l->elts[i - 1];
         l->elts[i].next = &l->elts[i + 1];
@@ -64,6 +70,9 @@ void fixed_circular_list_clean(fixed_circular_list_t *l) /* NONNULL() */
 #ifdef OLD_RING
     for (i = 0; i < l->len; i++) {
         l->elts[i].used = FALSE;
+        if (NULL != l->clean_func) {
+            l->clean_func(l->elts[i].data);
+        }
     }
 #else
     memset(l->used, FALSE, l->len);

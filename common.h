@@ -151,16 +151,21 @@ extern char *__progname;
 typedef void *(*func_ctor_t)(void); /* Constructor callback */
 typedef void (*func_dtor_t)(void *); /* Destructor callback */
 
-#ifndef MAX
-# define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif /* !MAX */
+# ifndef MAX
+#  define MAX(a, b) ((a) > (b) ? (a) : (b))
+# endif /* !MAX */
 
-#ifndef MIN
-# define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif /* !MIN */
+# ifndef MIN
+#  define MIN(a, b) ((a) < (b) ? (a) : (b))
+# endif /* !MIN */
 
 # define FETCH_DATA(from, to, type) \
     type *to = (type *) (from)
+
+# ifdef _MSC_VER
+#  define OLD_INTERVAL 1
+#  define OLD_RING     1
+# endif /* _MSC_VER */
 
 # include "alloc.h"
 # include "error.h"
