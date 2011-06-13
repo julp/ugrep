@@ -15,7 +15,7 @@
  **/
 
 #ifdef DEBUG
-# define IN_BUFFER_SIZE 2 /* Voluntarily small for development/test */
+# define IN_BUFFER_SIZE 200 /* Voluntarily small for development/test */
 #else
 # define IN_BUFFER_SIZE 1024
 #endif
@@ -158,25 +158,27 @@ USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
     return uset;
 }
 
+// use an hashtable and read 'from' and 'to' as UChar32 for performance ?
 void trtr(
     UChar *from, int32_t from_length,
     UChar *to, int32_t to_length,
     UChar *in, int32_t in_length,
     UChar *out, int32_t *out_length, int32_t out_size
 ) {
-    int i, f, t;
+    int cpf;
+    int i, cuf, t;
     UBool isError;
     UChar32 ci, cf, ct;
 
     isError = FALSE;
     for (i = 0; i < in_length; ) {
         U16_NEXT(in, i, in_length, ci);
-        for (f = 0; f < from_length; ) {
-            U16_NEXT(from, f, from_length, cf);
+        for (cpf = 0, cuf = 0; cuf < from_length; cpf++) { // fcp = from code point, fcu = from code unit
+            U16_NEXT(from, cuf, from_length, cf);
             if (cf == ci) {
                 if (NULL != to && 0 != *to) { // dFlag off
                     t = 0;
-                    U16_FWD_N(to, t, to_length, f - 1);
+                    U16_FWD_N(to, t, to_length, cpf);
                     U16_NEXT(to, t, to_length, ct);
                     U16_APPEND(out, *out_length, out_size, ct, isError);
                     goto endinnerloop;

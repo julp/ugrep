@@ -26,17 +26,20 @@ assertExitValue() {
     return $?
 }
 
-assertExpectingOutputValue() {
+assertOutputValue() {
     if [ $# -lt 3 ]; then
         echo "ArgumentError: ${FUNCNAME[0]}(message, command1, value[, operator = '=='])"
         return $FALSE
     fi
+    #X=$(${2% 2> /dev/null})
+    #echo "\$2 = :$X:"
+    #echo "\$3 = :$3:"
     __assertTrue "$1" "[[ \`$2\` ${4:-==} '$3' ]]"
 
     return $?
 }
 
-assertOutputValue() {
+assertOutputCommand() {
     if [ $# -lt 3 ]; then
         echo "ArgumentError: ${FUNCNAME[0]}(message, command1, command2[, operator = '=='])"
         return $FALSE
@@ -62,7 +65,7 @@ assertOutputValueEx() {
     assertExitValue "$1" "diff -quN ${tmp1} ${tmp2} > /dev/null" $TRUE
 
 #    if [ $? -ne $TRUE ]; then
-#        diff -uN ${tmp1} ${tmp2}
+#        diff --text -uN "${tmp1}" "${tmp2}"
 #    fi
 
     return $?
@@ -84,7 +87,7 @@ assertOutputValueExIgnoreBlanks() {
     assertExitValue "$1" "diff -bquN ${tmp1} ${tmp2} > /dev/null" $TRUE
 
 #    if [ $? -ne $TRUE ]; then
-#        diff -uN ${tmp1} ${tmp2}
+#        diff --text -uN ${tmp1} ${tmp2}
 #    fi
 
     return $?

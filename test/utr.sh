@@ -2,11 +2,6 @@
 
 # charset: UTF-8
 
-# WARNING:
-# * only file in UTF-8 *without BOM* should be compared (grep considers BOM when ugrep don't)
-# * comparaison must be about an UTF-8 file with LF line ending (grep considers CR when ugrep don't)
-# * search string should be ASCII only when LC_ALL=C
-
 declare -r TESTDIR=$(dirname $(readlink -f "${BASH_SOURCE}"))
 declare -r DATADIR="${TESTDIR}/data"
 
@@ -34,37 +29,27 @@ declare -r DATADIR="${TESTDIR}/data"
 #        rent locale.  If the current locale is C or POSIX, the dollar sign is ignored.  If the string is translated and replaced,
 #        the replacement is double-quoted.
 
-# declare -r A=$'\xF0\x9D\x98\xBC'
-# declare -r B=$'\xF0\x9D\x98\xBD'
-# declare -r C=$'\xF0\x9D\x98\xBE'
-# declare -r D=$'\xF0\x9D\x98\xBF'
-# declare -r E=$'\xF0\x9D\x99\x80'
-
-declare -r A=$'\xF0\x9D\x9A\xA8'
-declare -r B=$'\xF0\x9D\x9A\xA9'
-# declare -r C=$''
-# declare -r D=$''
-# declare -r E=$''
-
-# declare -r INPUT="a${A}b${B}c${C}d${D}e${E}"
-declare -r INPUT="a${A}b${B}"
+declare -r A=$'\xF0\x9D\x98\xBC'
+declare -r B=$'\xF0\x9D\x98\xBD'
+declare -r C=$'\xF0\x9D\x98\xBE'
+declare -r D=$'\xF0\x9D\x98\xBF'
+declare -r E=$'\xF0\x9D\x99\x80'
+declare -r INPUT="a${A}b${B}c${C}d${D}e${E}"
+declare -r N1=$'\xF0\x9D\x9F\x8F'
+declare -r N2=$'\xF0\x9D\x9F\x90'
+declare -r N3=$'\xF0\x9D\x9F\x91'
+declare -r N4=$'\xF0\x9D\x9F\x92'
+declare -r N5=$'\xF0\x9D\x9F\x93'
 
 . ${TESTDIR}/assert.sh.inc
 
+assertOutputValue "tr 1 CU => 0" "./utr -d [abcde] ${INPUT} 2> /dev/null" "${A}${B}${C}${D}${E}"
+assertOutputValue "tr 2 CU => 0" "./utr -d [${A}${B}${C}${D}${E}] ${INPUT} 2> /dev/null" "abcde"
 
-assertExpectingOutputValue "tr 1 cu => 0" "./utr -d '[ab]' '${INPUT}'" "${A}${B}"
-assertExpectingOutputValue "tr 2 cu => 0" "./utr -d '[${A}${B}]' '${INPUT}'" "ab"
+assertOutputValue "tr 1 CU => 1" "./utr abcde 12345 ${INPUT} 2> /dev/null" "1${A}2${B}3${C}4${D}5${E}"
+assertOutputValue "tr 2 CU => 1" "./utr ${A}${B}${C}${D}${E} 12345 ${INPUT} 2> /dev/null" "a1b2c3d4e5"
 
-# Actually (but not working: characters on 2 code units lead to character repetitions? :o):
-# 1 => 0
-# 2 => 0
-
-# TODO:
-
-# 1 => 1
-# 2 => 1
-
-# 1 => 2
-# 2 => 2
+assertOutputValue "tr 1 CU => 2" "./utr abcde ${N1}${N2}${N3}${N4}${N5} ${INPUT} 2> /dev/null" "${N1}${A}${N2}${B}${N3}${C}${N4}${D}${N5}${E}"
+assertOutputValue "tr 2 CU => 2" "./utr ${A}${B}${C}${D}${E} ${N1}${N2}${N3}${N4}${N5} ${INPUT} 2> /dev/null" "a${N1}b${N2}c${N3}d${N4}e${N5}"
 
 exit $?
