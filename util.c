@@ -11,6 +11,10 @@ char __progname[_MAX_PATH] = "<unknown>";
 
 #include "common.h"
 
+#ifdef _MSC_VER
+INITIALIZER_DECL(ustdio_init);
+#endif /* _MSC_VER */
+
 UFILE *ustdout = NULL;
 UFILE *ustderr = NULL;
 
@@ -24,7 +28,7 @@ int exit_failure_value = 0;
 
 UBool stdout_is_tty(void)
 {
-    return (1 == isatty(STDOUT_FILENO));
+    return (isatty(STDOUT_FILENO));
 }
 
 UChar *convert_argv_from_local(const char *cargv, int32_t *uargv_length, error_t **error)
@@ -215,11 +219,17 @@ INITIALIZER_P(ustdio_init)
             }
             RegCloseKey(hkey);
         }
+        /**
+         * /!\ Don't use ustdout or ustderr before following lines (it includes debug macro) /!\
+         **/
         ustdout = u_finit(stdout, NULL, cp);
         ustderr = u_finit(stderr, NULL, cp);
     } else
 #endif /* _MSC_VER */
     {
+        /**
+         * /!\ Don't use ustdout or ustderr before following lines (it includes debug macro) /!\
+         **/
         ustdout = u_finit(stdout, NULL, NULL);
         ustderr = u_finit(stderr, NULL, NULL);
     }

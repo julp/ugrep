@@ -16,6 +16,8 @@ int32_t u_ltrim(UChar *, int32_t, UChar *, int32_t);
 int32_t u_rtrim(UChar *, int32_t, UChar *, int32_t);
 int32_t u_trim(UChar *, int32_t, UChar *, int32_t);
 //void ustdio_init(void);
+# ifndef _MSC_VER
 INITIALIZER_DECL(ustdio_init);
+# endif /* !_MSC_VER */
 
 #endif /* UTIL_H */
