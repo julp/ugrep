@@ -672,6 +672,11 @@ static void print_line(int lineno, UBool line_match, UBool print_sep, UBool eol)
 }
 
 #ifdef DEBUG
+# ifdef OLD_RING
+#  define RING_ELEMENT_USED(e) e.used
+# else
+#  define RING_ELEMENT_USED(e) *e.used
+# endif /* OLD_RING */
 void fixed_circular_list_print(fixed_circular_list_t *l) /* NONNULL() */
 {
     size_t i;
@@ -682,7 +687,7 @@ void fixed_circular_list_print(fixed_circular_list_t *l) /* NONNULL() */
     u_printf("--------------------------------------------\n");
     for (i = 0; i < l->len; i++) {
         FETCH_DATA(l->elts[i].data, x, line_t);
-        u_printf("| %d | %p | %4d | %3d | %4d | %S\n", i, &l->elts[i], l->elts[i].used, &l->elts[i] == l->ptr, &l->elts[i] == l->head, x->ustr->ptr);
+        u_printf("| %d | %p | %4d | %3d | %4d | %S\n", i, &l->elts[i], RING_ELEMENT_USED(l->elts[i]), &l->elts[i] == l->ptr, &l->elts[i] == l->head, x->ustr->ptr);
     }
 }
 #endif /* DEBUG */
