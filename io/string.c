@@ -11,7 +11,8 @@ typedef struct {
     char *start, *end, *ptr;
 } string_input_t;
 
-static void *string_open(error_t **error, const char *buffer, int length) // "hack" for now
+
+static void *string_open(error_t **UNUSED(error), const char *buffer, int length) // "hack" for now
 {
     string_input_t *this;
 
@@ -26,46 +27,16 @@ static void *string_open(error_t **error, const char *buffer, int length) // "ha
 
 static int32_t string_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
 {
-    UErrorCode status;
-    const UChar *uend;
-    const char *prev_pos;
     FETCH_DATA(data, this, string_input_t);
 
-    status = U_ZERO_ERROR;
-    uend = buffer + max_len;
-    prev_pos = this->ptr;
-    ucnv_toUnicode(this->ucnv, &buffer, uend, &this->ptr, this->end, NULL, FALSE, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ucnv_toUnicode");
-        return -1;
-    }
-
-    return this->ptr - prev_pos;
+    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len);
 }
 
 static int32_t string_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
 {
-    UChar32 c;
-    int32_t i, len;
-    UErrorCode status;
     FETCH_DATA(data, this, string_input_t);
 
-    status = U_ZERO_ERROR;
-    len = this->length > max_len ? max_len : this->length;
-    for (i = 0; i < len; i++) {
-        c = ucnv_getNextUChar(this->ucnv, (const char **) &this->ptr, this->end, &status);
-        if (U_FAILURE(status)) {
-            if (U_INDEX_OUTOFBOUNDS_ERROR == status) {
-                break;
-            } else {
-                icu_error_set(error, FATAL, status, "ucnv_getNextUChar");
-                return -1;
-            }
-        }
-        buffer[i] = c;
-    }
-
-    return i;
+    STRING_READUCHARS32(error, this->ucnv, this->ptr, this->end, buffer, max_len);
 }
 
 static void string_rewind(void *data, int32_t signature_length)
@@ -126,20 +97,11 @@ static UBool string_has_encoding(void *data)
     return NULL != this->ucnv;
 }
 
-static const char *string_get_encoding(void *data)
+static const char *string_get_encoding(error_t **error, void *data)
 {
-    UErrorCode status;
-    const char *encoding;
     FETCH_DATA(data, this, string_input_t);
 
-    status = U_ZERO_ERROR;
-    encoding = ucnv_getName(this->ucnv, &status);
-    if (U_SUCCESS(status)) {
-        return encoding;
-    } else {
-        //icu_error_set(error, FATAL, status, "ucnv_getName");
-        return "ucnv_getName() failed";
-    }
+    STRING_GET_ENCODING(error, this->ucnv);
 }
 
 static UBool string_set_encoding(error_t **error, void *data, const char *encoding)

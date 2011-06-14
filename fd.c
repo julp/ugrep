@@ -261,7 +261,11 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename)
     if (!this->imp->set_encoding(error, this->priv_imp, encoding)) {
         goto failed;
     }
-    debug("%s, file encoding = %s", filename, this->imp->get_encoding(this->priv_imp));
+#ifdef DEBUG
+    if (NULL != (encoding = this->imp->get_encoding(NULL, this->priv_imp))) {
+        debug("%s, file encoding = %s", filename, encoding);
+    }
+#endif /* DEBUG */
     if (this->imp->seekable(this->priv_imp)) {
         this->imp->rewind(this->priv_imp, this->signature_length);
         if (BIN_FILE_TEXT != this->binbehave) {

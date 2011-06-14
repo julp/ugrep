@@ -29,9 +29,9 @@ ARGS='--color=never -HnA 4 -B 6 "^[^{}]*$" ugrep.c'
 assertOutputValueEx "-A 4 -B 6 (with -v)" "LC_ALL=C ./ugrep -v ${ARGS} 2>/dev/null" "grep -v ${ARGS}"
 
 ARGS='élève'
-assertOutputValue "count matching lines (-c)" "./ugrep -c ${ARGS} ${UFILE} 2>/dev/null" "grep -c ${ARGS} ${FILE}" "-eq"
+assertOutputCommand "count matching lines (-c)" "./ugrep -c ${ARGS} ${UFILE} 2>/dev/null" "grep -c ${ARGS} ${FILE}" "-eq"
 ARGS='élève'
-assertOutputValue "count non-matching lines (-vc)" "./ugrep -vc ${ARGS} ${UFILE} 2>/dev/null" "grep -vc ${ARGS} ${FILE}" "-eq"
+assertOutputCommand "count non-matching lines (-vc)" "./ugrep -vc ${ARGS} ${UFILE} 2>/dev/null" "grep -vc ${ARGS} ${FILE}" "-eq"
 
 # ./ugrep -q élève test/utf8_eleve.txt 2>/dev/null
 # assertTrue "[[ $? -eq 0 ]]"
@@ -47,11 +47,11 @@ assertExitValue "exit value with no lines selected" "./ugrep -q zzz ${UFILE} 2>/
 assertExitValue "exit value with error and no more file" "./ugrep -q élève /unexistant 2>/dev/null" 1 "-gt"
 
 ARGS='--color=never élève'
-assertOutputValue "file with match (-l)" "./ugrep -l ${ARGS} ${FILE} 2>/dev/null" "grep -l ${ARGS} ${FILE}"
-assertOutputValue "file without match (-L)" "./ugrep -L ${ARGS} ${FILE} 2>/dev/null" "grep -L ${ARGS} ${FILE}"
+assertOutputCommand "file with match (-l)" "./ugrep -l ${ARGS} ${FILE} 2>/dev/null" "grep -l ${ARGS} ${FILE}"
+assertOutputCommand "file without match (-L)" "./ugrep -L ${ARGS} ${FILE} 2>/dev/null" "grep -L ${ARGS} ${FILE}"
 
 ARGS='--color=never zzz'
-assertOutputValue "file with match (-l)" "./ugrep -l ${ARGS} ${FILE} 2>/dev/null" "grep -l ${ARGS} ${FILE}"
-assertOutputValue "file without match (-L)" "./ugrep -L ${ARGS} ${FILE} 2>/dev/null" "grep -L ${ARGS} ${FILE}"
+assertOutputCommand "file with match (-l)" "./ugrep -l ${ARGS} ${FILE} 2>/dev/null" "grep -l ${ARGS} ${FILE}"
+assertOutputCommand "file without match (-L)" "./ugrep -L ${ARGS} ${FILE} 2>/dev/null" "grep -L ${ARGS} ${FILE}"
 
 exit $?

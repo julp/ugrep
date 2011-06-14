@@ -113,7 +113,7 @@ static UBool stdio_has_encoding(void *UNUSED(data))
     return TRUE; // Each UFILE has it's own converter which is system default codepage by default
 }
 
-static const char *stdio_get_encoding(void *data)
+static const char *stdio_get_encoding(error_t **error, void *data)
 {
     UErrorCode status;
     const char *encoding;
@@ -124,8 +124,8 @@ static const char *stdio_get_encoding(void *data)
     if (U_SUCCESS(status)) {
         return encoding;
     } else {
-        //icu_error_set(error, FATAL, status, "ucnv_getName");
-        return "ucnv_getName() failed";
+        icu_error_set(error, FATAL, status, "ucnv_getName");
+        return NULL;
     }
 }
 
