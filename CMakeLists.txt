@@ -21,7 +21,7 @@ find_package(ICU REQUIRED)
 find_package(ZLIB)
 find_package(BZip2)
 
-set(COMMON_BASE_SOURCES alloc.c ustring.c io/mmio.c io/stdio.c io/string.c error.c fd.c util.c)
+set(COMMON_BASE_SOURCES alloc.c ustring.c io/mmap.c io/stdio.c io/string.c error.c reader.c util.c)
 set(EXTRA_SOURCES "")
 set(EXTRA_LIBS "")
 
