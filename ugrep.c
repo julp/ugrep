@@ -880,11 +880,11 @@ static int procfile(reader_t *reader, const char *filename)
 #if defined(NO_COLOR) || !defined(_MSC_VER)
                             u_fputs(l->ustr->ptr, ustdout);
 #else
-                            if (ENGINE_WHOLE_LINE_MATCH == l->ret && _colorize && *colors[LINE_MATCH].value) {
+                            if (ENGINE_WHOLE_LINE_MATCH == l->ret && _colorize && colors[LINE_MATCH].value) {
                                 console_apply_color(LINE_MATCH);
                                 u_fputs(l->ustr->ptr, ustdout);
                                 console_reset(LINE_MATCH);
-                            } else if (l->pattern_matches /* > 0 */ && _colorize && *colors[SINGLE_MATCH].value) {
+                            } else if (l->pattern_matches /* > 0 */ && _colorize && colors[SINGLE_MATCH].value) {
                                 slist_element_t *e;
                                 int32_t last = 0;
 
@@ -923,11 +923,11 @@ static int procfile(reader_t *reader, const char *filename)
 #if defined(NO_COLOR) || !defined(_MSC_VER)
                         u_fputs(ustr->ptr, ustdout);
 #else
-                        if (ENGINE_WHOLE_LINE_MATCH == line->ret && _colorize && *colors[LINE_MATCH].value) {
+                        if (ENGINE_WHOLE_LINE_MATCH == line->ret && _colorize && colors[LINE_MATCH].value) {
                             console_apply_color(LINE_MATCH);
                             u_fputs(ustr->ptr, ustdout);
                             console_reset(LINE_MATCH);
-                        } else if (line->pattern_matches /* > 0 */ && _colorize && *colors[SINGLE_MATCH].value) {
+                        } else if (line->pattern_matches /* > 0 */ && _colorize && colors[SINGLE_MATCH].value) {
                             slist_element_t *e;
                             int32_t last = 0;
 
