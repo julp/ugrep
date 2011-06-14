@@ -112,32 +112,14 @@ static int32_t mmap_readuchars(error_t **error, void *data, UChar *buffer, size_
 {
     FETCH_DATA(data, this, mmfd_t);
 
-    STRING_READUCHARS(error, this->ptr, this->end, this->ucnv, buffer, max_len);
+    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len);
 }
 
 static int32_t mmap_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
 {
-    UChar32 c;
-    int32_t i, len;
-    UErrorCode status;
     FETCH_DATA(data, this, mmfd_t);
 
-    status = U_ZERO_ERROR;
-    len = this->len > max_len ? max_len : this->len;
-    for (i = 0; i < len; i++) {
-        c = ucnv_getNextUChar(this->ucnv, (const char **) &this->ptr, this->end, &status);
-        if (U_FAILURE(status)) {
-            if (U_INDEX_OUTOFBOUNDS_ERROR == status) {
-                break;
-            } else {
-                icu_error_set(error, FATAL, status, "ucnv_getNextUChar");
-                return -1;
-            }
-        }
-        buffer[i] = c;
-    }
-
-    return i;
+    STRING_READUCHARS32(error, this->ucnv, this->ptr, this->end, buffer, max_len);
 }
 
 static void mmap_rewind(void *data, int32_t signature_length)

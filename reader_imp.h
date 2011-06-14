@@ -19,22 +19,41 @@ typedef struct {
     void (*rewind)(void *, int32_t); /* Caller must provide BOM length (as 2nd argument) */
 } reader_imp_t;
 
-# define STRING_READUCHARS(error, ptr, end, ucnv, buffer, max_len)                            \
-    do {                                                                                      \
-        UErrorCode status;                                                                    \
-        UChar *dest;                                                                          \
-        const UChar *uend;                                                                    \
-                                                                                              \
-        status = U_ZERO_ERROR;                                                                \
-        dest = buffer;                                                                        \
-        uend = buffer + max_len;                                                              \
-        ucnv_toUnicode(ucnv, &dest, uend, (const char **) &ptr, end, NULL, FALSE, &status);   \
-        if (U_FAILURE(status)) {                                                              \
-            icu_error_set(error, FATAL, status, "ucnv_toUnicode");                            \
-            return -1;                                                                        \
-        }                                                                                     \
-                                                                                              \
-        return dest - buffer;                                                                 \
+# define STRING_READUCHARS(error, ucnv, ptr, end, buffer, max_len)                          \
+    do {                                                                                    \
+        UErrorCode status;                                                                  \
+        UChar *dest;                                                                        \
+        const UChar *uend;                                                                  \
+                                                                                            \
+        status = U_ZERO_ERROR;                                                              \
+        dest = buffer;                                                                      \
+        uend = buffer + max_len;                                                            \
+        ucnv_toUnicode(ucnv, &dest, uend, (const char **) &ptr, end, NULL, FALSE, &status); \
+        if (U_FAILURE(status)) {                                                            \
+            icu_error_set(error, FATAL, status, "ucnv_toUnicode");                          \
+            return -1;                                                                      \
+        }                                                                                   \
+                                                                                            \
+        return dest - buffer;                                                               \
+    } while (0);
+
+# define STRING_READUCHARS32(error, ucnv, ptr, end, buffer, max_len)         \
+    do {                                                                     \
+        UChar32 c;                                                           \
+        int32_t i;                                                           \
+        UErrorCode status;                                                   \
+                                                                             \
+        status = U_ZERO_ERROR;                                               \
+        for (i = 0; i < max_len && ptr < end; i++) {                         \
+            c = ucnv_getNextUChar(ucnv, (const char **) &ptr, end, &status); \
+            if (U_FAILURE(status)) {                                         \
+                icu_error_set(error, FATAL, status, "ucnv_getNextUChar");    \
+                return -1;                                                   \
+            }                                                                \
+            buffer[i] = c;                                                   \
+        }                                                                    \
+                                                                             \
+        return i;                                                            \
     } while (0);
 
 # define STRING_GET_ENCODING(error, ucnv)                        \
