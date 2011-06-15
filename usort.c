@@ -20,9 +20,6 @@ enum {
 
 /* ========== global variables ========== */
 
-#define POINTER_TO_INT(p)   ((int) (long) (p))
-#define INT_TO_POINTER(i)   ((void *) (long) (i))
-
 RBTree *tree = NULL;
 UCollator *ucol = NULL;
 
@@ -133,16 +130,18 @@ static int procfile(reader_t *reader, const char *filename)
             if (uFlag) {
                 rbtree_insert(tree, ustr, NULL);
             } else {
-                // TODO: find better
-                void *old;
-                int *count;
+                int *p;
+                int side;
+                void *res;
+                RBTreeNode *parent;
 
-                count = mem_new(*count);
-                *count = 1;
-                if (!rbtree_insert_ex(tree, ustr, count, &old)) {
-                    int *x = (int *) old;
-                    *x = *x + 1;
-                    free(count);
+                if (0 == rbtree_lookup_node(tree, ustr, &parent, &side, &res)) {
+                    p = mem_new(*p);
+                    *p = 1;
+                    rbtree_insert_node(tree, (RBTreeNode*) res, p, parent, side);
+                } else {
+                    p = (int *) res;
+                    *p = *p + 1;
                 }
             }
         }
@@ -243,7 +242,7 @@ Insensible aux accents et à la casse : Collator::STRENGTH à Collator::PRIMARY 
     argv += optind;
 
 //     if (ALL == wanted) {
-        tree = rbtree_new(usort_cmp_func[!!rFlag], ustring_destroy, uFlag ? NULL : free);
+        tree = rbtree_new(usort_cmp_func[!!rFlag], (func_dtor_t) ustring_destroy, uFlag ? NULL : free);
 //     }
 
     if (0 == argc) {

@@ -26,7 +26,11 @@
 #else
 # define IN_BUFFER_SIZE 1024
 #endif
-#define OUT_BUFFER_SIZE  2*IN_BUFFER_SIZE
+/**
+ * 2*IN_BUFFER_SIZE because each char may be converted into a surrogate pair
+ * (trailing \0 not counted)
+ **/
+#define OUT_BUFFER_SIZE 2*IN_BUFFER_SIZE
 
 enum {
     UTR_EXIT_SUCCESS = 0,

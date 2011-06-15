@@ -6,7 +6,7 @@ typedef enum {
     RED   = 1
 } RBTColor;
 
-typedef struct _RBTreeNode
+struct _RBTreeNode
 {
     void *key;
     void *value;
@@ -14,7 +14,7 @@ typedef struct _RBTreeNode
     struct _RBTreeNode *right;
     struct _RBTreeNode *parent;
     RBTColor color;
-} RBTreeNode;
+};
 
 /*static const RBTreeNode nil = {
     NULL,
@@ -120,41 +120,60 @@ static void _rbtreenode_rotate_right(RBTree *tree, RBTreeNode *node) /* NONNULL(
     node->parent = p;
 }
 
-int rbtree_insert_ex(RBTree *tree, void *key, void *new_value, void **old_value) /* NONNULL(1) */
+enum {
+    RIGHT,
+    LEFT
+};
+
+int rbtree_lookup_node(RBTree *tree, void *key, RBTreeNode **parent, int *side, void **res) /* NONNULL(1, 3, 4, 5) */
 {
-    int cmp;
-    RBTreeNode *x, *y, *new, *parent;
+    RBTreeNode *node = tree->root;
 
-    require_else_return_zero(NULL != tree);
+    require_else_return_zero(tree != NULL);
+    require_else_return_zero(parent != NULL);
+    require_else_return_zero(side != NULL);
+    require_else_return_zero(res != NULL);
 
-    y = NULL;
-    x = tree->root;
-    while (NULL != x) {
-        y = x;
-        cmp = tree->cmp_func(key, x->key);
+    *parent = NULL;
+    *side = RIGHT;
+
+    while (NULL != node) {
+        int cmp = tree->cmp_func(key, node->key);
         if (0 == cmp) {
-            if (NULL != old_value) {
-                *old_value = x->value;
-            }
-            return 0;
-        } else if (cmp < 0) {
-            x = x->left;
-        } else /*if (cmp > 0)*/ {
-            x = x->right;
+            *res = node->value;
+            return 1;
+        }
+        *parent = node;
+        if (cmp > 0) {
+            *side = LEFT;
+            node = node->left;
+        } else {
+            *side = RIGHT;
+            node = node->right;
         }
     }
-    new =_rbtreenode_new(key, new_value);
-    new->parent = y;
-    if (NULL == y) {
+
+    *res = _rbtreenode_new(key, NULL);
+    return 0;
+}
+
+int rbtree_insert_node(RBTree *tree, RBTreeNode *new, void *value, RBTreeNode *parent, int side) /* NONNULL(1, 2) */
+{
+    require_else_return_zero(NULL != tree);
+    require_else_return_zero(NULL != new);
+
+    new->parent = parent;
+    new->value = value;
+    if (NULL == parent) {
         tree->first = tree->last = tree->root = new;
-    } else if (tree->cmp_func(key, y->key) < 0) {
-        y->left = new;
-        if (y == tree->first) {
+    } else if (LEFT == side) {
+        parent->left = new;
+        if (parent == tree->first) {
             tree->first = new;
         }
     } else {
-        y->right = new;
-        if (y == tree->last) {
+        parent->right = new;
+        if (parent == tree->last) {
             tree->last = new;
         }
     }
@@ -210,9 +229,18 @@ int rbtree_insert_ex(RBTree *tree, void *key, void *new_value, void **old_value)
 
 int rbtree_insert(RBTree *tree, void *key, void *value) /* NONNULL(1) */
 {
+    int side;
+    void *new;
+    RBTreeNode *parent;
+
     require_else_return_zero(NULL != tree);
 
-    return rbtree_insert_ex(tree, key, value, NULL);
+    if (0 == rbtree_lookup_node(tree, key, &parent, &side, &new)) {
+        return rbtree_insert_node(tree, (RBTreeNode *) new, value, parent, side);
+    } else {
+        return 0;
+    }
+
 }
 
 static void _rbtree_destroy(RBTree *tree, RBTreeNode *node) /* NONNULL(1) */
