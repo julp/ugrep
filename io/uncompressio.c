@@ -150,57 +150,28 @@ static void compressed_rewind(void *data, int32_t signature_length)
 {
     FETCH_DATA(data, this, compressedfd_t);
 
-    this->ptr = this->start + signature_length;
+    STRING_REWIND(this->start, this->ptr, signature_length);
 }
 
 static UBool compressed_readline(error_t **error, void *data, UString *ustr)
 {
-    UChar32 c;
-    UErrorCode status;
     FETCH_DATA(data, this, compressedfd_t);
 
-    status = U_ZERO_ERROR;
-    do {
-        c = ucnv_getNextUChar(this->ucnv, (const char **) &this->ptr, this->end, &status);
-        if (U_FAILURE(status)) {
-            if (U_INDEX_OUTOFBOUNDS_ERROR == status) { // c == U_EOF
-                /*if (!ustring_empty(ustr)) {
-                    break;
-                } else {
-                    return FALSE;
-                }*/
-                break;
-            } else {
-                icu_error_set(error, FATAL, status, "ucnv_getNextUChar");
-                return FALSE;
-            }
-        }
-        ustring_append_char(ustr, c);
-    } while (U_LF != c);
-
-    return TRUE;
+    STRING_READLINE(error, this->ucnv, this->ptr, this->end, ustr);
 }
 
 static size_t compressed_readbytes(void *data, char *buffer, size_t max_len)
 {
-    size_t n;
     FETCH_DATA(data, this, compressedfd_t);
 
-    if (this->len > max_len) {
-        n = max_len;
-    } else {
-        n = this->len;
-    }
-    memcpy(buffer, this->ptr, n);
-
-    return n;
+    STRING_READBYTES(this->ptr, this->end, buffer, max_len);
 }
 
 static UBool compressed_has_encoding(void *data)
 {
     FETCH_DATA(data, this, compressedfd_t);
 
-    return NULL != this->ucnv;
+    STRING_HAS_ENCODING(this->ucnv);
 }
 
 static const char *compressed_get_encoding(error_t **error, void *data)
@@ -212,28 +183,21 @@ static const char *compressed_get_encoding(error_t **error, void *data)
 
 static UBool compressed_set_encoding(error_t **error, void *data, const char *encoding)
 {
-    UErrorCode status;
     FETCH_DATA(data, this, compressedfd_t);
 
-    status = U_ZERO_ERROR;
-    this->ucnv = ucnv_open(encoding, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ucnv_open");
-    }
-
-    return U_SUCCESS(status);
+    STRING_SET_ENCODING(error, this->ucnv, encoding);
 }
 
 static UBool compressed_eof(void *data)
 {
     FETCH_DATA(data, this, compressedfd_t);
 
-    return this->ptr >= this->end;
+    STRING_EOF(this->ptr, this->end);
 }
 
 static UBool compressed_seekable(void *UNUSED(data))
 {
-    return TRUE;
+    STRING_SEEKABLE();
 }
 
 

@@ -19,22 +19,49 @@ typedef struct {
     void (*rewind)(void *, int32_t); /* Caller must provide BOM length (as 2nd argument) */
 } reader_imp_t;
 
-# define STRING_READUCHARS(error, ucnv, ptr, end, buffer, max_len)                          \
-    do {                                                                                    \
-        UErrorCode status;                                                                  \
-        UChar *dest;                                                                        \
-        const UChar *uend;                                                                  \
-                                                                                            \
-        status = U_ZERO_ERROR;                                                              \
-        dest = buffer;                                                                      \
-        uend = buffer + max_len;                                                            \
-        ucnv_toUnicode(ucnv, &dest, uend, (const char **) &ptr, end, NULL, FALSE, &status); \
-        if (U_FAILURE(status)) {                                                            \
-            icu_error_set(error, FATAL, status, "ucnv_toUnicode");                          \
-            return -1;                                                                      \
-        }                                                                                   \
-                                                                                            \
-        return dest - buffer;                                                               \
+/*static inline int min(int a, int b)
+{
+    return (a > b) ? a : b;
+}*/
+
+# define STRING_REWIND(start, ptr, signature_length) \
+    do {                                             \
+        ptr = start + signature_length;              \
+    } while (0);
+
+# define STRING_READBYTES(ptr, end, buffer, max_len) \
+    do {                                             \
+        size_t n;                                    \
+                                                     \
+        if (end - ptr > max_len) {                   \
+            n = max_len;                             \
+        } else {                                     \
+            n = end - ptr;                           \
+        }                                            \
+        memcpy(buffer, ptr, n);                      \
+        ptr += n;                                    \
+                                                     \
+        return n;                                    \
+    } while (0);
+
+# define STRING_READUCHARS(error, ucnv, ptr, end, buffer, max_len)                               \
+    do {                                                                                         \
+        UErrorCode status;                                                                       \
+        UChar *dest;                                                                             \
+        const UChar *uend;                                                                       \
+                                                                                                 \
+        require_else_return_val(max_len >= 2, -1);                                               \
+                                                                                                 \
+        status = U_ZERO_ERROR;                                                                   \
+        dest = buffer;                                                                           \
+        uend = buffer + max_len + 1 /* Trailing \0 */;                                           \
+        ucnv_toUnicode(ucnv, &dest, uend, (const char **) &ptr, end, NULL, ptr >= end, &status); \
+        if (U_FAILURE(status) && U_BUFFER_OVERFLOW_ERROR != status) {                            \
+            icu_error_set(error, FATAL, status, "ucnv_toUnicode");                               \
+            return -1;                                                                           \
+        }                                                                                        \
+                                                                                                 \
+        return dest - buffer;                                                                    \
     } while (0);
 
 # define STRING_READUCHARS32(error, ucnv, ptr, end, buffer, max_len)         \
@@ -56,6 +83,33 @@ typedef struct {
         return i;                                                            \
     } while (0);
 
+# define STRING_READLINE(error, ucnv, ptr, end, ustr)                         \
+    do {                                                                      \
+        UChar32 c;                                                            \
+        UErrorCode status;                                                    \
+                                                                              \
+        status = U_ZERO_ERROR;                                                \
+        do {                                                                  \
+            c = ucnv_getNextUChar(ucnv, (const char **) &ptr, end, &status);  \
+            if (U_FAILURE(status)) {                                          \
+                if (U_INDEX_OUTOFBOUNDS_ERROR == status) { /* c == U_EOF */   \
+                    break;                                                    \
+                } else {                                                      \
+                    icu_error_set(error, FATAL, status, "ucnv_getNextUChar"); \
+                    return FALSE;                                             \
+                }                                                             \
+            }                                                                 \
+            ustring_append_char(ustr, c);                                     \
+        } while (U_LF != c);                                                  \
+                                                                              \
+        return TRUE;                                                          \
+    } while (0);
+
+# define STRING_HAS_ENCODING(ucnv) \
+    do {                           \
+        return NULL != ucnv;       \
+    } while (0);
+
 # define STRING_GET_ENCODING(error, ucnv)                        \
     do {                                                         \
         UErrorCode status;                                       \
@@ -69,6 +123,29 @@ typedef struct {
             icu_error_set(error, FATAL, status, "ucnv_getName"); \
             return NULL;                                         \
         }                                                        \
+    } while (0);
+
+# define STRING_SET_ENCODING(error, ucnv, encoding) \
+    do {                                            \
+        UErrorCode status;                                    \
+                                                              \
+        status = U_ZERO_ERROR;                                \
+        ucnv = ucnv_open(encoding, &status);                  \
+        if (U_FAILURE(status)) {                              \
+            icu_error_set(error, FATAL, status, "ucnv_open"); \
+        }                                                     \
+                                                              \
+        return U_SUCCESS(status);                             \
+    } while (0);
+
+# define STRING_EOF(ptr, end) \
+    do {                      \
+        return ptr >= end;    \
+    } while (0);
+
+# define STRING_SEEKABLE() \
+    do {                   \
+        return TRUE;       \
     } while (0);
 
 #endif /* READER_H */

@@ -11,11 +11,18 @@
 #include "common.h"
 
 /**
- * TODO: readers and/or utr should assume to don't cut on the middle of a code point (= 2 code units)
+ * TODO:
+ * - use UChar32 for from and to? (u_strToUTF32?)
+ * - consider cFlag
+ * - the case: set1_type == STRING && set2_type == FUNCTION
  **/
 
 #ifdef DEBUG
-# define IN_BUFFER_SIZE 200 /* Voluntarily small for development/test */
+/**
+ * Voluntarily small for development/test
+ * Unit: code unit/UChar, so minimum is 2 not 1! (don't take care of trailing \0)
+ **/
+# define IN_BUFFER_SIZE 2
 #else
 # define IN_BUFFER_SIZE 1024
 #endif
@@ -359,7 +366,9 @@ int main(int argc, char **argv)
 
     while (!reader_eof(&reader)) {
         out_length = 0;
-        in_length = reader_readuchars(&reader, NULL, in, IN_BUFFER_SIZE);
+        if (-1 == (in_length = reader_readuchars(&reader, &error, in, IN_BUFFER_SIZE))) {
+            print_error(error);
+        }
         in[in_length] = 0;
         if (CLASS == set1_type || FUNCTION == set1_type) {
             int i;
