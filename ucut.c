@@ -18,9 +18,21 @@ enum {
     UCUT_EXIT_USAGE
 };
 
+enum {
+    FIELD_NO_ERR = 0,
+    FIELD_ERR_NUMBER_EXPECTED, // s == *endptr
+    FIELD_ERR_OUT_OF_RANGE,    // number <= 0 or number > INT_MAX
+    FIELD_ERR_NON_DIGIT_FOUND, // *endptr not in ('\0', ',')
+    FIELD_ERR_INVALID_RANGE,   // lower_limit > upper_limit
+    FIELD_ERR__COUNT
+};
+
 /* ========== global variables ========== */
 
-int from, to;
+UBool cFlag = FALSE;
+UBool fFlag = FALSE;
+
+UChar32 delim = 0x0000;
 UString *ustr = NULL;
 
 /* ========== getopt stuff ========== */
@@ -35,6 +47,8 @@ static char optstr[] = "d:f:";
 
 static struct option long_options[] =
 {
+    {"bytes",           required_argument, NULL, 'b'}, // no sense? ignore?
+    {"characters",      required_argument, NULL, 'c'},
     {"delimiter",       required_argument, NULL, 'd'},
     {"fields",          required_argument, NULL, 'f'},
     {"version",         no_argument,       NULL, 'v'},
@@ -53,14 +67,34 @@ static void usage(void)
 
 /* ========== cutter ========== */
 
-static int /*pieces_length*/ engine_fixed_split(void *data, int from, int to, void/*?*/ *pieces)
+#if 0
+static int /*pieces_length*/ engine_fixed_split(void *data, void/*?*/ *positions, void/*?*/ *pieces)
 {
     // ustring_sync_copy with a ratio of 2 ?
     // dynamic array of UChar * ?
     // list (slist_t) ?
 }
 
+static int /*pieces_length*/ split_on_length(void/*?*/ *positions, void/*?*/ *pieces)
+{
+    // ustring_sync_copy with a ratio of 2 ?
+    // dynamic array of UChar * ?
+    // list (slist_t) ?
+}
+#endif
+
 /* ========== main ========== */
+
+#ifndef HAVE_STRCHRNUL
+static char *strchrnul(const char *s, int c)
+{
+    while (('\0' != *s) && (*s != c)) {
+        s++;
+    }
+
+    return (char *) s;
+}
+#endif /* HAVE_STRCHRNUL */
 
 static int parseInt(const char *s, char **endptr, int *ret)
 {
@@ -75,6 +109,61 @@ static int parseInt(const char *s, char **endptr, int *ret)
         return 0;
     }
     *ret = (int) val;
+
+    return 1;
+}
+
+static int parseFields(const char *s/*, void *positions*/)
+{
+    char *p, *comma;
+    char *endptr;
+    int lower_limit;
+    int upper_limit;
+
+    p = s;
+    while ('\0' != *p) {
+        lower_limit = 0;
+        upper_limit = INT_MAX;
+        comma = strchrnul(p, ',');
+        if ('-' == *p) {
+            /* -Y */
+            if (!parseInt(p + 1, &endptr, &upper_limit) || ('\0' != *endptr && ',' != *endptr)) {
+                return 0;
+            }
+        } else {
+            if (NULL == memchr(p, '-', comma - p)) {
+                /* X */
+                if (!parseInt(p, &endptr, &lower_limit) || ('\0' != *endptr && ',' != *endptr)) {
+                    return 0;
+                }
+                upper_limit = lower_limit;
+            } else {
+                /* X- or X-Y */
+                if (!parseInt(p, &endptr, &lower_limit)) {
+                    return 0;
+                }
+                if ('-' == *endptr) {
+                    if ('\0' == *(endptr + 1)) {
+                        // NOP (lower_limit = 0)
+                    } else {
+                        if (!parseInt(endptr + 1, &endptr, &upper_limit) || ('\0' != *endptr && ',' != *endptr)) {
+                            return 0;
+                        }
+                    }
+                } else {
+                    return 0;
+                }
+            }
+            if (lower_limit >/*=*/ upper_limit) {
+                return 0;
+            }
+        }
+        debug("Interval is [%d;%d]", lower_limit, upper_limit);
+        if ('\0' == *comma) {
+            break;
+        }
+        p = comma + 1;
+    }
 
     return 1;
 }
@@ -127,59 +216,21 @@ int main(int argc, char **argv)
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
+            case 'b':
+                debug("parseFields = %d", parseFields(optarg));
+                break;
+            case 'c':
+                cFlag = TRUE;
+                debug("parseFields = %d", parseFields(optarg));
+                break;
             case 'd':
+                // assumes u_countChar32 == 1
                 // change delimiter
                 break;
             case 'f':
-            {
-                char *endptr;
-
-                if (*optarg == '-') {
-                    /* -Y */
-                    // parseInt(optarg+1) ; *endptr = '\0'
-                    if (!parseInt(optarg + 1, &endptr, &to) || '\0' != *endptr) {
-                        goto invalid_fields;
-                    }
-                    from = -1;
-                } else {
-                    if (NULL == strchr(optarg, '-')) {
-                        /* X */
-                        // parseInt(optarg) ; *endptr = '\0'
-                        if (!parseInt(optarg, &endptr, &from) || '\0' != *endptr) {
-                            goto invalid_fields;
-                        }
-                        to = from;
-                    } else {
-                        /* X- or X-Y */
-                        // parseInt(optarg)
-                        // *endptr = '-'
-                        // optarg++
-                        // X-: if (*endptr = '\0') { NOP }
-                        // X-Y: else { parseInt(optarg) }
-                        if (!parseInt(optarg, &endptr, &from)) {
-                            goto invalid_fields;
-                        }
-                        if ('-' == *endptr) {
-                            if ('\0' == *(endptr + 1)) {
-                                to = -1;
-                            } else {
-                                if (!parseInt(endptr + 1, &endptr, &to) || '\0' != *endptr) {
-                                    goto invalid_fields;
-                                }
-                            }
-                        } else {
-                            goto invalid_fields;
-                        }
-                    }
-                }
-                /*if (to != -1 && from > to) {
-                    goto invalid_fields;
-                }*/
+                fFlag = TRUE;
+                debug("parseFields = %d", parseFields(optarg));
                 break;
-invalid_fields:
-                fprintf(stderr, "Invalid field(s)\n");
-                return UCUT_EXIT_USAGE;
-            }
             case READER_OPT:
                 if (!reader_set_imp_by_name(&reader, optarg)) {
                     fprintf(stderr, "Unknown reader\n");
@@ -196,6 +247,13 @@ invalid_fields:
     }
     argc -= optind;
     argv += optind;
+
+    if (cFlag && fFlag) {
+        usage();
+    }
+    if (!cFlag && !fFlag) {
+        usage();
+    }
 
     ustr = ustring_new();
 
