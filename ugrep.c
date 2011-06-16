@@ -129,6 +129,11 @@ UBool colorize = TRUE;
 #endif /* !NO_COLOR */
 UBool line_print = TRUE;
 
+static int return_values[2/*error?*/][2/*matches?*/] = {
+    { UGREP_EXIT_FAILURE, UGREP_EXIT_MATCH },
+    { UGREP_EXIT_NO_MATCH, UGREP_EXIT_MATCH }
+};
+
 /* ========== general helper functions ========== */
 
 static UBool is_pattern(const UChar *pattern)
@@ -724,7 +729,7 @@ void fixed_circular_list_print(fixed_circular_list_t *l) /* NONNULL() */
 }
 #endif /* DEBUG */
 
-static int procfile(reader_t *reader, const char *filename)
+static int procfile(reader_t *reader, const char *filename, int *matches)
 {
     UString *ustr;
     error_t *error;
@@ -760,6 +765,7 @@ static int procfile(reader_t *reader, const char *filename)
             ustr = line->ustr;
             if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
+                return 1;
             }
             pattern_matches = 0;
             reader->lineno++;
@@ -796,6 +802,7 @@ static int procfile(reader_t *reader, const char *filename)
                 }
                 if (ENGINE_FAILURE == ret) {
                     print_error(error);
+                    return 1;
                 } else if (ENGINE_WHOLE_LINE_MATCH == ret) {
                     pattern_matches++;
                     break; // no need to continue (line level)
@@ -974,20 +981,22 @@ endfile:
         reader_close(reader);
     } else {
         print_error(error);
+        return 1;
     }
+    *matches += arg_matches;
 
-    return arg_matches;
+    return 0;
 }
 
 #ifndef WITHOUT_FTS
-static int procdir(reader_t *reader, char **dirname)
+static int procdir(reader_t *reader, char **dirname, int *matches)
 {
+    int ret;
     FTS *fts;
     FTSENT *p;
-    int matches;
     int ftsflags;
 
-    matches = 0;
+    ret = 0;
     /*ftsflags = 0;
     if (Hflag)
         ftsflags = FTS_COMFOLLOW;
@@ -1010,13 +1019,13 @@ static int procdir(reader_t *reader, char **dirname)
             case FTS_DP:
                 break;
             default:
-                matches += procfile(reader, p->fts_path);
+                ret |= procfile(reader, p->fts_path, matches);
                 break;
         }
     }
     fts_close(fts);
 
-    return matches;
+    return ret;
 }
 #endif /* !WITHOUT_FTS */
 
@@ -1054,6 +1063,7 @@ int main(int argc, char **argv)
 #endif /* !NO_COLOR */
 
     int c;
+    int ret;
     int lastc;
     UBool newarg;
     int prevoptind;
@@ -1071,6 +1081,7 @@ int main(int argc, char **argv)
     error_t *error;
     int pattern_type; // -E/F
 
+    ret = 0;
     matches = 0;
     error = NULL;
     wFlag = FALSE;
@@ -1308,16 +1319,16 @@ int main(int argc, char **argv)
 #endif /* !NO_COLOR */
 
     if (0 == argc) {
-        matches = procfile(&reader, "-");
+        ret |= procfile(&reader, "-", &matches);
 #ifndef WITHOUT_FTS
     } else if (rFlag) {
-        matches = procdir(&reader, argv);
+        ret |= procdir(&reader, argv, &matches);
 #endif /* !WITHOUT_FTS */
     } else {
         for ( ; argc--; ++argv) {
-            matches += procfile(&reader, *argv);
+            ret |= procfile(&reader, *argv, &matches);
         }
     }
 
-    return (matches > 0 ? UGREP_EXIT_MATCH : UGREP_EXIT_NO_MATCH);
+    return return_values[0 == ret][matches > 0];
 }
