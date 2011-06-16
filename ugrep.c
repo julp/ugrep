@@ -23,9 +23,9 @@
 #define SEP_NO_MATCH_UCHAR 0x002d
 
 #ifdef _MSC_VER
-const UChar EOL[] = {U_CR, U_LF, U_NUL};
+const UChar EOL[] = {U_CR, U_LF, 0};
 #else
-const UChar EOL[] = {U_LF, U_NUL};
+const UChar EOL[] = {U_LF, 0};
 #endif /* _MSC_VER */
 const size_t EOL_LEN = ARRAY_SIZE(EOL) - 1;
 
@@ -160,7 +160,7 @@ static UBool is_pattern(const UChar *pattern)
         0x007c, // |
         0x003a, // :
         0x002d, // -
-        U_NUL
+        0
     };
 
     return (NULL != u_strpbrk(pattern, meta));
@@ -395,7 +395,7 @@ typedef struct {
     int bg;
 } attr_t;
 
-static const UChar reset[] = {0x001b, 0x005b, 0x0030, 0x006d, U_NUL};
+static const UChar reset[] = {0x001b, 0x005b, 0x0030, 0x006d, 0};
 static const int32_t reset_len = ARRAY_SIZE(reset) - 1;
 
 attr_t attrs[] = {
@@ -429,15 +429,15 @@ typedef struct {
 } color_t;
 
 color_t colors[] = {
-    {"single-match",  {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0034, 0x006d, U_NUL}},
-    {"line-match",    {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0036, 0x006d, U_NUL}},
-    {"file-match",    {0x001b, 0x005b, 0x0033, 0x0032, 0x006d, U_NUL}},
-    {"file-no-match", {0x001b, 0x005b, 0x0033, 0x0031, 0x006d, U_NUL}},
-    {"line-number",   {0x001b, 0x005b, 0x0033, 0x0035, 0x006d, U_NUL}},
-    {"sep-match",     {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, U_NUL}},
-    {"sep-no-match",  {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, U_NUL}},
-    {"context-sep",   {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, U_NUL}},
-    {NULL,            {U_NUL}}
+    {"single-match",  {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0034, 0x006d, 0}},
+    {"line-match",    {0x001b, 0x005b, 0x0031, 0x003b, 0x0033, 0x0036, 0x006d, 0}},
+    {"file-match",    {0x001b, 0x005b, 0x0033, 0x0032, 0x006d, 0}},
+    {"file-no-match", {0x001b, 0x005b, 0x0033, 0x0031, 0x006d, 0}},
+    {"line-number",   {0x001b, 0x005b, 0x0033, 0x0035, 0x006d, 0}},
+    {"sep-match",     {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, 0}},
+    {"sep-no-match",  {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, 0}},
+    {"context-sep",   {0x001b, 0x005b, 0x0033, 0x0033, 0x006d, 0}},
+    {NULL,            {0}}
 };
 
 static UChar *u_stpncpy(UChar *dest, const UChar *src, int32_t length)
@@ -490,10 +490,10 @@ static void parse_userpref(void)
             HRESULT hr;
             LPITEMIDLIST pidl = NULL;
 
-            hr = SHGetSpecialFolderLocation (NULL, CSIDL_PROFILE, &pidl);
+            hr = SHGetSpecialFolderLocation(NULL, CSIDL_PROFILE, &pidl);
             if (hr == S_OK) {
                 SHGetPathFromIDList(pidl, home);
-                CoTaskMemFree (pidl);
+                CoTaskMemFree(pidl);
             }
         }
 # else
@@ -555,7 +555,7 @@ static void parse_userpref(void)
 # ifdef _MSC_VER
                                                 c->value = 0;
 # else
-                                                *c->value = U_NUL;
+                                                *c->value = 0;
 # endif /* _MSC_VER */
                                                 break;
                                             } else {
@@ -610,7 +610,7 @@ static void parse_userpref(void)
                                 c->value = user_attrs;
 # else
                                 if (attrs_count > 0) {
-                                    UChar prefix[] = {0x001b, 0x005b, U_NUL}, suffix[] = {0x006d, U_NUL}, sep[] = {0x003b, U_NUL};
+                                    UChar prefix[] = {0x001b, 0x005b, 0}, suffix[] = {0x006d, 0}, sep[] = {0x003b, 0};
                                     UChar *ptr, buf[MAX_SEQ_LEN], defval[MAX_SEQ_LEN];
                                     UFILE *ufp;
                                     int i, len;
@@ -625,6 +625,7 @@ static void parse_userpref(void)
                                         }
                                         for (i = 0; i < attrs_count; i++) {
                                             len = u_fprintf(ufp, "%d", user_attrs[i]);
+                                            buf[len] = 0;
                                             if (NULL == (ptr = u_stpncpy(ptr, sep, MAX_SEQ_LEN - (ptr - c->value)))) {
                                                 u_strcpy(c->value, defval); // restore default color
                                                 u_fclose(ufp);
@@ -861,7 +862,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
                     flist_element_t *el;
 
                     if ( (before_context || after_context) && last_line_print > before_context && (reader->lineno - before_context > last_line_print + 1) ) {
-                        const UChar linesep[] = {SEP_NO_MATCH_UCHAR, SEP_NO_MATCH_UCHAR, U_NUL};
+                        const UChar linesep[] = {SEP_NO_MATCH_UCHAR, SEP_NO_MATCH_UCHAR, 0};
 
 #ifndef NO_COLOR
                         console_apply_color(CONTEXT_SEP);
