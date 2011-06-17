@@ -31,7 +31,7 @@ UBool stdout_is_tty(void)
     return (isatty(STDOUT_FILENO));
 }
 
-UChar *convert_argv_from_local(const char *cargv, int32_t *uargv_length, error_t **error)
+UChar *local_to_uchar(const char *cargv, int32_t *uargv_length, error_t **error)
 {
     UChar *uargv;
     UConverter *ucnv;
@@ -62,6 +62,34 @@ UChar *convert_argv_from_local(const char *cargv, int32_t *uargv_length, error_t
     }
 
     return uargv;
+}
+
+UChar32 *local_to_uchar32(const char *cargv, int32_t *u32argv_length, error_t **error)
+{
+    UChar *u16argv;
+    UChar32 *u32argv;
+    UErrorCode status;
+    int32_t u16argv_length;
+    int32_t _u32argv_length;
+
+    if (NULL == (u16argv = local_to_uchar(cargv, &u16argv_length, error))) {
+        return NULL;
+    } else {
+        status = U_ZERO_ERROR;
+        _u32argv_length = u_countChar32(u16argv, u16argv_length);
+        u32argv = mem_new_n(*u32argv, _u32argv_length + 1);
+        u_strToUTF32(u32argv, _u32argv_length, NULL, u16argv, u16argv_length, &status);
+        if (U_FAILURE(status)) {
+            free(u16argv);
+            free(u32argv);
+        }
+        //u32argv[_u32argv_length] = 0;
+        free(u16argv);
+        if (NULL != u32argv_length) {
+            *u32argv_length = _u32argv_length;
+        }
+        return u32argv;
+    }
 }
 
 void print_error(error_t *error)

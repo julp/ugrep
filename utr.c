@@ -12,9 +12,7 @@
 
 /**
  * TODO:
- * - use UChar32 for from and to? (u_strToUTF32?)
- * - consider cFlag
- * - the case: set1_type == STRING && set2_type == FUNCTION
+ * - consider cFlag (complemente/negate)
  **/
 
 #ifdef DEBUG
@@ -48,9 +46,9 @@ enum {
 /*
 set1 | set2 | note
 
-char | char     | strtr
-char | string   | forbidden
-char | class    | impossible
+char | char | strtr
+char | string | forbidden
+char | class | impossible
 char | function | ok
 
 string | char     | strtr
@@ -67,6 +65,11 @@ function | char     | ok
 function | string   | forbidden
 function | class    | impossible
 function | function | ok
+
+char: UChar32
+string: UChar32 *
+class: UChar *
+function: - (stay with char *)
 */
 
 typedef UBool (*filter_func_t)(UChar32);
@@ -151,7 +154,7 @@ USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
     int32_t upattern_length;
 
     status = U_ZERO_ERROR;
-    if (NULL == (upattern = convert_argv_from_local(cpattern, &upattern_length, error))) {
+    if (NULL == (upattern = local_to_uchar(cpattern, &upattern_length, error))) {
         return NULL;
     }
     uset = uset_openPattern(upattern, upattern_length, &status);
@@ -169,31 +172,29 @@ USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
     return uset;
 }
 
-// use an hashtable and read 'from' and 'to' as UChar32 for performance ?
+// use an hashtable for performance ?
 void trtr(
-    UChar *from, int32_t from_length,
-    UChar *to, int32_t to_length,
+    UChar32 *from, int32_t from_length,
+    UChar32 *to, int32_t to_length,
     UChar *in, int32_t in_length,
     UChar *out, int32_t *out_length, int32_t out_size
 ) {
-    int cpf;
-    int i, cuf, t;
+    int i, f;
+    UChar32 ci;
     UBool isError;
-    UChar32 ci, cf, ct;
 
-    isError = FALSE;
+    isError = FALSE; // unused
     for (i = 0; i < in_length; ) {
         U16_NEXT(in, i, in_length, ci);
-        for (cpf = 0, cuf = 0; cuf < from_length; cpf++) { // fcp = from code point, fcu = from code unit
-            U16_NEXT(from, cuf, from_length, cf);
-            if (cf == ci) {
-                if (NULL != to && 0 != *to) { // dFlag off
-                    t = 0;
-                    U16_FWD_N(to, t, to_length, cpf);
-                    U16_NEXT(to, t, to_length, ct);
-                    U16_APPEND(out, *out_length, out_size, ct, isError);
+        for (f = 0; f < from_length; f++) {
+            if (from[f] == ci) {
+                if (NULL == to || 0 == *to || 0 == to_length) { // dFlag on
                     goto endinnerloop;
-                } else { // dFlag on
+                } else if (1 == to_length) { // dFlag off, to_length == 1
+                    U16_APPEND(out, *out_length, out_size, to[0], isError);
+                    goto endinnerloop;
+                } else { // dFlag off, to_length == from_length
+                    U16_APPEND(out, *out_length, out_size, to[f], isError);
                     goto endinnerloop;
                 }
             }
@@ -210,10 +211,11 @@ int main(int argc, char **argv)
     int c;
     USet *uset;
     UBool match;
-    UChar32 i32, f32, t32;
+    UChar32 i32;
     error_t *error;
     reader_t reader;
     UChar *from, *to;
+    UChar32 *from32, *to32;
     translate_func_t tr_func;
     filter_func_t filter_func;
     int set1_type, set2_type;
@@ -228,6 +230,7 @@ int main(int argc, char **argv)
     tr_func = NULL;
     from = to = NULL;
     filter_func = NULL;
+    from32 = to32 = NULL;
     isError = cFlag = dFlag = FALSE;
     exit_failure_value = UTR_EXIT_FAILURE;
 
@@ -310,14 +313,12 @@ int main(int argc, char **argv)
                 return UTR_EXIT_USAGE;
             }
         } else {
-            if (NULL == (to = convert_argv_from_local(argv[1], &to_length, &error))) {
+            if (NULL == (to32 = local_to_uchar32(argv[1], &to_length, &error))) {
                 print_error(error);
                 return UTR_EXIT_FAILURE;
             }
-            if (1 == u_countChar32(to, to_length)) {
-                int i = 0;
+            if (1 == to_length) {
                 set2_type = CHARACTER;
-                U16_GET(to, 0, i, to_length, t32);
             } else {
                 set2_type = STRING;
             }
@@ -344,14 +345,12 @@ int main(int argc, char **argv)
             return UTR_EXIT_FAILURE;
         }
     } else {
-        if (NULL == (from = convert_argv_from_local(argv[0], &from_length, &error))) {
+        if (NULL == (from32 = local_to_uchar32(argv[0], &from_length, &error))) {
             print_error(error);
             return UTR_EXIT_FAILURE;
         }
-        if (1 == u_countChar32(from, from_length)) {
-            int i = 0;
+        if (1 == from_length) {
             set1_type = CHARACTER;
-            U16_GET(from, 0, i, from_length, f32);
         } else {
             set1_type = STRING;
         }
@@ -361,18 +360,21 @@ int main(int argc, char **argv)
         if (STRING != set1_type) {
             return UTR_EXIT_FAILURE;
         } else {
-            if (u_countChar32(from, from_length) != u_countChar32(to, to_length)) {
+            if (from_length != to_length) {
                 fprintf(stderr, "Number of code points differs between sets\n");
                 return UTR_EXIT_FAILURE;
             }
         }
     }
 
+    debug("isAlpha = %d", u_isalpha(0x0001D63C));
+
     while (!reader_eof(&reader)) {
         out_length = 0;
         if (-1 == (in_length = reader_readuchars(&reader, &error, in, IN_BUFFER_SIZE))) {
             print_error(error);
         }
+        debug("in_length = %d", in_length);
         in[in_length] = 0;
         if (CLASS == set1_type || FUNCTION == set1_type) {
             int i;
@@ -389,7 +391,7 @@ int main(int argc, char **argv)
                     if (dFlag) {
                         continue;
                     } else if (CHARACTER == set2_type) {
-                        i32 = t32;
+                        i32 = to32[0];
                     } else if (FUNCTION == set2_type) {
                         i32 = tr_func(i32);
                     }
@@ -417,18 +419,21 @@ int main(int argc, char **argv)
 #endif
         } else if (FUNCTION == set2_type) {
             if (CHARACTER == set1_type) {
-                int i = 0;
-                UChar replacement[3] = { 0, 0, 0 };
-
-                t32 = tr_func(f32);
-                U16_APPEND(replacement, i, sizeof(replacement), t32, isError);
-                trtr(from, from_length, replacement, i, in, in_length, out, &out_length, OUT_BUFFER_SIZE);
+                to32 = mem_new(*to32); // we don't use \0 in fact
+                to32[0] = from32[0];
+                to_length = 1;
             } else if (STRING == set1_type) {
-                // to = function(from) (un realloc pourrait être nécessaire ?)
-                trtr(from, from_length, to, to_length, in, in_length, out, &out_length, OUT_BUFFER_SIZE);
+                int i;
+
+                to32 = mem_new_n(*to32, from_length); // we don't use \0 in fact, so forget "+ 1"
+                to_length = from_length;
+                for (i = 0; i < from_length; i++) {
+                    to32[i] = tr_func(from32[i]);
+                }
             }
+            trtr(from32, from_length, to32, to_length, in, in_length, out, &out_length, OUT_BUFFER_SIZE);
         } else {
-            trtr(from, from_length, to, to_length, in, in_length, out, &out_length, OUT_BUFFER_SIZE);
+            trtr(from32, from_length, to32, to_length, in, in_length, out, &out_length, OUT_BUFFER_SIZE);
         }
         out[out_length] = 0;
         u_file_write(out, out_length, ustdout);
@@ -439,6 +444,12 @@ int main(int argc, char **argv)
         free(from);
     }
     if (NULL != to) {
+        free(to);
+    }
+    if (NULL != from32) {
+        free(from);
+    }
+    if (NULL != to32) {
         free(to);
     }
     if (NULL != uset) {

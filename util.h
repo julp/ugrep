@@ -8,7 +8,8 @@ extern UFILE *ustderr;
 extern int verbosity;
 extern int exit_failure_value;
 
-UChar *convert_argv_from_local(const char *, int32_t *, error_t **);
+UChar *local_to_uchar(const char *, int32_t *, error_t **);
+UChar32 *local_to_uchar32(const char *, int32_t *, error_t **);
 void print_error(error_t *error);
 void report(int type, const char *format, ...);
 UBool stdout_is_tty(void);
