@@ -127,12 +127,15 @@ static char optstr[] = "Ccdst";
 
 static struct option long_options[] =
 {
-    {"complement",      no_argument, NULL, 'c'},
-    {"delete",          no_argument, NULL, 'd'},
-    {"squeeze-repeats", no_argument, NULL, 's'},
-    {"truncate",        no_argument, NULL, 't'},
-    {"version",         no_argument, NULL, 'v'},
-    {NULL,              no_argument, NULL, 0}
+    // only apply to stdin (not string from argv always converted from system encoding
+    {"input",           required_argument, NULL, INPUT_OPT},
+    {"reader",          required_argument, NULL, READER_OPT},
+    {"complement",      no_argument,       NULL, 'c'},
+    {"delete",          no_argument,       NULL, 'd'},
+    {"squeeze-repeats", no_argument,       NULL, 's'},
+    {"truncate",        no_argument,       NULL, 't'},
+    {"version",         no_argument,       NULL, 'v'},
+    {NULL,              no_argument,       NULL, 0}
 };
 
 static void usage(void)
