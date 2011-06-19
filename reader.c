@@ -159,10 +159,11 @@ UBool reader_open_string(reader_t *this, error_t **error, const char *string)
 {
     reader_init(this, NULL);
     this->imp = &string_reader_imp;
+    this->sourcename = "(string)";
     if (NULL == (this->priv_imp = this->imp->open(error, string, -1))) {
         return FALSE;
     }
-    if (!this->imp->set_encoding(error, this->priv_imp, NULL)) {
+    if (!this->imp->set_encoding(error, this->priv_imp, NULL)) { /* NULL <=> inherit system encoding */
         return FALSE;
     }
 
