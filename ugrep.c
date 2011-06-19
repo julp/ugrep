@@ -559,7 +559,7 @@ static void parse_userpref(void)
 # endif /* _MSC_VER */
                                                 break;
                                             } else {
-                                                for (a = attrs; a->name; a++) {
+                                                for (a = attrs; NULL != a->name; a++) {
                                                     if (!strcmp(a->name, t)) {
                                                         if (a->bg == a->fg || (a->bg != a->fg && colors_count < 2)) {
 # ifdef _MSC_VER
@@ -590,7 +590,7 @@ static void parse_userpref(void)
                                             } else {
                                                 attr_t *a;
 
-                                                for (a = attrs; a->name; a++) {
+                                                for (a = attrs; NULL != a->name; a++) {
                                                     if (val == a->bg || val == a->fg) {
                                                         if (a->bg == a->fg || (a->bg != a->fg && colors_count++ < 2)) {
                                                             user_attrs[attrs_count++] = val;
