@@ -32,8 +32,8 @@ assertOutputValue() {
         return $FALSE
     fi
     #X=$(${2% 2> /dev/null})
-    #echo "\$2 = :$X:"
-    #echo "\$3 = :$3:"
+    #echo "Get    : '$X'"
+    #echo "Expect : '$3'"
     __assertTrue "$1" "[[ \`$2\` ${4:-==} '$3' ]]"
 
     return $?
