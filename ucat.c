@@ -1,10 +1,10 @@
 #include <limits.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #ifndef WITHOUT_FTS
 # include <fts.h>
 #endif /* !WITHOUT_FTS */
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <errno.h>
