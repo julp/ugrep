@@ -18,8 +18,8 @@ set(UGREP_VERSION_MINOR 4)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
 
 find_package(ICU REQUIRED)
-find_package(ZLIB)
-find_package(BZip2)
+find_package(ZLIB QUIET)
+find_package(BZip2 QUIET)
 
 set(COMMON_BASE_SOURCES alloc.c ustring.c io/mmap.c io/stdio.c io/string.c error.c reader.c util.c)
 set(EXTRA_SOURCES "")
@@ -73,13 +73,14 @@ configure_file(
     "config.h"
 )
 
-message(STATUS CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE})
-message(STATUS ZLIB_FOUND = ${ZLIB_FOUND})
-message(STATUS BZIP2_FOUND = ${BZIP2_FOUND})
+message("==> CMAKE_BUILD_TYPE : ${CMAKE_BUILD_TYPE}")
+message("==> BZIP2 : ${BZIP2_FOUND}")
+message("==> ICU   : ${ICU_VERSION}")
+message("==> ZLIB  : ${ZLIB_VERSION_STRING}")
 
 list(REMOVE_DUPLICATES EXTRA_SOURCES)
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+include_directories(${ICU_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
 set(UgrepBinaries )
 macro(declare_ugrep_binary _KEY)
