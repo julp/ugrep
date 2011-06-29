@@ -3,6 +3,8 @@
 declare -ri TRUE=0
 declare -ri FALSE=1
 
+trap "rm -f /tmp/${PPID}.*" EXIT ERR SIGINT
+
 __assertTrue() {
     if eval $2; then
         printf "%s, %s: [ \e[%d;01m%s\e[0m ]\n" `basename $0` "$1" 32 OK
@@ -31,10 +33,13 @@ assertOutputValue() {
         echo "ArgumentError: ${FUNCNAME[0]}(message, command1, value[, operator = '=='])"
         return $FALSE
     fi
-    #X=$(${2% 2> /dev/null})
-    #echo "Get    : '$X'"
-    #echo "Expect : '$3'"
     __assertTrue "$1" "[[ \`$2\` ${4:-==} '$3' ]]"
+
+    if [ $? -ne $TRUE ]; then
+        X=$(${2% 2> /dev/null})
+        echo "Get    : '$X'"
+        echo "Expect : '$3'"
+    fi
 
     return $?
 }
@@ -57,16 +62,16 @@ assertOutputValueEx() {
         return $FALSE
     fi
 
-    tmp1=`mktemp`
-    tmp2=`mktemp`
+    tmp1=`mktemp /tmp/${PPID}.XXXXXX`
+    tmp2=`mktemp /tmp/${PPID}.XXXXXX`
     eval "\`$2 > $tmp1\`"
     eval "\`$3 > $tmp2\`"
 
     assertExitValue "$1" "diff -quN ${tmp1} ${tmp2} > /dev/null" $TRUE
 
-#    if [ $? -ne $TRUE ]; then
-#        diff --text -uN "${tmp1}" "${tmp2}"
-#    fi
+    if [ $? -ne $TRUE ]; then
+        diff --text -uN "${tmp1}" "${tmp2}"
+    fi
 
     return $?
 }
@@ -79,16 +84,16 @@ assertOutputValueExIgnoreBlanks() {
         return $FALSE
     fi
 
-    tmp1=`mktemp`
-    tmp2=`mktemp`
+    tmp1=`mktemp /tmp/${PPID}.XXXXXX`
+    tmp2=`mktemp /tmp/${PPID}.XXXXXX`
     eval "\`$2 > $tmp1\`"
     eval "\`$3 > $tmp2\`"
 
     assertExitValue "$1" "diff -bquN ${tmp1} ${tmp2} > /dev/null" $TRUE
 
-#    if [ $? -ne $TRUE ]; then
-#        diff --text -uN ${tmp1} ${tmp2}
-#    fi
+    if [ $? -ne $TRUE ]; then
+        diff --text -uN ${tmp1} ${tmp2}
+    fi
 
     return $?
 }
