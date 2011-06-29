@@ -19,11 +19,6 @@ typedef struct {
     void (*rewind)(void *, int32_t); /* Caller must provide BOM length (as 2nd argument) */
 } reader_imp_t;
 
-/*static inline int min(int a, int b)
-{
-    return (a > b) ? a : b;
-}*/
-
 # define STRING_REWIND(start, ptr, signature_length, pendingCU) \
     do {                                                        \
         ptr = start + signature_length;                         \

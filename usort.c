@@ -141,7 +141,7 @@ static int procfile(reader_t *reader, const char *filename)
                     rbtree_insert_node(tree, (RBTreeNode*) res, p, parent, side);
                 } else {
                     p = (int *) res;
-                    *p = *p + 1;
+                    (*p)++;
                 }
             }
         }
