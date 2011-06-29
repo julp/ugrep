@@ -1,81 +1,177 @@
-# Finds the International Components for Unicode (ICU) Library
+# This module can find the International Components for Unicode (ICU) Library
 #
-# ICU_FOUND - True if ICU found.
-# ICU_I18N_FOUND - True if ICU's internationalization library found.
-# ICU_INCLUDE_DIRS - Directory to include to get ICU headers
-# Note: always include ICU headers as, e.g.,
-# unicode/utypes.h
-# ICU_LIBRARIES - Libraries to link against for the common ICU
-# ICU_I18N_LIBRARIES - Libraries to link against for ICU internationaliation
-# (note: in addition to ICU_LIBRARIES)
+# The following variables will be defined for your use:
+#   - ICU_FOUND             : were all of your specified components found (include dependencies)?
+#   - ICU_INCLUDE_DIR       : ICU include directory
+#   - ICU_LIBRARIES         : ICU libraries
+#   - ICU_VERSION           : complete version of ICU (x.y.z)
+#   - ICU_MAJOR_VERSION     : major version of ICU
+#   - ICU_MINOR_VERSION     : minor version of ICU
+#   - ICU_PATCH_VERSION     : patch version of ICU
+#   - ICU_<COMPONENT>_FOUND : were <COMPONENT> found? (FALSE for non specified component if it is not a dependency)
+#
+# Example Usage:
+#
+#   1. Copy this file in the root of your project source directory
+#   2. Then, tell CMake to search this non-standard module in your project directory by adding to your CMakeLists.txt:
+#     set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
+#   3. Finally call find_package() once, here are some examples to pick from
+#
+#   Require ICU 4.4 or later
+#     find_package(ICU 4.4 REQUIRED)
+#
+#   if(ICU_FOUND)
+#      include_directories(${ICU_INCLUDE_DIRS})
+#      add_executable(myapp myapp.c)
+#      target_link_libraries(myapp ${ICU_LIBRARIES})
+#   endif()
 
-# Look for the header file.
+find_package(PkgConfig)
+
+########## Private ##########
+function(icudebug _varname)
+    if (ICU_DEBUG)
+        message("${_varname} = ${${_varname}}")
+    endif(ICU_DEBUG)
+endfunction(icudebug)
+
+set(IcuComponents )
+# <icu component name> <library name 1> ... <library name N>
+macro(declare_icu_component _NAME)
+    list(APPEND IcuComponents ${_NAME})
+    set("IcuComponents_${_NAME}" ${ARGN})
+endmacro(declare_icu_component)
+
+declare_icu_component(data icudata)
+declare_icu_component(uc   icuuc)         # Common and Data libraries
+declare_icu_component(i18n icui18n icuin) # Internationalization library
+declare_icu_component(io   icuio)         # Stream and I/O Library
+declare_icu_component(le   icule)         # Layout library
+declare_icu_component(lx   iculx)         # Paragraph Layout library
+
+########## Public ##########
+set(ICU_FOUND TRUE)
+set(ICU_LIBRARIES )
+set(ICU_INCLUDES_DIR )
+set(ICU_DEFINITIONS )
+foreach(_icu_component ${IcuComponents})
+    string(TOUPPER "${_icu_component}" _icu_upper_component)
+    set("ICU_${_icu_upper_component}_FOUND" FALSE) # may be done in the declare_icu_component macro
+endforeach(_icu_component)
+
+# Check components
+if(NOT ICU_FIND_COMPONENTS) # uc required at least
+    set(ICU_FIND_COMPONENTS uc)
+else()
+    list(APPEND ICU_FIND_COMPONENTS uc)
+    list(REMOVE_DUPLICATES ICU_FIND_COMPONENTS)
+    foreach(_icu_component ${ICU_FIND_COMPONENTS})
+        if(NOT DEFINED "IcuComponents_${_icu_component}")
+            message(FATAL_ERROR "Unknwon ICU component: ${_icu_component}")
+        endif()
+    endforeach(_icu_component)
+endif()
+
+# Includes
 find_path(
-  ICU_INCLUDE_DIR
-  NAMES unicode/utypes.h
-  DOC "Include directory for the ICU library")
-mark_as_advanced(ICU_INCLUDE_DIR)
+    ICU_INCLUDE_DIR
+    NAMES unicode/utypes.h
+    DOC "Include directories for ICU"
+)
 
-# Look for the library.
-find_library(
-  ICU_LIBRARY
-  NAMES icuuc cygicuuc cygicuuc32
-  DOC "Libraries to link against for the common parts of ICU")
-mark_as_advanced(ICU_LIBRARY)
+# Check dependencies
+if(PKG_CONFIG_FOUND)
+    set(_components_dup ${ICU_FIND_COMPONENTS})
+    foreach(_icu_component ${_components_dup})
+        pkg_check_modules(PC_ICU "icu-${_icu_component}" QUIET)
 
-# Copy the results to the output variables.
-if(ICU_INCLUDE_DIR AND ICU_LIBRARY)
-  set(ICU_FOUND 1)
-  set(ICU_LIBRARIES ${ICU_LIBRARY})
-  set(ICU_INCLUDE_DIRS ${ICU_INCLUDE_DIR})
+        if(PC_ICU_FOUND)
+            foreach(_pc_icu_library ${PC_ICU_LIBRARIES})
+                string(REGEX REPLACE "^icu" "" _pc_stripped_icu_library ${_pc_icu_library})
+                list(APPEND ICU_FIND_COMPONENTS ${_pc_stripped_icu_library})
+            endforeach(_pc_icu_library)
+        endif(PC_ICU_FOUND)
+    endforeach(_icu_component)
+    list(REMOVE_DUPLICATES ICU_FIND_COMPONENTS)
+endif(PKG_CONFIG_FOUND)
 
-  set(ICU_VERSION 0)
-  set(ICU_MAJOR_VERSION 0)
-  set(ICU_MINOR_VERSION 0)
-  if (EXISTS "${ICU_INCLUDE_DIR}/unicode/uvernum.h")
-    FILE(READ "${ICU_INCLUDE_DIR}/unicode/uvernum.h" _ICU_VERSION_CONENTS)
-  else()
-    FILE(READ "${ICU_INCLUDE_DIR}/unicode/uversion.h" _ICU_VERSION_CONENTS)
-  endif()
+# Check libraries
+foreach(_icu_component ${ICU_FIND_COMPONENTS})
+    find_library(
+        _icu_lib
+        NAMES ${IcuComponents_${_icu_component}}
+        DOC "Libraries for ICU"
+    )
 
-  STRING(REGEX REPLACE ".*#define U_ICU_VERSION_MAJOR_NUM ([0-9]+).*" "\\1" ICU_MAJOR_VERSION "${_ICU_VERSION_CONENTS}")
-  STRING(REGEX REPLACE ".*#define U_ICU_VERSION_MINOR_NUM ([0-9]+).*" "\\1" ICU_MINOR_VERSION "${_ICU_VERSION_CONENTS}")
+    string(TOUPPER "${_icu_component}" _icu_upper_component)
+    if(_icu_lib-NOTFOUND)
+        set("ICU_${_icu_upper_component}_FOUND" FALSE)
+        set("ICU_FOUND" FALSE)
+    else(_icu_lib-NOTFOUND)
+        set("ICU_${_icu_upper_component}_FOUND" TRUE)
+    endif(_icu_lib-NOTFOUND)
 
-  set(ICU_VERSION "${ICU_MAJOR_VERSION}.${ICU_MINOR_VERSION}")
+    list(APPEND ICU_LIBRARIES ${_icu_lib})
 
-  # Look for the ICU internationalization libraries
-  find_library(
-    ICU_I18N_LIBRARY
-    NAMES icuin icui18n cygicuin cygicuin32
-    DOC "Libraries to link against for ICU internationalization")
-  mark_as_advanced(ICU_I18N_LIBRARY)
-  if (ICU_I18N_LIBRARY)
-    set(ICU_I18N_FOUND 1)
-    set(ICU_I18N_LIBRARIES ${ICU_I18N_LIBRARY})
-  else (ICU_I18N_LIBRARY)
-    set(ICU_I18N_FOUND 0)
-    set(ICU_I18N_LIBRARIES)
-  endif (ICU_I18N_LIBRARY)
-else(ICU_INCLUDE_DIR AND ICU_LIBRARY)
-  set(ICU_FOUND 0)
-  set(ICU_I18N_FOUND 0)
-  set(ICU_LIBRARIES)
-  set(ICU_I18N_LIBRARIES)
-  set(ICU_INCLUDE_DIRS)
-  set(ICU_VERSION)
-  set(ICU_MAJOR_VERSION)
-  set(ICU_MINOR_VERSION)
-endif(ICU_INCLUDE_DIR AND ICU_LIBRARY)
+    set(_icu_lib _icu_lib-NOTFOUND) # Workaround
+endforeach(_icu_component)
 
-IF(ICU_FOUND)
-  IF( NOT ICU_FIND_QUIETLY )
-    MESSAGE( STATUS "Found ICU header files in ${ICU_INCLUDE_DIRS}")
-    MESSAGE( STATUS "Found ICU libraries: ${ICU_LIBRARIES}")
-  ENDIF( NOT ICU_FIND_QUIETLY )
-ELSE(ICU_FOUND)
-IF(ICU_FIND_REQUIRED)
-MESSAGE( FATAL_ERROR "Could not find ICU" )
-ELSE(ICU_FIND_REQUIRED)
-MESSAGE( STATUS "Optional package ICU was not found" )
-ENDIF(ICU_FIND_REQUIRED)
-ENDIF(ICU_FOUND)
+list(REMOVE_DUPLICATES ICU_LIBRARIES)
+
+if(ICU_FOUND)
+    if(EXISTS "${ICU_INCLUDE_DIR}/unicode/uvernum.h")
+        file(READ "${ICU_INCLUDE_DIR}/unicode/uvernum.h" _icu_contents)
+#     else()
+#         todo
+    endif()
+
+    string(REGEX REPLACE ".*# *define *U_ICU_VERSION_MAJOR_NUM *([0-9]+).*" "\\1" ICU_MAJOR_VERSION "${_icu_contents}")
+    string(REGEX REPLACE ".*# *define *U_ICU_VERSION_MINOR_NUM *([0-9]+).*" "\\1" ICU_MINOR_VERSION "${_icu_contents}")
+    string(REGEX REPLACE ".*# *define *U_ICU_VERSION_PATCHLEVEL_NUM *([0-9]+).*" "\\1" ICU_PATCH_VERSION "${_icu_contents}")
+    set(ICU_VERSION "${ICU_MAJOR_VERSION}.${ICU_MINOR_VERSION}.${ICU_PATCH_VERSION}")
+endif(ICU_FOUND)
+
+if(ICU_INCLUDE_DIR)
+    include(FindPackageHandleStandardArgs)
+    if(ICU_FIND_REQUIRED AND NOT ICU_FIND_QUIETLY)
+        find_package_handle_standard_args(ICU REQUIRED_VARS ICU_LIBRARIES ICU_INCLUDE_DIR VERSION_VAR ICU_VERSION)
+    else()
+        find_package_handle_standard_args(ICU "ICU not found" ICU_LIBRARIES ICU_INCLUDE_DIR)
+    endif()
+else(ICU_INCLUDE_DIR)
+    if(ICU_FIND_REQUIRED AND NOT ICU_FIND_QUIETLY)
+        message(FATAL_ERROR "Could not find ICU include directory")
+    endif()
+endif(ICU_INCLUDE_DIR)
+
+mark_as_advanced(
+    ICU_INCLUDES_DIR
+    ICU_LIBRARIES
+    ICU_DEFINITIONS
+    ICU_VERSION
+    ICU_MAJOR_VERSION
+    ICU_MINOR_VERSION
+    ICU_PATCH_VERSION
+)
+
+# IN (args)
+icudebug("ICU_FIND_COMPONENTS")
+icudebug("ICU_FIND_REQUIRED")
+icudebug("ICU_FIND_QUIETLY")
+icudebug("ICU_FIND_VERSION")
+# OUT
+# Found
+icudebug("ICU_FOUND")
+icudebug("ICU_UC_FOUND")
+icudebug("ICU_I18N_FOUND")
+icudebug("ICU_IO_FOUND")
+icudebug("ICU_LE_FOUND")
+icudebug("ICU_LX_FOUND")
+# Linking
+icudebug("ICU_INCLUDE_DIR")
+icudebug("ICU_LIBRARIES")
+# Version
+icudebug("ICU_MAJOR_VERSION")
+icudebug("ICU_MINOR_VERSION")
+icudebug("ICU_PATCH_VERSION")
+icudebug("ICU_VERSION")

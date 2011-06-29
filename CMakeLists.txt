@@ -17,7 +17,8 @@ set(UGREP_VERSION_MINOR 4)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
 
-find_package(ICU REQUIRED)
+# set(ICU_DEBUG TRUE)
+find_package(ICU 4.4 COMPONENTS i18n io REQUIRED)
 find_package(ZLIB QUIET)
 find_package(BZip2 QUIET)
 
