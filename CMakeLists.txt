@@ -99,7 +99,7 @@ foreach (UgrepBinary ${UgrepBinaries})
     #message(STATUS "UgrepBinary = ${UgrepBinary}")
     #message(STATUS "UgrepBinaries_${UgrepBinary} = ${UgrepBinaries_${UgrepBinary}}")
     add_executable(${UgrepBinary} ${UgrepBinaries_${UgrepBinary}})
-    target_link_libraries(${UgrepBinary} ${ICU_LIBRARIES} ${ICU_I18N_LIBRARIES} ${EXTRA_LIBS} icuio)
+    target_link_libraries(${UgrepBinary} ${ICU_LIBRARIES} ${EXTRA_LIBS})
     install(TARGETS ${UgrepBinary} DESTINATION bin)
 endforeach(UgrepBinary)
 
