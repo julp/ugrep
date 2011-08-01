@@ -2,8 +2,6 @@
 #ifdef _MSC_VER
 # define STRICT
 # include <windows.h>
-# include <direct.h>
-# include <Winreg.h>
 # include <psapi.h>
 # pragma comment(lib,"Psapi.lib")
 char __progname[_MAX_PATH] = "<unknown>";
@@ -236,17 +234,11 @@ INITIALIZER_P(ustdio_init)
 #ifdef _MSC_VER
     GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
     if (stdout_is_tty()) {
-        HKEY hkey;
         char cp[30] = "";
-        DWORD cp_len;
 
-        cp_len = sizeof(cp) / sizeof(char);
-        if (ERROR_SUCCESS == RegOpenKeyExA(HKEY_LOCAL_MACHINE, TEXT("SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"), 0, KEY_QUERY_VALUE, &hkey)) {
-            if (ERROR_SUCCESS == RegQueryValueExA(hkey, TEXT("OEMCP"), NULL, NULL, (LPBYTE) &cp, &cp_len)) {
-                cp[cp_len] = '\0';
-            }
-            RegCloseKey(hkey);
-        }
+        snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
+        ustdout = u_finit(stdout, NULL, cp);
+        ustderr = u_finit(stderr, NULL, cp);
         /**
          * /!\ Don't use ustdout or ustderr before following lines (it includes debug macro) /!\
          **/
