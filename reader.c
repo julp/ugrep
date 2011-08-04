@@ -163,7 +163,7 @@ UBool reader_open_string(reader_t *this, error_t **error, const char *string)
     if (NULL == (this->priv_imp = this->imp->open(error, string, -1))) {
         return FALSE;
     }
-    if (!this->imp->set_encoding(error, this->priv_imp, NULL)) { /* NULL <=> inherit system encoding */
+    if (!this->imp->set_encoding(error, this->priv_imp, this->default_encoding)) { /* NULL <=> inherit system encoding */
         return FALSE;
     }
 
