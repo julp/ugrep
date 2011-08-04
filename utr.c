@@ -37,34 +37,48 @@ enum {
 };
 
 enum {
-    CHARACTER, // set2: character or function
-    STRING,    // set2: string, function or character
-    CLASS,     // set2: function
-    FUNCTION,  // for set2 only
+    NONE,
+    CHARACTER, // idea would be to optimize against STRING
+    STRING,
+    CLASS,
+    FUNCTION,
+    COUNT
 } /* set_type_t*/;
 
 /*
-set1 | set2 | note
++----------+----------+----+------+
+| set1     | set2     | -c | note |
++----------+----------+----+------+
+| function | none     | ko | ok (apply this translation function) => special case without -d, others are forbidden
++----------+----------+----+-------
+| char     | char     | ok | strtr
+| char     | string   | -- | forbidden
+| char     | class    | -- | impossible
+| char     | function | ok | ok => no sense ?
++----------+----------+----+-------
+| string   | char     | ok | strtr
+| string   | string   | ko | strtr
+| string   | class    | -- | impossible
+| string   | function | ok | ok => no sense ?
++----------+----------+----+-------
+| class    | char     | ok | ok
+| class    | string   | -- | forbidden
+| class    | class    | -- | impossible
+| class    | function | ok | ok => no sense ?
++----------+----------+----+-------
+| function | char     | ok | ok
+| function | string   | -- | forbidden
+| function | class    | -- | impossible
+| function | function | ok | ok => no sense ?
++----------+----------+----+-------
 
-char | char | strtr
-char | string | forbidden
-char | class | impossible
-char | function | ok
+Note n°1:
+For u_strToTitle, as translation function, may be really difficult (impossible?) to apply while reading input by multiple blocks.
+Can we keep and reuse UBreakIterator state of the previous block?
 
-string | char     | strtr
-string | string   | strtr
-string | class    | impossible
-string | function | ok
-
-class | char     | ok
-class | string   | forbidden
-class | class    | impossible
-class | function | ok
-
-function | char     | ok
-function | string   | forbidden
-function | class    | impossible
-function | function | ok
+Note n°2:
+Don't forget that full case mapping can change the number of code points and/or code units of a string.
+An output buffer 4 times larger than input buffer may be more appropriate?
 
 char: UChar32
 string: UChar32 *
@@ -127,7 +141,7 @@ static char optstr[] = "Ccdst";
 
 static struct option long_options[] =
 {
-    // only apply to stdin (not string from argv always converted from system encoding
+    // only apply to stdin (not string from argv, always converted from system encoding)
     {"input",           required_argument, NULL, INPUT_OPT},
     {"reader",          required_argument, NULL, READER_OPT},
     {"complement",      no_argument,       NULL, 'c'},
@@ -160,11 +174,17 @@ USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
     if (NULL == (upattern = local_to_uchar(cpattern, &upattern_length, error))) {
         return NULL;
     }
-    uset = uset_openPattern(upattern, upattern_length, &status);
-    if (U_FAILURE(status)) {
-        free(upattern);
-        icu_error_set(error, FATAL, status, "uset_openPattern");
-        return NULL;
+    if ('[' == *cpattern) {
+        uset = uset_openPattern(upattern, upattern_length, &status);
+        if (U_FAILURE(status)) {
+            free(upattern);
+            icu_error_set(error, FATAL, status, "uset_openPattern");
+            return NULL;
+        }
+    } else {
+        uset = uset_openEmpty();
+        uset_addString(uset, upattern, upattern_length);
+        //uset_add(uset, UChar32 c);
     }
     free(upattern);
     if (negate) {
@@ -209,6 +229,30 @@ endinnerloop:
     }
 }
 
+void cptr(
+    UChar32 from,
+    UChar32 to,
+    UChar *in, int32_t in_length,
+    UChar *out, int32_t *out_length, int32_t out_size,
+    UBool negate
+) {
+    int i;
+    UChar32 ci;
+    UBool isError;
+
+    isError = FALSE; // unused
+    for (i = 0; i < in_length; ) {
+        U16_NEXT(in, i, in_length, ci);
+        if (((from == ci) ^ negate)) {
+            if (-1 != to) {
+                U16_APPEND(out, *out_length, out_size, to, isError);
+            }
+            continue;
+        }
+        U16_APPEND(out, *out_length, out_size, ci, isError);
+    }
+}
+
 int main(int argc, char **argv)
 {
     int c;
@@ -234,6 +278,7 @@ int main(int argc, char **argv)
     from = to = NULL;
     filter_func = NULL;
     from32 = to32 = NULL;
+    set1_type = set2_type = NONE;
     isError = cFlag = dFlag = FALSE;
     exit_failure_value = UTR_EXIT_FAILURE;
 
@@ -289,13 +334,30 @@ int main(int argc, char **argv)
         }
     } else {
         switch (argc) {
-            case 2:
-                // set1 (argv[0]) + set2 (argv[1]) + stdin
+            case 1:
+                // set1 (argv[0]) + stdin
                 reader_open_stdin(&reader, &error);
                 break;
+            case 2:
+                // set1 (argv[0]) as FUNC + string
+                // OR
+                // set1 (argv[0]) + set2 (argv[1]) + stdin
+                if (!strncmp("fn:", argv[0], STR_LEN("fn:"))) {
+                    set2_type = NONE;
+                    reader_open_string(&reader,  &error, argv[1]);
+                } else {
+                    reader_open_stdin(&reader, &error);
+                }
+                break;
             case 3:
+                // set1 (argv[0]) as FUNC + set2 (argv[1]) + string
+                // OR
                 // set1 (argv[0]) + set2 (argv[1]) + string
-                reader_open_string(&reader,  &error, argv[2]);
+                if (!strncmp("fn:", argv[0], STR_LEN("fn:"))) {
+                    usage();
+                } else {
+                    reader_open_string(&reader,  &error, argv[2]);
+                }
                 break;
             default:
                 usage();
@@ -370,14 +432,12 @@ int main(int argc, char **argv)
         }
     }
 
-    debug("isAlpha = %d", u_isalpha(0x0001D63C));
-
     while (!reader_eof(&reader)) {
         out_length = 0;
         if (-1 == (in_length = reader_readuchars(&reader, &error, in, IN_BUFFER_SIZE))) {
             print_error(error);
         }
-        debug("in_length = %d", in_length);
+debug("in_length = %d", in_length);
         in[in_length] = 0;
         if (CLASS == set1_type || FUNCTION == set1_type) {
             int i;
@@ -387,7 +447,7 @@ int main(int argc, char **argv)
                 if (CLASS == set1_type) {
                     match = uset_contains(uset, i32);
                 } else if (FUNCTION == set1_type) {
-                    match = filter_func(i32);
+                    match = filter_func(i32) ^ cFlag;
                 } /*else { BUG }*/
                 // TODO: consider cFlag
                 if (match) {
@@ -403,23 +463,8 @@ int main(int argc, char **argv)
                     U16_APPEND(out, out_length, OUT_BUFFER_SIZE, i32, isError);
                 }
             }
-#if 0
-        } else if (dFlag /*&& (STRING == set1_type || CHARACTER == set1_type)*/) {
-            int i;
-
-            for (i = 0; i < in_length; ) {
-                U16_NEXT(in, i, in_length, i32);
-                if (STRING == set1_type) {
-                    match = ?;
-                } else if (CHARACTER == set1_type) {
-                    match = i32 == f32;
-                } /*else { BUG }*/
-                // TODO: consider cFlag
-                if (!match) {
-                    U16_APPEND(out, out_length, OUT_BUFFER_SIZE, i32, isError);
-                }
-            }
-#endif
+        } else if (CHARACTER == set1_type && CHARACTER == set2_type) {
+            cptr(*from32, dFlag ? -1 : *to32, in, in_length, out, &out_length, OUT_BUFFER_SIZE, cFlag);
         } else if (FUNCTION == set2_type) {
             if (CHARACTER == set1_type) {
                 to32 = mem_new(*to32); // we don't use \0 in fact
