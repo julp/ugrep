@@ -38,10 +38,12 @@ enum {
 
 enum {
     NONE,
-    CHARACTER, // idea would be to optimize against STRING
+    CHARACTER,       // a single code point, idea would be to optimize against STRING (more than one code point)
     STRING,
-    CLASS,
-    FUNCTION,
+    SET,
+    FILTER_FUNCTION,
+    SIMPLE_FUNCTION, // simple translation (case mapping)
+    GLOBAL_FUNCTION, // full translation (case mapping)
     COUNT
 } /* set_type_t*/;
 
@@ -61,10 +63,10 @@ enum {
 | string   | class    | -- | impossible
 | string   | function | ok | ok => no sense ?
 +----------+----------+----+-------
-| class    | char     | ok | ok
-| class    | string   | -- | forbidden
-| class    | class    | -- | impossible
-| class    | function | ok | ok => no sense ?
+| set      | char     | ok | ok
+| set      | string   | -- | forbidden
+| set      | class    | -- | impossible
+| set      | function | ok | ok => no sense ?
 +----------+----------+----+-------
 | function | char     | ok | ok
 | function | string   | -- | forbidden
@@ -87,7 +89,8 @@ function: - (stay with char *)
 */
 
 typedef UBool (*filter_func_t)(UChar32);
-typedef UChar32 (*translate_func_t)(UChar32);
+typedef UChar32 (*simple_translate_func_t)(UChar32);
+typedef UString *(*global_translate_func_t)(UChar *); // ?
 
 typedef struct {
     const char *name;
@@ -96,38 +99,39 @@ typedef struct {
 
 typedef struct {
     const char *name;
-    translate_func_t func;
+    simple_translate_func_t sfunc;
+    global_translate_func_t gfunc;
 } translate_func_decl_t;
 
 /* ========== global variables ========== */
 
 filter_func_decl_t filter_functions[] = {
-    {"isupper", u_isupper},
-    {"islower", u_islower},
-    {"istitle", u_istitle},
-    {"isdigit", u_isdigit},
-    {"isalpha", u_isalpha},
-    {"isalnum", u_isalnum},
-    {"isxdigit", u_isxdigit},
-    {"ispunct", u_ispunct},
-    {"isgraph", u_isgraph},
-    {"isblank", u_isblank},
-    {"isdefined", u_isdefined},
-    {"isspace", u_isspace},
+    {"isupper",         u_isupper},
+    {"islower",         u_islower},
+    {"istitle",         u_istitle},
+    {"isdigit",         u_isdigit},
+    {"isalpha",         u_isalpha},
+    {"isalnum",         u_isalnum},
+    {"isxdigit",        u_isxdigit},
+    {"ispunct",         u_ispunct},
+    {"isgraph",         u_isgraph},
+    {"isblank",         u_isblank},
+    {"isdefined",       u_isdefined},
+    {"isspace",         u_isspace},
     {"isJavaSpaceChar", u_isJavaSpaceChar},
-    {"isWhitespace", u_isWhitespace},
-    {"iscntrl", u_iscntrl},
-    {"isISOControl", u_isISOControl},
-    {"isprint", u_isprint},
-    {"isbase", u_isbase},
-    {NULL, NULL}
+    {"isWhitespace",    u_isWhitespace},
+    {"iscntrl",         u_iscntrl},
+    {"isISOControl",    u_isISOControl},
+    {"isprint",         u_isprint},
+    {"isbase",          u_isbase},
+    {NULL,              NULL}
 };
 
 translate_func_decl_t translate_functions[] = {
-    {"toupper", u_toupper},
-    {"tolower", u_tolower},
-    {"totitle", u_totitle},
-    {NULL, NULL}
+    {"toupper", u_toupper, NULL},
+    {"tolower", u_tolower, NULL},
+    {"totitle", u_totitle, NULL},
+    {NULL,      NULL,      NULL}
 };
 
 /* ========== getopt stuff ========== */
@@ -163,6 +167,8 @@ static void usage(void)
     exit(UTR_EXIT_USAGE);
 }
 
+/* ========== set helpers ========== */
+
 USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
 {
     USet *uset;
@@ -174,17 +180,11 @@ USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
     if (NULL == (upattern = local_to_uchar(cpattern, &upattern_length, error))) {
         return NULL;
     }
-    if ('[' == *cpattern) {
-        uset = uset_openPattern(upattern, upattern_length, &status);
-        if (U_FAILURE(status)) {
-            free(upattern);
-            icu_error_set(error, FATAL, status, "uset_openPattern");
-            return NULL;
-        }
-    } else {
-        uset = uset_openEmpty();
-        uset_addString(uset, upattern, upattern_length);
-        //uset_add(uset, UChar32 c);
+    uset = uset_openPattern(upattern, upattern_length, &status);
+    if (U_FAILURE(status)) {
+        free(upattern);
+        icu_error_set(error, FATAL, status, "uset_openPattern");
+        return NULL;
     }
     free(upattern);
     if (negate) {
@@ -194,6 +194,24 @@ USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
 
     return uset;
 }
+
+USet *create_set_from_string32(const UChar32 *string32, int32_t string32_length, UBool negate, error_t **UNUSED(error)) {
+    USet *uset;
+    int i;
+
+    uset = uset_openEmpty();
+    for (i = 0; i < string32_length; i++) {
+        uset_add(uset, string32[i]);
+    }
+    if (negate) {
+        uset_complement(uset);
+    }
+    uset_freeze(uset);
+
+    return uset;
+}
+
+/* ========== replacement helpers ========== */
 
 // use an hashtable for performance ?
 void trtr(
@@ -213,7 +231,7 @@ void trtr(
             if (from[f] == ci) {
                 if (NULL == to || 0 == *to || 0 == to_length) { // dFlag on
                     goto endinnerloop;
-                } else if (1 == to_length) { // dFlag off, to_length == 1
+                } else if (1 == to_length) { // dFlag off, to_length == 1 (to is a single code point)
                     U16_APPEND(out, *out_length, out_size, to[0], isError);
                     goto endinnerloop;
                 } else { // dFlag off, to_length == from_length
@@ -253,6 +271,8 @@ void cptr(
     }
 }
 
+/* ========== main ========== */
+
 int main(int argc, char **argv)
 {
     int c;
@@ -263,7 +283,7 @@ int main(int argc, char **argv)
     reader_t reader;
     UChar *from, *to;
     UChar32 *from32, *to32;
-    translate_func_t tr_func;
+    simple_translate_func_t tr_func;
     filter_func_t filter_func;
     int set1_type, set2_type;
     UBool dFlag, cFlag, isError;
@@ -325,7 +345,7 @@ int main(int argc, char **argv)
                 reader_open_stdin(&reader, &error);
                 break;
             case 2:
-                // set1 (argv[0]) + string
+                // set1 (argv[0]) + string (argv[1])
                 reader_open_string(&reader, &error, argv[1]);
                 break;
             default:
@@ -339,25 +359,18 @@ int main(int argc, char **argv)
                 reader_open_stdin(&reader, &error);
                 break;
             case 2:
-                // set1 (argv[0]) as FUNC + string
+                // set1 (argv[0]) as FUNC + string (argv[1])
                 // OR
                 // set1 (argv[0]) + set2 (argv[1]) + stdin
                 if (!strncmp("fn:", argv[0], STR_LEN("fn:"))) {
-                    set2_type = NONE;
                     reader_open_string(&reader,  &error, argv[1]);
                 } else {
                     reader_open_stdin(&reader, &error);
                 }
                 break;
             case 3:
-                // set1 (argv[0]) as FUNC + set2 (argv[1]) + string
-                // OR
-                // set1 (argv[0]) + set2 (argv[1]) + string
-                if (!strncmp("fn:", argv[0], STR_LEN("fn:"))) {
-                    usage();
-                } else {
-                    reader_open_string(&reader,  &error, argv[2]);
-                }
+                // set1 (argv[0]) + set2 (argv[1]) + string (argv[2])
+                reader_open_string(&reader,  &error, argv[2]);
                 break;
             default:
                 usage();
@@ -368,8 +381,8 @@ int main(int argc, char **argv)
 
             for (f = translate_functions; NULL != f->name; f++) {
                 if (!strcmp(f->name, argv[1] + STR_LEN("fn:"))) {
-                    set2_type = FUNCTION;
-                    tr_func = f->func;
+                    set2_type = SIMPLE_FUNCTION;
+                    tr_func = f->sfunc;
                     break;
                 }
             }
@@ -394,7 +407,7 @@ int main(int argc, char **argv)
 
         for (f = filter_functions; NULL != f->name; f++) {
             if (!strcmp(f->name, argv[0] + STR_LEN("fn:"))) {
-                set1_type = FUNCTION;
+                set1_type = FILTER_FUNCTION;
                 filter_func = f->func;
                 break;
             }
@@ -404,7 +417,7 @@ int main(int argc, char **argv)
             return UTR_EXIT_USAGE;
         }
     } else if ('[' == *argv[0]) {
-        set1_type = CLASS;
+        set1_type = SET;
         if (NULL == (uset = create_set_from_argv(argv[0], cFlag, &error))) {
             print_error(error);
             return UTR_EXIT_FAILURE;
@@ -417,14 +430,27 @@ int main(int argc, char **argv)
         if (1 == from_length) {
             set1_type = CHARACTER;
         } else {
-            set1_type = STRING;
+            if (cFlag) { // reajust
+                if (NULL == (uset = create_set_from_string32(from32, from_length, cFlag, &error))) {
+                    print_error(error);
+                    return UTR_EXIT_FAILURE;
+                }
+                set1_type = SET;
+            } else {
+                set1_type = STRING;
+            }
         }
     }
 
     if (STRING == set2_type) {
         if (STRING != set1_type) {
+            fprintf(stderr, "Using a string as a set have only sense if the first set is defined as a string too\n");
             return UTR_EXIT_FAILURE;
         } else {
+            if (cFlag) {
+                fprintf(stderr, "Complement option cannot be applied when the both sets are defined as strings\n");
+                return UTR_EXIT_FAILURE;
+            }
             if (from_length != to_length) {
                 fprintf(stderr, "Number of code points differs between sets\n");
                 return UTR_EXIT_FAILURE;
@@ -439,23 +465,22 @@ int main(int argc, char **argv)
         }
 debug("in_length = %d", in_length);
         in[in_length] = 0;
-        if (CLASS == set1_type || FUNCTION == set1_type) {
+        if (SET == set1_type || FILTER_FUNCTION == set1_type) {
             int i;
 
             for (i = 0; i < in_length; ) {
                 U16_NEXT(in, i, in_length, i32);
-                if (CLASS == set1_type) {
+                if (SET == set1_type) {
                     match = uset_contains(uset, i32);
-                } else if (FUNCTION == set1_type) {
+                } else if (FILTER_FUNCTION == set1_type) {
                     match = filter_func(i32) ^ cFlag;
                 } /*else { BUG }*/
-                // TODO: consider cFlag
                 if (match) {
                     if (dFlag) {
                         continue;
                     } else if (CHARACTER == set2_type) {
-                        i32 = to32[0];
-                    } else if (FUNCTION == set2_type) {
+                        i32 = *to32;
+                    } else if (SIMPLE_FUNCTION == set2_type) {
                         i32 = tr_func(i32);
                     }
                     U16_APPEND(out, out_length, OUT_BUFFER_SIZE, i32, isError);
@@ -465,7 +490,7 @@ debug("in_length = %d", in_length);
             }
         } else if (CHARACTER == set1_type && CHARACTER == set2_type) {
             cptr(*from32, dFlag ? -1 : *to32, in, in_length, out, &out_length, OUT_BUFFER_SIZE, cFlag);
-        } else if (FUNCTION == set2_type) {
+        } else if (SIMPLE_FUNCTION == set2_type) {
             if (CHARACTER == set1_type) {
                 to32 = mem_new(*to32); // we don't use \0 in fact
                 to32[0] = from32[0];
