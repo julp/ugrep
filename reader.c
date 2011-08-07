@@ -39,11 +39,13 @@ static UBool is_binary_uchar(UChar32 c)
     return !u_isprint(c) && !u_isspace(c) && U_BS != c;
 }
 
-static UBool is_binary(UChar32 *buffer, size_t buffer_len)
+static UBool is_binary(UChar32 *buffer, size_t buffer_len) /* NONNULL(1) */
 {
     UChar32 *p;
 
-    for (p = buffer; U_NUL != *p; p++) {
+    require_else_return_false(NULL != buffer);
+
+    for (p = buffer; 0 != *p; p++) {
         if (is_binary_uchar(*p)) {
             return TRUE;
         }
@@ -52,8 +54,10 @@ static UBool is_binary(UChar32 *buffer, size_t buffer_len)
     return ((size_t)(p - buffer)) < buffer_len;
 }
 
-void reader_init(reader_t *this, const char *name)
+void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
 {
+    require_else_return(NULL != this);
+
     this->sourcename = NULL;
     this->default_encoding = NULL;
     if (NULL != name) {
@@ -83,9 +87,11 @@ reader_imp_t *reader_get_by_name(const char *name)
     return NULL;
 }
 
-UBool reader_set_imp_by_name(reader_t *this, const char *name)
+UBool reader_set_imp_by_name(reader_t *this, const char *name) /* NONNULL(1) */
 {
     reader_imp_t **imp;
+
+    require_else_return_false(NULL != this);
 
     for (imp = available_readers; *imp; imp++) {
         if (!(*imp)->internal && !strcmp((*imp)->name, name)) {
@@ -97,41 +103,57 @@ UBool reader_set_imp_by_name(reader_t *this, const char *name)
     return FALSE;
 }
 
-void reader_set_binary_behavior(reader_t *this, int binbehave)
+void reader_set_binary_behavior(reader_t *this, int binbehave) /* NONNULL(1) */
 {
+    require_else_return(NULL != this);
     require_else_return(binbehave >= BIN_FILE_BIN && binbehave <= BIN_FILE_TEXT);
 
     this->binbehave = binbehave;
 }
 
-UBool reader_set_encoding(reader_t *this, error_t **error, const char *encoding)
+UBool reader_set_encoding(reader_t *this, error_t **error, const char *encoding) /* NONNULL(1) */
 {
+    require_else_return_false(NULL != this);
+
     return this->imp->set_encoding(error, this->priv_imp, encoding);
 }
 
-void reader_set_default_encoding(reader_t *this, const char *encoding)
+void reader_set_default_encoding(reader_t *this, const char *encoding) /* NONNULL(1) */
 {
+    require_else_return(NULL != this);
+
     this->default_encoding = encoding;
 }
 
-UBool reader_eof(reader_t *this)
+UBool reader_eof(reader_t *this) /* NONNULL(1) */
 {
+    require_else_return_false(NULL != this);
+
     return this->imp->eof(this->priv_imp);
 }
 
-int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t max_len)
+int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t max_len) /* NONNULL(1, 3) */
 {
+    require_else_return_val(NULL != this, -1);
+    require_else_return_val(NULL != buffer, -1);
+
     return this->imp->readuchars(error, this->priv_imp, buffer, max_len);
 }
 
-UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
+UBool reader_readline(reader_t *this, error_t **error, UString *ustr) /* NONNULL(1, 3) */
 {
+    require_else_return_false(NULL != this);
+    require_else_return_false(NULL != ustr);
+
     ustring_truncate(ustr);
+
     return this->imp->readline(error, this->priv_imp, ustr);
 }
 
-void reader_close(reader_t *this)
+void reader_close(reader_t *this) /* NONNULL(1) */
 {
+    require_else_return(NULL != this);
+
     if (NULL != this->imp->close) {
         this->imp->close(this->priv_imp);
     }
@@ -139,24 +161,34 @@ void reader_close(reader_t *this)
     this->priv_imp = NULL;
 }
 
-void *reader_get_user_data(reader_t *this)
+void *reader_get_user_data(reader_t *this) /* NONNULL(1) */
 {
+    require_else_return_null(NULL != this);
+
     return this->priv_user;
 }
 
-void reader_set_user_data(reader_t *this, void *data)
+void reader_set_user_data(reader_t *this, void *data) /* NONNULL(1) */
 {
+    require_else_return(NULL != this);
+
     this->priv_user = data;
 }
 
-UBool reader_open_stdin(reader_t *this, error_t **error)
+UBool reader_open_stdin(reader_t *this, error_t **error) /* NONNULL(1) */
 {
+    require_else_return_false(NULL != this);
+
     reader_init(this, "stdio");
+
     return reader_open(this, error, "-");
 }
 
-UBool reader_open_string(reader_t *this, error_t **error, const char *string)
+UBool reader_open_string(reader_t *this, error_t **error, const char *string) /* NONNULL(1, 3) */
 {
+    require_else_return_false(NULL != this);
+    require_else_return_false(NULL != string);
+
     reader_init(this, NULL);
     this->imp = &string_reader_imp;
     this->sourcename = "(string)";
@@ -170,7 +202,7 @@ UBool reader_open_string(reader_t *this, error_t **error, const char *string)
     return TRUE;
 }
 
-UBool reader_open(reader_t *this, error_t **error, const char *filename)
+UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONNULL(1, 3) */
 {
     int fsfd;
     /*struct stat st;*/
@@ -178,6 +210,9 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename)
     size_t buffer_len;
     const char *encoding;
     char buffer[MAX_ENC_REL_LEN + 1];
+
+    require_else_return_false(NULL != this);
+    require_else_return_false(NULL != filename);
 
     /*if (-1 == (stat(filename, &st))) {
         error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
@@ -276,7 +311,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename)
             if (-1 == (ubuffer_len = this->imp->readuchars32(error, this->priv_imp, ubuffer, MAX_BIN_REL_LEN))) {
                 goto failed;
             }
-            ubuffer[ubuffer_len] = U_NUL;
+            ubuffer[ubuffer_len] = 0;
             this->binary = is_binary(ubuffer, ubuffer_len);
             debug("%s, binary file : %s", filename, this->binary ? RED("yes") : GREEN("no"));
             if (this->binary) {

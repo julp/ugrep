@@ -22,18 +22,22 @@ typedef struct {
     UBool binary;
 } reader_t;
 
-void reader_close(reader_t *);
-UBool reader_eof(reader_t *);
+#define DEFAULT_READER_NAME "mmap"
+
+void reader_close(reader_t *) NONNULL(1);
+UBool reader_eof(reader_t *) NONNULL(1);
 reader_imp_t *reader_get_by_name(const char *);
-void reader_init(reader_t *, const char *);
-UBool reader_open(reader_t *, error_t **, const char *);
-UBool reader_open_stdin(reader_t *, error_t **);
-UBool reader_open_string(reader_t *, error_t **, const char *);
-UBool reader_readline(reader_t *, error_t **, UString *);
-int32_t reader_readuchars(reader_t *, error_t **, UChar *, size_t);
-void reader_set_binary_behavior(reader_t *, int);
-void reader_set_default_encoding(reader_t *, const char *);
-UBool reader_set_encoding(reader_t *, error_t **, const char *);
-UBool reader_set_imp_by_name(reader_t *, const char *);
+void *reader_get_user_data(reader_t *) NONNULL(1);
+void reader_init(reader_t *, const char *) NONNULL(1);
+UBool reader_open(reader_t *, error_t **, const char *) NONNULL(1, 3);
+UBool reader_open_stdin(reader_t *, error_t **) NONNULL(1);
+UBool reader_open_string(reader_t *, error_t **, const char *) NONNULL(1, 3);
+UBool reader_readline(reader_t *, error_t **, UString *) NONNULL(1, 3);
+int32_t reader_readuchars(reader_t *, error_t **, UChar *, size_t) NONNULL(1, 3);
+void reader_set_binary_behavior(reader_t *, int) NONNULL(1);
+void reader_set_default_encoding(reader_t *, const char *) NONNULL(1);
+UBool reader_set_encoding(reader_t *, error_t **, const char *) NONNULL(1);
+UBool reader_set_imp_by_name(reader_t *, const char *) NONNULL(1);
+void reader_set_user_data(reader_t *, void *) NONNULL(1);
 
 #endif /* FD_H */
