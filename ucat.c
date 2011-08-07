@@ -206,7 +206,7 @@ int main(int argc, char **argv)
     }
 
     ret = 0;
-    reader_init(&reader, "mmap");
+    reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = UCAT_EXIT_FAILURE;
     //ustdio_init();
 

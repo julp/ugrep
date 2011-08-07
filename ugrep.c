@@ -1097,7 +1097,7 @@ int main(int argc, char **argv)
         return UGREP_EXIT_FAILURE;
     }
 
-    reader_init(&reader, "mmap");
+    reader_init(&reader, DEFAULT_READER_NAME);
     patterns = slist_new(pattern_destroy);
     exit_failure_value = UGREP_EXIT_FAILURE;
 

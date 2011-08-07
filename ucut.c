@@ -211,7 +211,7 @@ int main(int argc, char **argv)
 
     ret = 0;
     error = NULL;
-    reader_init(&reader, "mmap");
+    reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = UCUT_EXIT_FAILURE;
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {

@@ -179,7 +179,7 @@ int main(int argc, char **argv)
     ret = 0;
     wanted = ALL;
     error = NULL;
-    reader_init(&reader, "mmap");
+    reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = USORT_EXIT_FAILURE;
     //ustdio_init();
 
