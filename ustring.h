@@ -8,7 +8,16 @@ typedef struct {
     size_t allocated;
 } UString;
 
-UString *ustr_convert_argv_from_local(const char *, error_t **);
+typedef enum {
+    UCASE_NONE,
+    UCASE_FOLD,
+    UCASE_LOWER,
+    UCASE_UPPER,
+    UCASE_TITLE,
+    UCASE_COUNT
+} UCaseType;
+
+UString *ustring_convert_argv_from_local(const char *, error_t **);
 UString *ustring_adopt_string(UChar *) NONNULL();
 UString *ustring_adopt_string_len(UChar *, size_t);
 void ustring_append_char(UString *, UChar) NONNULL();
@@ -20,6 +29,7 @@ void ustring_dump(UString *) NONNULL();
 UString *ustring_dup_string(const UChar *) NONNULL();
 UString *ustring_dup_string_len(const UChar *, size_t) NONNULL();
 UBool ustring_empty(const UString *) NONNULL();
+UBool ustring_fullcase(UString *, UChar *, int32_t, UCaseType, UBreakIterator *, error_t **) NONNULL(1);
 void ustring_insert_len(UString *, size_t, const UChar *, size_t) NONNULL();
 void ustring_ltrim(UString *) NONNULL();
 UString *ustring_new(void) WARN_UNUSED_RESULT;

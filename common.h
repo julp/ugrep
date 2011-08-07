@@ -136,7 +136,6 @@ extern char *__progname;
 # define U_BS  0x0008 /* backspace */
 # define U_CR  0x000D /* \r */
 # define U_LF  0x000A /* \n */
-# define U_NUL 0x0000 /* \0 */
 
 # if defined(DEBUG) && !defined(_MSC_VER)
 #  define RED(str)    "\33[1;31m" str "\33[0m"

@@ -2,6 +2,8 @@
 
 #include "common.h"
 
+#include <unicode/ubrk.h>
+
 #ifdef DEBUG
 # define USTRING_INITIAL_LENGTH 1 /* Voluntarily small for development/test */
 #else
@@ -40,12 +42,12 @@ UString *ustring_sized_new(size_t requested) /* WARN_UNUSED_RESULT */
     ustr->len = 0;
     ustr->allocated = nearest_power(requested);
     ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
-    *ustr->ptr = U_NUL;
+    *ustr->ptr = 0;
 
     return ustr;
 }
 
-UString *ustr_convert_argv_from_local(const char *cargv, error_t **error)
+UString *ustring_convert_argv_from_local(const char *cargv, error_t **error)
 {
     UString *ustr;
     UConverter *ucnv;
@@ -74,13 +76,24 @@ UString *ustr_convert_argv_from_local(const char *cargv, error_t **error)
     return ustr;
 }
 
-static void _ustring_maybe_expand(UString *ustr, size_t length) /* NONNULL() */
+static void _ustring_maybe_expand_of(UString *ustr, size_t additional_length) /* NONNULL() */
 {
     require_else_return(NULL != ustr);
 
-    if (ustr->len + length >= ustr->allocated) {
+    if (ustr->len + additional_length >= ustr->allocated) {
         //debug("Expand from %d to %d effective UChar", ustr->allocated, ustr->allocated*2);
-        ustr->allocated = nearest_power(ustr->len + length);
+        ustr->allocated = nearest_power(ustr->len + additional_length);
+        ustr->ptr = mem_renew(ustr->ptr, *ustr->ptr, ustr->allocated + 1);
+    }
+}
+
+static void _ustring_maybe_expand_to(UString *ustr, size_t total_length) /* NONNULL() */
+{
+    require_else_return(NULL != ustr);
+
+    if (total_length >= ustr->allocated) {
+        //debug("Expand from %d to %d effective UChar", ustr->allocated, ustr->allocated*2);
+        ustr->allocated = nearest_power(total_length);
         ustr->ptr = mem_renew(ustr->ptr, *ustr->ptr, ustr->allocated + 1);
     }
 }
@@ -129,9 +142,9 @@ void ustring_chomp(UString *ustr) /* NONNULL() */
 
     if (ustr->len > 0) {
         if (U_LF == ustr->ptr[ustr->len - 1]) {
-            ustr->ptr[--ustr->len] = U_NUL;
+            ustr->ptr[--ustr->len] = 0;
             if (ustr->len > 0 && U_CR == ustr->ptr[ustr->len - 1]) {
-                ustr->ptr[--ustr->len] = U_NUL;
+                ustr->ptr[--ustr->len] = 0;
             }
         }
     }
@@ -160,7 +173,7 @@ void ustring_truncate(UString *ustr) /* NONNULL() */
 {
     require_else_return(NULL != ustr);
 
-    *ustr->ptr = U_NUL;
+    *ustr->ptr = 0;
     ustr->len = 0;
 }
 
@@ -175,7 +188,7 @@ void ustring_subreplace_len(UString *ustr, const UChar *replacement, size_t repl
 
         diff_len = replacement_length - length;
         if (diff_len > 0) {
-            _ustring_maybe_expand(ustr, diff_len);
+            _ustring_maybe_expand_of(ustr, diff_len);
         }
         if (replacement >= ustr->ptr && replacement <= ustr->ptr + ustr->len) {
             // TODO: overlap
@@ -215,7 +228,7 @@ void ustring_dump(UString *ustr) /* NONNULL() */
         }
     }
     if (len > 0) {
-        _ustring_maybe_expand(ustr, len);
+        _ustring_maybe_expand_of(ustr, len);
         ustr->len += len;
         ustr->ptr[ustr->len] = 0;
         p = ustr->ptr + ustr->len;
@@ -253,7 +266,7 @@ void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t l
     require_else_return(NULL != ustr);
     require_else_return(position <= ustr->len);
 
-    _ustring_maybe_expand(ustr, length);
+    _ustring_maybe_expand_of(ustr, length);
     if (c >= ustr->ptr && c <= ustr->ptr + ustr->len) {
         size_t offset = c - ustr->ptr;
         size_t precount = 0;
@@ -280,7 +293,7 @@ void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t l
         }
     }
     ustr->len += length;
-    ustr->ptr[ustr->len] = U_NUL;
+    ustr->ptr[ustr->len] = 0;
 }
 
 UString *ustring_dup_string_len(const UChar *from, size_t length) /* NONNULL() */
@@ -294,7 +307,7 @@ UString *ustring_dup_string_len(const UChar *from, size_t length) /* NONNULL() *
     ustr->allocated = nearest_power(ustr->len);
     ustr->ptr = mem_new_n(UChar, ustr->allocated + 1);
     u_memcpy(ustr->ptr, from, ustr->len);
-    ustr->ptr[ustr->len] = U_NUL;
+    ustr->ptr[ustr->len] = 0;
 
     return ustr;
 }
@@ -344,4 +357,67 @@ void ustring_rtrim(UString *ustr) /* NONNULL() */
     require_else_return(NULL != ustr);
 
     ustr->len = u_rtrim(ustr->ptr, ustr->len, NULL, -1);
+}
+
+typedef int32_t (*func_full_case_mapping_t)(UChar *, int32_t, const UChar *, int32_t, UBreakIterator *ubrk, const char *, UErrorCode *);
+
+static int32_t u_strFoldCaseEx(UChar *dest, int32_t destCapacity, const UChar *src, int32_t srcLength, UBreakIterator *UNUSED(ubrk), const char *UNUSED(locale), UErrorCode *status)
+{
+    return u_strFoldCase(dest, destCapacity, src, srcLength, U_FOLD_CASE_DEFAULT, status);
+}
+
+static int32_t u_strToLowerEx(UChar *dest, int32_t destCapacity, const UChar *src, int32_t srcLength, UBreakIterator *UNUSED(ubrk), const char *locale, UErrorCode *status)
+{
+    return u_strToLower(dest, destCapacity, src, srcLength, locale, status);
+}
+
+static int32_t u_strToUpperEx(UChar *dest, int32_t destCapacity, const UChar *src, int32_t srcLength, UBreakIterator *UNUSED(ubrk), const char *locale, UErrorCode *status)
+{
+    return u_strToUpper(dest, destCapacity, src, srcLength, locale, status);
+}
+
+struct case_mapping_t {
+    const char *name; // ICU real/called name function
+    func_full_case_mapping_t func;
+};
+
+static const struct case_mapping_t unicode_case_mapping[UCASE_COUNT] = {
+    { NULL,            NULL },
+    { "u_strFoldCase", u_strFoldCaseEx },
+    { "u_strToLower",  u_strToLowerEx },
+    { "u_strToUpper",  u_strToUpperEx },
+    { "u_strToTitle",  u_strToTitle }
+};
+
+UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct, UBreakIterator *ubrk, error_t **error) /* NONNULL(1) */
+{
+    UErrorCode status;
+
+    require_else_return_false(NULL != ustr);
+    require_else_return_false(ct >= UCASE_NONE && ct < UCASE_COUNT);
+
+    status = U_ZERO_ERROR;
+    if (UCASE_NONE == ct) {
+        _ustring_maybe_expand_to(ustr, ustr->len = src_len);
+        // TODO: manage overlap?
+        u_memcpy(ustr->ptr, src, src_len);
+        ustr->ptr[ustr->len] = 0;
+        return TRUE;
+    }
+    do {
+        ustr->len = unicode_case_mapping[ct].func(ustr->ptr, ustr->allocated + 1, src, src_len, ubrk, NULL, &status);
+        if (U_SUCCESS(status)) {
+            break;
+        }
+        status = U_ZERO_ERROR;
+        ustr->allocated *= 2;
+        ustr->ptr = mem_renew(ustr->ptr, *ustr->ptr, ustr->allocated + 1);
+    } while (U_BUFFER_OVERFLOW_ERROR == status);
+    if (U_FAILURE(status)) {
+        error_set(error, FATAL, "ICU Error \"%s\" from %s()", u_errorName(status), unicode_case_mapping[ct].name);
+        return FALSE;
+    } else {
+        ustr->ptr[ustr->len] = 0;
+        return TRUE;
+    }
 }

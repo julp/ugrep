@@ -94,7 +94,7 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
     p = mem_new(*p);
     p->flags = flags;
     p->usearch = NULL;
-    if (NULL == (p->pattern = ustr_convert_argv_from_local(pattern, error))) {
+    if (NULL == (p->pattern = ustring_convert_argv_from_local(pattern, error))) {
         pattern_destroy(p);
         return NULL;
     }
