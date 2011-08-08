@@ -7,6 +7,7 @@
 #include <errno.h>
 
 #include <unicode/uset.h>
+#include <unicode/ubrk.h>
 
 #include "common.h"
 
@@ -82,6 +83,10 @@ Note n°2:
 Don't forget that full case mapping can change the number of code points and/or code units of a string.
 An output buffer 4 times larger than input buffer may be more appropriate?
 
+Note n°3:
+U+03A3 (Lu) // U+03C3/U+03C3 (Ll) may not work, depending on how(where) read is splitted
+
+
 char: UChar32
 string: UChar32 *
 class: UChar *
@@ -90,7 +95,6 @@ function: - (stay with char *)
 
 typedef UBool (*filter_func_t)(UChar32);
 typedef UChar32 (*simple_translate_func_t)(UChar32);
-typedef UString *(*global_translate_func_t)(UChar *); // ?
 
 typedef struct {
     const char *name;
@@ -99,11 +103,14 @@ typedef struct {
 
 typedef struct {
     const char *name;
-    simple_translate_func_t sfunc;
-    global_translate_func_t gfunc;
-} translate_func_decl_t;
+    UCaseType ct;
+} case_map_element_t;
 
 /* ========== global variables ========== */
+
+UString *ustr = NULL;
+UBreakIterator *ubrk = NULL;
+UBool possible_untermminated_word = FALSE;
 
 filter_func_decl_t filter_functions[] = {
     {"isupper",         u_isupper},
@@ -127,17 +134,26 @@ filter_func_decl_t filter_functions[] = {
     {NULL,              NULL}
 };
 
-translate_func_decl_t translate_functions[] = {
-    {"toupper", u_toupper, NULL},
-    {"tolower", u_tolower, NULL},
-    {"totitle", u_totitle, NULL},
-    {NULL,      NULL,      NULL}
+case_map_element_t case_map[] = {
+    {"toupper", UCASE_UPPER},
+    {"tolower", UCASE_LOWER},
+    {"totitle", UCASE_TITLE},
+    {NULL,      UCASE_NONE}
+};
+
+static const simple_translate_func_t simple_case_mapping[UCASE_COUNT] = {
+    NULL,      // UCASE_NONE
+    NULL,      // UCASE_FOLD
+    u_tolower,
+    u_toupper,
+    u_totitle
 };
 
 /* ========== getopt stuff ========== */
 
 enum {
     INPUT_OPT = CHAR_MAX + 1,
+    SYSTEM_OPT,
     READER_OPT
 };
 
@@ -147,6 +163,7 @@ static struct option long_options[] =
 {
     // only apply to stdin (not string from argv, always converted from system encoding)
     {"input",           required_argument, NULL, INPUT_OPT},
+    {"system",          required_argument, NULL, SYSTEM_OPT},
     {"reader",          required_argument, NULL, READER_OPT},
     {"complement",      no_argument,       NULL, 'c'},
     {"delete",          no_argument,       NULL, 'd'},
@@ -273,6 +290,16 @@ void cptr(
 
 /* ========== main ========== */
 
+static void exit_cb(void)
+{
+    if (NULL != ustr) {
+        ustring_destroy(ustr);
+    }
+    if (NULL != ubrk) {
+        ubrk_close(ubrk);
+    }
+}
+
 int main(int argc, char **argv)
 {
     int c;
@@ -281,26 +308,43 @@ int main(int argc, char **argv)
     UChar32 i32;
     error_t *error;
     reader_t reader;
+    UChar *in;
     UChar *from, *to;
+    UErrorCode status;
     UChar32 *from32, *to32;
-    simple_translate_func_t tr_func;
     filter_func_t filter_func;
     int set1_type, set2_type;
-    UBool dFlag, cFlag, isError;
-    UChar in[IN_BUFFER_SIZE + 1];
+    UBool set2_expected, dFlag, cFlag, isError;
+    UChar realin[IN_BUFFER_SIZE + 1 + 3]; // + 1 for \0, + 3 for fake characters
     UChar out[OUT_BUFFER_SIZE + 1];
     int32_t in_length, out_length;
     int32_t from_length, to_length;
+    UCaseType set1_case_type, set2_case_type;
 
     uset = NULL;
     error = NULL;
-    tr_func = NULL;
+    in = realin + 1;
     from = to = NULL;
     filter_func = NULL;
     from32 = to32 = NULL;
+    status = U_ZERO_ERROR;
     set1_type = set2_type = NONE;
-    isError = cFlag = dFlag = FALSE;
     exit_failure_value = UTR_EXIT_FAILURE;
+    set1_case_type = set2_case_type = UCASE_NONE;
+    isError = set2_expected = cFlag = dFlag = FALSE;
+
+    realin[0] = 0x0020;
+    // these following 'z', permit us to known if the word may be splitted or not
+    realin[IN_BUFFER_SIZE + 1] = 0x007A; // z (test this offset as boundary)
+    realin[IN_BUFFER_SIZE + 2] = 0x007A; // z (without it, boundary test were always true because we are at the end of the string)
+    realin[IN_BUFFER_SIZE + 3] = 0; // just in case and debugging
+
+    if (0 != atexit(exit_cb)) {
+        fputs("can't register atexit() callback", stderr);
+        return UTR_EXIT_FAILURE;
+    }
+
+    reader_init(&reader, DEFAULT_READER_NAME);
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
@@ -326,6 +370,9 @@ int main(int argc, char **argv)
                     fprintf(stderr, "Unknown reader\n");
                     return UTR_EXIT_USAGE;
                 }
+                break;
+            case SYSTEM_OPT:
+                // TODO
                 break;
             case INPUT_OPT:
                 reader_set_default_encoding(&reader, optarg);
@@ -365,75 +412,92 @@ int main(int argc, char **argv)
                 if (!strncmp("fn:", argv[0], STR_LEN("fn:"))) {
                     reader_open_string(&reader,  &error, argv[1]);
                 } else {
+                    set2_expected = TRUE;
                     reader_open_stdin(&reader, &error);
                 }
                 break;
             case 3:
                 // set1 (argv[0]) + set2 (argv[1]) + string (argv[2])
+                set2_expected = TRUE;
                 reader_open_string(&reader,  &error, argv[2]);
                 break;
             default:
                 usage();
                 break;
         }
-        if (!strncmp("fn:", argv[1], STR_LEN("fn:"))) {
-            translate_func_decl_t *f;
+        if (set2_expected) {
+            if (!strncmp("fn:", argv[1], STR_LEN("fn:"))) {
+                case_map_element_t *c;
 
-            for (f = translate_functions; NULL != f->name; f++) {
-                if (!strcmp(f->name, argv[1] + STR_LEN("fn:"))) {
-                    set2_type = SIMPLE_FUNCTION;
-                    tr_func = f->sfunc;
-                    break;
+                for (c = case_map; NULL != c->name; c++) {
+                    if (!strcmp(c->name, argv[1] + STR_LEN("fn:"))) {
+                        set2_type = SIMPLE_FUNCTION;
+                        set2_case_type = c->ct;
+                        break;
+                    }
                 }
-            }
-            if (NULL == tr_func) {
-                fprintf(stderr, "Unknown translate function '%s'\n", argv[1] + STR_LEN("fn:"));
-                return UTR_EXIT_USAGE;
-            }
-        } else {
-            if (NULL == (to32 = local_to_uchar32(argv[1], &to_length, &error))) {
-                print_error(error);
-                return UTR_EXIT_FAILURE;
-            }
-            if (1 == to_length) {
-                set2_type = CHARACTER;
+                if (UCASE_NONE == set2_case_type) {
+                    fprintf(stderr, "Unknown translate function '%s'\n", argv[1] + STR_LEN("fn:"));
+                    return UTR_EXIT_USAGE;
+                }
             } else {
-                set2_type = STRING;
+                if (NULL == (to32 = local_to_uchar32(argv[1], &to_length, &error))) {
+                    print_error(error);
+                    return UTR_EXIT_FAILURE;
+                }
+                if (1 == to_length) {
+                    set2_type = CHARACTER;
+                } else {
+                    set2_type = STRING;
+                }
             }
         }
     }
     if (!strncmp("fn:", argv[0], STR_LEN("fn:"))) {
-        filter_func_decl_t *f;
+        if (NONE == set2_type && !dFlag) {
+            case_map_element_t *c;
 
-        for (f = filter_functions; NULL != f->name; f++) {
-            if (!strcmp(f->name, argv[0] + STR_LEN("fn:"))) {
-                set1_type = FILTER_FUNCTION;
-                filter_func = f->func;
-                break;
+            for (c = case_map; NULL != c->name; c++) {
+                if (!strcmp(c->name, argv[0] + STR_LEN("fn:"))) {
+                    set1_type = GLOBAL_FUNCTION;
+                    set1_case_type = c->ct;
+                    break;
+                }
             }
-        }
-        if (NULL == filter_func) {
-            fprintf(stderr, "Unknown filter function '%s'\n", argv[0] + STR_LEN("fn:"));
-            return UTR_EXIT_USAGE;
+            if (UCASE_NONE == set1_case_type) {
+                fprintf(stderr, "Unknown translate function '%s'\n", argv[0] + STR_LEN("fn:"));
+                return UTR_EXIT_USAGE;
+            }
+        } else {
+            filter_func_decl_t *f;
+
+            for (f = filter_functions; NULL != f->name; f++) {
+                if (!strcmp(f->name, argv[0] + STR_LEN("fn:"))) {
+                    set1_type = FILTER_FUNCTION;
+                    filter_func = f->func;
+                    break;
+                }
+            }
+            if (NULL == filter_func) {
+                fprintf(stderr, "Unknown filter function '%s'\n", argv[0] + STR_LEN("fn:"));
+                return UTR_EXIT_USAGE;
+            }
         }
     } else if ('[' == *argv[0]) {
         set1_type = SET;
         if (NULL == (uset = create_set_from_argv(argv[0], cFlag, &error))) {
             print_error(error);
-            return UTR_EXIT_FAILURE;
         }
     } else {
         if (NULL == (from32 = local_to_uchar32(argv[0], &from_length, &error))) {
             print_error(error);
-            return UTR_EXIT_FAILURE;
         }
         if (1 == from_length) {
             set1_type = CHARACTER;
         } else {
-            if (cFlag) { // reajust
+            if (cFlag) { // readjust
                 if (NULL == (uset = create_set_from_string32(from32, from_length, cFlag, &error))) {
                     print_error(error);
-                    return UTR_EXIT_FAILURE;
                 }
                 set1_type = SET;
             } else {
@@ -458,13 +522,23 @@ int main(int argc, char **argv)
         }
     }
 
+    if (GLOBAL_FUNCTION == set1_type /*&& set2_type == NONE*/) {
+        ustr = ustring_new();
+        if (set1_case_type == UCASE_TITLE) {
+            ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
+            if (U_FAILURE(status)) {
+                icu_msg(FATAL, status, "ubrk_open");
+            }
+        }
+    }
+
     while (!reader_eof(&reader)) {
         out_length = 0;
         if (-1 == (in_length = reader_readuchars(&reader, &error, in, IN_BUFFER_SIZE))) {
             print_error(error);
         }
-debug("in_length = %d", in_length);
-        in[in_length] = 0;
+// debug("in_length = %d", in_length);
+        // don't append a nul character: work with lengths (needed for correct titlecasing)
         if (SET == set1_type || FILTER_FUNCTION == set1_type) {
             int i;
 
@@ -481,7 +555,7 @@ debug("in_length = %d", in_length);
                     } else if (CHARACTER == set2_type) {
                         i32 = *to32;
                     } else if (SIMPLE_FUNCTION == set2_type) {
-                        i32 = tr_func(i32);
+                        i32 = simple_case_mapping[set2_case_type](i32);
                     }
                     U16_APPEND(out, out_length, OUT_BUFFER_SIZE, i32, isError);
                 } else {
@@ -501,10 +575,30 @@ debug("in_length = %d", in_length);
                 to32 = mem_new_n(*to32, from_length); // we don't use \0 in fact, so forget "+ 1"
                 to_length = from_length;
                 for (i = 0; i < from_length; i++) {
-                    to32[i] = tr_func(from32[i]);
+                    to32[i] = simple_case_mapping[set2_case_type](from32[i]);
                 }
             }
             trtr(from32, from_length, to32, to_length, in, in_length, out, &out_length, OUT_BUFFER_SIZE);
+        } else if (GLOBAL_FUNCTION == set1_type /*&& set2_type == NONE*/) {
+            // out and out_length unused: static buffer unappropriate for this case
+            if (UCASE_TITLE == set1_case_type) {
+                if (possible_untermminated_word) {
+                    realin[0] = 0x0041; // prepend an uppercase letter (A): assume a splitted word doesn't become titlecased where it shouldn't
+                } else {
+                    realin[0] = 0x0020; // prepend a space: so we are not interfering in titlecasing
+                }
+                if (!ustring_fullcase(ustr, realin, in_length + 3, set1_case_type, ubrk, &error)) {
+                    print_error(error);
+                }
+                u_file_write(ustr->ptr + 1, ustr->len - 3, ustdout);
+                possible_untermminated_word = (in_length == IN_BUFFER_SIZE && !ubrk_isBoundary(ubrk, in_length + 1));
+            } else {
+                if (!ustring_fullcase(ustr, in, in_length, set1_case_type, ubrk, &error)) {
+                    print_error(error);
+                }
+                u_file_write(ustr->ptr, ustr->len, ustdout);
+            }
+            continue;
         } else {
             trtr(from32, from_length, to32, to_length, in, in_length, out, &out_length, OUT_BUFFER_SIZE);
         }
