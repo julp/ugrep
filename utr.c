@@ -153,7 +153,6 @@ static const simple_translate_func_t simple_case_mapping[UCASE_COUNT] = {
 
 enum {
     INPUT_OPT = CHAR_MAX + 1,
-    SYSTEM_OPT,
     READER_OPT
 };
 
@@ -163,7 +162,6 @@ static struct option long_options[] =
 {
     // only apply to stdin (not string from argv, always converted from system encoding)
     {"input",           required_argument, NULL, INPUT_OPT},
-    {"system",          required_argument, NULL, SYSTEM_OPT},
     {"reader",          required_argument, NULL, READER_OPT},
     {"complement",      no_argument,       NULL, 'c'},
     {"delete",          no_argument,       NULL, 'd'},
@@ -370,9 +368,6 @@ int main(int argc, char **argv)
                     fprintf(stderr, "Unknown reader\n");
                     return UTR_EXIT_USAGE;
                 }
-                break;
-            case SYSTEM_OPT:
-                // TODO
                 break;
             case INPUT_OPT:
                 reader_set_default_encoding(&reader, optarg);
