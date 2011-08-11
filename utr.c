@@ -153,6 +153,9 @@ static const simple_translate_func_t simple_case_mapping[UCASE_COUNT] = {
 
 enum {
     INPUT_OPT = CHAR_MAX + 1,
+    STDIN_OPT,
+    OUTPUT_OPT,
+    SYSTEM_OPT,
     READER_OPT
 };
 
@@ -162,6 +165,9 @@ static struct option long_options[] =
 {
     // only apply to stdin (not string from argv, always converted from system encoding)
     {"input",           required_argument, NULL, INPUT_OPT},
+    {"stdin",           required_argument, NULL, STDIN_OPT},
+    {"output",          required_argument, NULL, OUTPUT_OPT},
+    {"system",          required_argument, NULL, SYSTEM_OPT},
     {"reader",          required_argument, NULL, READER_OPT},
     {"complement",      no_argument,       NULL, 'c'},
     {"delete",          no_argument,       NULL, 'd'},
@@ -370,7 +376,17 @@ int main(int argc, char **argv)
                 }
                 break;
             case INPUT_OPT:
-                reader_set_default_encoding(&reader, optarg);
+                //reader_set_default_encoding(&reader, optarg);
+                util_set_inputs_encoding(optarg);
+                break;
+            case STDIN_OPT:
+                util_set_stdin_encoding(optarg);
+                break;
+            case OUTPUT_OPT:
+                util_set_outputs_encoding(optarg);
+                break;
+            case SYSTEM_OPT:
+                util_set_system_encoding(optarg);
                 break;
             default:
                 usage();
@@ -379,6 +395,8 @@ int main(int argc, char **argv)
     }
     argc -= optind;
     argv += optind;
+
+    util_apply();
 
     if (dFlag) {
         switch (argc) {

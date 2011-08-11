@@ -174,8 +174,11 @@ static UBool is_patternC(const char *pattern)
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = CHAR_MAX + 1,
-    INPUT_OPT,
+    INPUT_OPT = CHAR_MAX + 1,
+    STDIN_OPT,
+    OUTPUT_OPT,
+    SYSTEM_OPT,
+    BINARY_OPT,
 // #ifndef NO_COLOR
     COLOR_OPT,
 // #endif /* !NO_COLOR */
@@ -190,12 +193,15 @@ static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilnqsvwx";
 
 static struct option long_options[] =
 {
+    {"input",               required_argument, NULL, INPUT_OPT},
+    {"stdin",               required_argument, NULL, STDIN_OPT},
+    {"output",              required_argument, NULL, OUTPUT_OPT},
+    {"system",              required_argument, NULL, SYSTEM_OPT},
 // #ifndef NO_COLOR
     {"color",               required_argument, NULL, COLOR_OPT},
     {"colour",              required_argument, NULL, COLOR_OPT},
 // #endif /* !NO_COLOR */
     {"binary-files",        required_argument, NULL, BINARY_OPT},
-    {"input",               required_argument, NULL, INPUT_OPT},
     {"reader",              required_argument, NULL, READER_OPT},
     {"after-context",       required_argument, NULL, 'A'},
     {"before-context",      required_argument, NULL, 'B'},
@@ -1253,7 +1259,17 @@ int main(int argc, char **argv)
                 }
                 break;
             case INPUT_OPT:
-                reader_set_default_encoding(&reader, optarg);
+                //reader_set_default_encoding(&reader, optarg);
+                util_set_inputs_encoding(optarg);
+                break;
+            case STDIN_OPT:
+                util_set_stdin_encoding(optarg);
+                break;
+            case OUTPUT_OPT:
+                util_set_outputs_encoding(optarg);
+                break;
+            case SYSTEM_OPT:
+                util_set_system_encoding(optarg);
                 break;
             default:
                 usage();
@@ -1265,6 +1281,8 @@ int main(int argc, char **argv)
     }
     argc -= optind;
     argv += optind;
+
+    util_apply();
 
     reader_set_binary_behavior(&reader, binbehave);
 

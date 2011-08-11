@@ -29,6 +29,11 @@ UBool stdout_is_tty(void)
     return (isatty(STDOUT_FILENO));
 }
 
+UBool stdin_is_tty(void)
+{
+    return (isatty(STDIN_FILENO));
+}
+
 UChar *local_to_uchar(const char *cargv, int32_t *uargv_length, error_t **error)
 {
     UChar *uargv;
@@ -231,6 +236,7 @@ int32_t u_rtrim(UChar *s, int32_t s_length, UChar *what, int32_t what_length)
 
 INITIALIZER_P(ustdio_init)
 {
+#if 0
 #ifdef _MSC_VER
     GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
     if (stdout_is_tty()) {
@@ -256,4 +262,162 @@ INITIALIZER_P(ustdio_init)
 
     debug("system locale = " YELLOW("%s"), u_fgetlocale(ustdout));
     debug("system codepage = " YELLOW("%s"), u_fgetcodepage(ustdout));
+#endif
 }
+
+/**
+ * 1 inputs in general
+ * 2 outputs (stdout/stderr)
+ * 3 stdin as special input case (if absent, inherits from 1 if !stdin_is_tty, 2 if stdin_is_tty, else default)
+ **/
+
+static const char *system_encoding = NULL;
+static const char *inputs_encoding = NULL;
+static const char *outputs_encoding = NULL;
+static const char *stdin_encoding = NULL;
+
+// il faut les passer à reader encore ... (ou alors il les demande via des helpers - c'est encore mieux)
+
+// Dans la mesure du possible:
+// - ne pas changer l'encodage system
+// - ne pas utiliser NULL comme nom de codepage
+// ???
+
+
+/**
+ *                          SYSTEM
+ *                          /    \
+ *                         /     \
+ *                        /      \
+ * outputs (stdout and stderr)   inputs in general
+ *                       /        \
+ *                      /         \
+ *                     /          \
+ *    if(stdin_is_tty) \          / if(!stdin_is_tty)
+ *                     \         /
+ *                     \        /
+ *                     \       /
+ *                     \      /
+ *                     \     /
+ *                      stdin
+ **/
+
+INITIALIZER_P(util_init)
+{
+#ifdef _MSC_VER
+    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
+    if (stdout_is_tty()) {
+        char cp[30] = { 0 };
+
+        snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
+        outputs_encoding = strdup(cp); // TODO: leak
+    }
+#endif /* _MSC_VER */
+}
+
+#if 0
+UBool util_override_system_codepage(const char *encoding)
+{
+    const char *found;
+
+    found = ucnv_getDefaultName();
+    if (!strcmp(found, encoding)) {
+        return TRUE; // same encoding as found by ICU
+    } else {
+        ucnv_setDefaultName(encoding);
+        return !strcmp(found, ucnv_getDefaultName());
+    }
+}
+#endif
+
+static UBool util_check_encoding(const char *encoding)
+{
+    UConverter *ucnv;
+    UErrorCode status;
+
+    ucnv = NULL;
+    status = U_ZERO_ERROR;
+    ucnv_open(encoding, &status);
+    if (U_FAILURE(status)) {
+        return FALSE;
+    }
+    ucnv_close(ucnv);
+    return TRUE;
+}
+
+void util_set_system_encoding(const char *encoding)
+{
+    if (util_check_encoding(encoding)) {
+        system_encoding = encoding;
+    } else {
+        fprintf(stderr, "invalid systeme encoding '%s', skip\n", encoding);
+    }
+}
+
+const char *util_get_inputs_encoding(void)
+{
+    return inputs_encoding;
+}
+
+void util_set_inputs_encoding(const char *encoding)
+{
+    if (util_check_encoding(encoding)) {
+        inputs_encoding = encoding;
+    } else {
+        fprintf(stderr, "invalid encoding '%s' for inputs, skip\n", encoding);
+    }
+}
+
+void util_set_outputs_encoding(const char *encoding)
+{
+    if (util_check_encoding(encoding)) {
+        outputs_encoding = encoding;
+    } else {
+        fprintf(stderr, "invalid encoding '%s' for outputs, skip\n", encoding);
+    }
+}
+
+const char *util_get_stdin_encoding(void)
+{
+    return inputs_encoding;
+}
+
+void util_set_stdin_encoding(const char *encoding)
+{
+    if (util_check_encoding(encoding)) {
+        stdin_encoding = encoding;
+    } else {
+        fprintf(stderr, "invalid encoding '%s' for stdin, skip\n", encoding);
+    }
+}
+
+void util_apply(void)
+{
+    if (NULL != system_encoding) {
+        ucnv_setDefaultName(system_encoding);
+    }
+    ustdout = u_finit(stdout, NULL, outputs_encoding);
+    ustderr = u_finit(stderr, NULL, outputs_encoding);
+    if (NULL == stdin_encoding) {
+        if (stdin_is_tty()) {
+            stdin_encoding = outputs_encoding;
+        } else {
+            stdin_encoding = inputs_encoding;
+        }
+    }
+}
+
+#if 0
+void util_open_stdio(void)
+{
+    if (NULL != ustdout) { // just in case
+        u_fclose(ustdout);
+    }
+    ustdout = u_finit(stdout, NULL, NULL); // don't use u_fadopt on std(in|out|err)
+
+    if (NULL != ustderr) { // just in case
+        u_fclose(ustderr);
+    }
+    ustderr = u_finit(stderr, NULL, NULL); // don't use u_fadopt on std(in|out|err)
+}
+#endif

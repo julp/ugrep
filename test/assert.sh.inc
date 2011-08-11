@@ -5,6 +5,20 @@ declare -ri FALSE=1
 
 trap "rm -f /tmp/${PPID}.*" EXIT ERR SIGINT
 
+UGREP_OPTS=""
+if [ -n "${UGREP_STDIN}" ]; then
+    UGREP_OPTS="--stdin=${UGREP_STDIN} ${UGREP_OPTS}"
+fi
+if [ -n "${UGREP_INPUT}" ]; then
+    UGREP_OPTS="--input=${UGREP_INPUT} ${UGREP_OPTS}"
+fi
+if [ -n "${UGREP_OUTPUT}" ]; then
+    UGREP_OPTS="--output=${UGREP_OUTPUT} ${UGREP_OPTS}"
+fi
+if [ -n "${UGREP_SYSTEM}" ]; then
+    UGREP_OPTS="--system=${UGREP_SYSTEM} ${UGREP_OPTS}"
+fi
+
 __assertTrue() {
     if eval $2; then
         printf "%s, %s: [ \e[%d;01m%s\e[0m ]\n" `basename $0` "$1" 32 OK

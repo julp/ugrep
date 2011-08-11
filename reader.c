@@ -59,7 +59,7 @@ void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
     require_else_return(NULL != this);
 
     this->sourcename = NULL;
-    this->default_encoding = NULL;
+    this->default_encoding = util_get_inputs_encoding();
     if (NULL != name) {
         reader_set_imp_by_name(this, name);
     } else {
@@ -195,7 +195,7 @@ UBool reader_open_string(reader_t *this, error_t **error, const char *string) /*
     if (NULL == (this->priv_imp = this->imp->open(error, string, -1))) {
         return FALSE;
     }
-    if (!this->imp->set_encoding(error, this->priv_imp, NULL)) { /* NULL <=> inherit system encoding */
+    if (!this->imp->set_encoding(error, this->priv_imp, util_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
         return FALSE;
     }
 
