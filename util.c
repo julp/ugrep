@@ -405,6 +405,10 @@ void util_apply(void)
             stdin_encoding = inputs_encoding;
         }
     }
+#ifdef DEBUG
+    debug("system encoding = " YELLOW("%s"), ucnv_getDefaultName());
+    debug("outputs encoding = " YELLOW("%s"), u_fgetcodepage(ustdout));
+#endif /* DEBUG */
 }
 
 #if 0

@@ -237,7 +237,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
     }
 
     //encoding = NULL;
-    encoding = this->default_encoding;
+    encoding = util_get_inputs_encoding();
     status = U_ZERO_ERROR;
     this->lineno = 0;
     this->binary = FALSE;
