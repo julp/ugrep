@@ -9,6 +9,7 @@ typedef struct {
 } UString;
 
 typedef enum {
+    UCASE_FAKE = -1, // quiet gcc
     UCASE_NONE,
     UCASE_FOLD,
     UCASE_LOWER,

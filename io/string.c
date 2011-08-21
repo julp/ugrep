@@ -19,7 +19,7 @@ static void *string_open(error_t **UNUSED(error), const char *buffer, int length
 
     this = mem_new(*this);
     this->ptr = this->start = buffer;
-    this->length = length < 0 ? strlen(buffer) : length;
+    this->length = length < 0 ? strlen(buffer) : (size_t) length;
     this->end = this->start + this->length;
     this->ucnv = NULL;
     this->pendingCU = 0;

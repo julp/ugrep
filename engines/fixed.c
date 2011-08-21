@@ -37,20 +37,18 @@ static void *engine_fixed_compile(error_t **error, const UChar *upattern, int32_
         UCollator *ucol;
         UErrorCode status;
         UBreakIterator *ubrk;
-        const char *inherited_loc;
 
         ubrk = NULL;
         status = U_ZERO_ERROR;
-        inherited_loc = uloc_getDefault();
         if (IS_WORD_BOUNDED(flags)) {
-            ubrk = ubrk_open(UBRK_WORD, inherited_loc, USEARCH_FAKE_USTR, &status);
+            ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
             if (U_FAILURE(status)) {
                 pattern_destroy(p);
                 icu_error_set(error, FATAL, status, "ubrk_open");
                 return NULL;
             }
         }
-        ucol = ucol_open(inherited_loc, &status);
+        ucol = ucol_open(NULL, &status);
         if (U_FAILURE(status)) {
             if (NULL != ubrk) {
                 ubrk_close(ubrk);
@@ -101,19 +99,17 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
     if (IS_WORD_BOUNDED(flags) || (IS_CASE_INSENSITIVE(flags) && !IS_WHOLE_LINE(flags))) {
         UCollator *ucol;
         UBreakIterator *ubrk;
-        const char *inherited_loc;
 
         ubrk = NULL;
-        inherited_loc = uloc_getDefault();
         if (IS_WORD_BOUNDED(flags)) {
-            ubrk = ubrk_open(UBRK_WORD, inherited_loc, USEARCH_FAKE_USTR, &status);
+            ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
             if (U_FAILURE(status)) {
                 pattern_destroy(p);
                 icu_error_set(error, FATAL, status, "ubrk_open");
                 return NULL;
             }
         }
-        ucol = ucol_open(inherited_loc, &status);
+        ucol = ucol_open(NULL, &status);
         if (U_FAILURE(status)) {
             if (NULL != ubrk) {
                 ubrk_close(ubrk);

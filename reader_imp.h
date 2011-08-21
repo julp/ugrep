@@ -29,7 +29,7 @@ typedef struct {
     do {                                             \
         size_t n;                                    \
                                                      \
-        if (end - ptr > max_len) {                   \
+        if ((size_t) (end - ptr) > max_len) {        \
             n = max_len;                             \
         } else {                                     \
             n = end - ptr;                           \
@@ -62,7 +62,7 @@ typedef struct {
             return -1;                                                                                             \
         }                                                                                                          \
         count = dest - buffer;                                                                                     \
-        if (count == max_len && !U16_IS_SINGLE(buffer[count - 1]) && U16_IS_LEAD(buffer[count - 1])) {             \
+        if ((size_t) count == max_len && !U16_IS_SINGLE(buffer[count - 1]) && U16_IS_LEAD(buffer[count - 1])) {    \
             pendingCU = buffer[--count];                                                                           \
         }                                                                                                          \
                                                                                                                    \
@@ -72,7 +72,7 @@ typedef struct {
 # define STRING_READUCHARS32(error, ucnv, ptr, end, buffer, max_len)         \
     do {                                                                     \
         UChar32 c;                                                           \
-        int32_t i;                                                           \
+        size_t i;                                                            \
         UErrorCode status;                                                   \
                                                                              \
         status = U_ZERO_ERROR;                                               \
