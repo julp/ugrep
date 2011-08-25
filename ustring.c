@@ -391,6 +391,7 @@ static const struct case_mapping_t unicode_case_mapping[UCASE_COUNT] = {
 
 UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct, UBreakIterator *ubrk, error_t **error) /* NONNULL(1) */
 {
+    int32_t len;
     UErrorCode status;
 
     require_else_return_false(NULL != ustr);
@@ -404,15 +405,13 @@ UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct,
         ustr->ptr[ustr->len] = 0;
         return TRUE;
     }
-    do {
-        ustr->len = unicode_case_mapping[ct].func(ustr->ptr, ustr->allocated + 1, src, src_len, ubrk, NULL, &status);
-        if (U_SUCCESS(status)) {
-            break;
-        }
-        status = U_ZERO_ERROR;
-        ustr->allocated *= 2;
-        ustr->ptr = mem_renew(ustr->ptr, *ustr->ptr, ustr->allocated + 1);
-    } while (U_BUFFER_OVERFLOW_ERROR == status);
+    len = unicode_case_mapping[ct].func(NULL, 0, src, src_len, ubrk, NULL, &status);
+    if (U_BUFFER_OVERFLOW_ERROR != status) {
+        return FALSE;
+    }
+    status = U_ZERO_ERROR;
+    _ustring_maybe_expand_to(ustr, len);
+    ustr->len = unicode_case_mapping[ct].func(ustr->ptr, ustr->allocated + 1, src, src_len, ubrk, NULL, &status);
     if (U_FAILURE(status)) {
         error_set(error, FATAL, "ICU Error \"%s\" from %s()", u_errorName(status), unicode_case_mapping[ct].name);
         return FALSE;
