@@ -71,7 +71,7 @@ static void usage(void)
     exit(USORT_EXIT_USAGE);
 }
 
-static int usort_cmp(const void *k1, const void *k2)
+/*static int usort_cmp(const void *k1, const void *k2)
 {
     UString *s1, *s2;
 
@@ -91,7 +91,7 @@ static int usort_cmp_r(const void *k1, const void *k2)
     return ucol_strcoll(ucol, s2->ptr, s2->len, s1->ptr, s1->len);
 }
 
-static const func_cmp_t usort_cmp_func[] = { usort_cmp, usort_cmp_r };
+static const func_cmp_t usort_cmp_func[] = { usort_cmp, usort_cmp_r };*/
 
 static void usort_print(const void *k, void *v)
 {
@@ -200,7 +200,7 @@ Insensible aux accents et à la casse : Collator::STRENGTH à Collator::PRIMARY 
                 bFlag = TRUE;
                 break;
             case 'f':
-                ucol_setStrength(ucol, UCOL_PRIMARY);
+                ucol_setStrength(ucol, UCOL_SECONDARY);
                 break;
             case 'n':
                 ucol_setAttribute(ucol, UCOL_NUMERIC_COLLATION, UCOL_ON, &status);
@@ -242,7 +242,8 @@ Insensible aux accents et à la casse : Collator::STRENGTH à Collator::PRIMARY 
     argv += optind;
 
 //     if (ALL == wanted) {
-        tree = rbtree_new(usort_cmp_func[!!rFlag], (func_dtor_t) ustring_destroy, uFlag ? NULL : free);
+        //tree = rbtree_new(usort_cmp_func[!!rFlag], (func_dtor_t) ustring_destroy, uFlag ? NULL : free);
+        tree = rbtree_collated_new(ucol, (func_dtor_t) ustring_destroy, uFlag ? NULL : free, rFlag);
 //     }
 
     if (0 == argc) {

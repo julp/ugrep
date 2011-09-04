@@ -2,6 +2,8 @@
 
 # define RBTREE_H
 
+# include <unicode/ucol.h>
+
 typedef int (*func_cmp_t)(const void *, const void *); /* Comparaison callback (like strcmp)*/
 typedef void (*func_apply_t)(const void *, void *); /* Foreach callback (value) */
 //typedef void (*func_apply_arg_t)(const void *, void *, void *); /* Foreach callback (value, arg) */
@@ -17,6 +19,7 @@ typedef enum
 } traverse_mode_t;
 
 void rbtree_clear(RBTree *) NONNULL();
+RBTree *rbtree_collated_new(UCollator *, func_dtor_t, func_dtor_t, int) NONNULL(1) WARN_UNUSED_RESULT;
 void rbtree_destroy(RBTree *) NONNULL();
 int rbtree_empty(RBTree *) NONNULL();
 int rbtree_insert(RBTree *, void *, void *) NONNULL(1);

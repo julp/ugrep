@@ -1,6 +1,35 @@
 #include "common.h"
 #include "rbtree.h"
 
+typedef void *(*func_hash_t)(const void *, const void *);
+
+static int ucol_key_cmp(const void *k1, const void *k2)
+{
+    return strcmp((const char *) k1, (const char *) k2);
+}
+
+static int ucol_key_cmp_r(const void *k1, const void *k2)
+{
+    return strcmp((const char *) k2, (const char *) k1);
+}
+
+static void *ucol_compute_key(const void *value, const void *data)
+{
+    uint8_t *key;
+    int32_t key_len;
+    const UString *ustr;
+    const UCollator *ucol;
+
+    ustr = (const UString *) value;
+    ucol = (const UCollator *) data;
+    key_len = ucol_getSortKey(ucol, ustr->ptr, ustr->len, NULL, 0);
+    key = mem_new_n(*key, key_len + 1);
+    ensure(key_len == ucol_getSortKey(ucol, ustr->ptr, ustr->len, key, key_len));
+    key[key_len] = 0;
+
+    return key;
+}
+
 typedef enum {
     BLACK = 0,
     RED   = 1
@@ -9,6 +38,7 @@ typedef enum {
 struct _RBTreeNode
 {
     void *key;
+    void *hash;
     void *value;
     struct _RBTreeNode *left;
     struct _RBTreeNode *right;
@@ -31,6 +61,8 @@ struct _RBTree
     RBTreeNode *last;
     RBTreeNode *first;
     func_cmp_t cmp_func;
+    void *priv_data_hash;
+    func_hash_t hash_func;
     func_dtor_t key_dtor_func;
     func_dtor_t value_dtor_func;
 };
@@ -45,6 +77,7 @@ static RBTreeNode *_rbtreenode_new(void *key, void *data)
     node->parent = NULL;
     node->color = RED;
     node->key = key;
+    node->hash = NULL;
     node->value = data;
 
     return node;
@@ -57,10 +90,38 @@ RBTree *rbtree_new(func_cmp_t cmp_func, func_dtor_t key_dtor_func, func_dtor_t v
     require_else_return_null(NULL != cmp_func);
 
     tree = mem_new(*tree);
+    tree->priv_data_hash = NULL;
     tree->root = tree->first = tree->last = NULL;
+    tree->hash_func = NULL;
     tree->cmp_func = cmp_func;
     tree->key_dtor_func = key_dtor_func;
     tree->value_dtor_func = value_dtor_func;
+
+    return tree;
+}
+
+RBTree *rbtree_hashed_new(func_cmp_t cmp_func, func_hash_t hash_func, func_dtor_t key_dtor_func, func_dtor_t value_dtor_func) /* NONNULL(1,2) WARN_UNUSED_RESULT */
+{
+    RBTree *tree;
+
+    require_else_return_null(NULL != cmp_func);
+    require_else_return_null(NULL != hash_func);
+
+    tree = rbtree_new(cmp_func, key_dtor_func, value_dtor_func);
+    tree->hash_func = hash_func;
+
+    return tree;
+}
+
+RBTree *rbtree_collated_new(UCollator *ucol, func_dtor_t key_dtor_func, func_dtor_t value_dtor_func, int inversed) /* NONNULL(1) WARN_UNUSED_RESULT */
+{
+    RBTree *tree;
+
+    require_else_return_null(NULL != ucol);
+
+    tree = rbtree_new(inversed ? ucol_key_cmp_r : ucol_key_cmp, key_dtor_func, value_dtor_func);
+    tree->priv_data_hash = ucol;
+    tree->hash_func = ucol_compute_key;
 
     return tree;
 }
@@ -127,6 +188,7 @@ enum {
 
 int rbtree_lookup_node(RBTree *tree, void *key, RBTreeNode **parent, int *side, void **res) /* NONNULL(1, 3, 4, 5) */
 {
+    void *hash;
     RBTreeNode *node = tree->root;
 
     require_else_return_zero(tree != NULL);
@@ -137,8 +199,17 @@ int rbtree_lookup_node(RBTree *tree, void *key, RBTreeNode **parent, int *side, 
     *parent = NULL;
     *side = RIGHT;
 
+    if (NULL != tree->hash_func) {
+        hash = tree->hash_func(key, tree->priv_data_hash);
+    }
     while (NULL != node) {
-        int cmp = tree->cmp_func(key, node->key);
+        int cmp;
+
+        if (NULL != tree->hash_func) {
+            cmp = tree->cmp_func(hash, node->hash);
+        } else {
+            cmp = tree->cmp_func(key, node->key);
+        }
         if (0 == cmp) {
             *res = node->value;
             return 1;
@@ -154,6 +225,7 @@ int rbtree_lookup_node(RBTree *tree, void *key, RBTreeNode **parent, int *side, 
     }
 
     *res = _rbtreenode_new(key, NULL);
+    ((RBTreeNode *)(*res))->hash = hash;
     return 0;
 }
 
@@ -162,6 +234,9 @@ int rbtree_insert_node(RBTree *tree, RBTreeNode *new, void *value, RBTreeNode *p
     require_else_return_zero(NULL != tree);
     require_else_return_zero(NULL != new);
 
+    if (NULL != tree->hash_func && NULL == new->hash) {
+        new->hash = tree->hash_func(new->key, tree->priv_data_hash);
+    }
     new->parent = parent;
     new->value = value;
     if (NULL == parent) {
@@ -240,7 +315,6 @@ int rbtree_insert(RBTree *tree, void *key, void *value) /* NONNULL(1) */
     } else {
         return 0;
     }
-
 }
 
 static void _rbtree_destroy(RBTree *tree, RBTreeNode *node) /* NONNULL(1) */
@@ -255,6 +329,9 @@ static void _rbtree_destroy(RBTree *tree, RBTreeNode *node) /* NONNULL(1) */
         }
         if (NULL != tree->key_dtor_func) {
             tree->key_dtor_func(node->key);
+        }
+        if (NULL != tree->hash_func) {
+            free(node->hash);
         }
         free(node);
     }
@@ -376,7 +453,11 @@ static RBTreeNode *_rbtreenode_lookup(RBTree *tree, void *key) /* NONNULL(1) */
     while (NULL != node) {
         int cmp;
 
-        cmp = tree->cmp_func(key, node->key);
+        if (NULL != tree->hash_func) {
+            cmp = tree->cmp_func(key, node->hash);
+        } else {
+            cmp = tree->cmp_func(key, node->key);
+        }
         if (0 == cmp) {
             return node;
         } else if (cmp < 0) {
@@ -395,6 +476,9 @@ int rbtree_lookup(RBTree *tree, void *key, void **value) /* NONNULL(1) */
 
     require_else_return_false(NULL != tree);
 
+    if (NULL != tree->hash_func) {
+        key = tree->hash_func(key, tree->priv_data_hash);
+    }
     if (NULL == (node = _rbtreenode_lookup(tree, key))) {
         return 0;
     } else {
@@ -411,6 +495,9 @@ int rbtree_replace(RBTree *tree, void *key, void *value, int call_dtor)
 
     require_else_return_false(NULL != tree);
 
+    if (NULL != tree->hash_func) {
+        key = tree->hash_func(key, tree->priv_data_hash);
+    }
     if (NULL == (node = _rbtreenode_lookup(tree, key))) {
         return 0;
     } else {
@@ -428,6 +515,9 @@ int rbtree_remove(RBTree *tree, void *key) /* NONNULL(1) */
 
     require_else_return_false(NULL != tree);
 
+    if (NULL != tree->hash_func) {
+        key = tree->hash_func(key, tree->priv_data_hash);
+    }
     if (NULL == (node = _rbtreenode_lookup(tree, key))) {
         return 0;
     } else {
