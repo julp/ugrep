@@ -20,6 +20,7 @@ typedef struct {
     size_t size;
     size_t lineno;
     UBool binary;
+    UChar pendingCU;
 } reader_t;
 
 #define DEFAULT_READER_NAME "mmap"

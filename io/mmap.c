@@ -26,7 +26,6 @@ typedef struct {
     size_t len;
     char *start, *end, *ptr;
     UConverter *ucnv;
-    UChar pendingCU;
 } mmfd_t;
 
 static void *mmap_open(error_t **error, const char *filename, int fd)
@@ -79,7 +78,6 @@ static void *mmap_open(error_t **error, const char *filename, int fd)
     this->ptr = this->start;
     this->end = this->start + this->len;
     this->ucnv = NULL;
-    this->pendingCU = 0;
 
     return this;
 
@@ -114,7 +112,7 @@ static int32_t mmap_readuchars(error_t **error, void *data, UChar *buffer, size_
 {
     FETCH_DATA(data, this, mmfd_t);
 
-    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len, this->pendingCU);
+    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len);
 }
 
 static int32_t mmap_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
@@ -128,7 +126,7 @@ static void mmap_rewind(void *data, int32_t signature_length)
 {
     FETCH_DATA(data, this, mmfd_t);
 
-    STRING_REWIND(this->start, this->ptr, signature_length, this->pendingCU);
+    STRING_REWIND(this->start, this->ptr, signature_length);
 }
 
 static UBool mmap_readline(error_t **error, void *data, UString *ustr)
@@ -170,7 +168,7 @@ static UBool mmap_eof(void *data)
 {
     FETCH_DATA(data, this, mmfd_t);
 
-    STRING_EOF(this->ptr, this->end, this->pendingCU);
+    STRING_EOF(this->ptr, this->end);
 }
 
 static UBool mmap_seekable(void *UNUSED(data))

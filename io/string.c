@@ -9,7 +9,6 @@ typedef struct {
     size_t length;
     UConverter *ucnv;
     char *start, *end, *ptr;
-    UChar pendingCU;
 } string_input_t;
 
 
@@ -22,7 +21,6 @@ static void *string_open(error_t **UNUSED(error), const char *buffer, int length
     this->length = length < 0 ? strlen(buffer) : (size_t) length;
     this->end = this->start + this->length;
     this->ucnv = NULL;
-    this->pendingCU = 0;
 
     return this;
 }
@@ -31,7 +29,7 @@ static int32_t string_readuchars(error_t **error, void *data, UChar *buffer, siz
 {
     FETCH_DATA(data, this, string_input_t);
 
-    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len, this->pendingCU);
+    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len);
 }
 
 static int32_t string_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
@@ -45,7 +43,7 @@ static void string_rewind(void *data, int32_t signature_length)
 {
     FETCH_DATA(data, this, string_input_t);
 
-    STRING_REWIND(this->start, this->ptr, signature_length, this->pendingCU);
+    STRING_REWIND(this->start, this->ptr, signature_length);
 }
 
 static UBool string_readline(error_t **error, void *data, UString *ustr)
@@ -87,7 +85,7 @@ static UBool string_eof(void *data)
 {
     FETCH_DATA(data, this, string_input_t);
 
-    STRING_EOF(this->ptr, this->end, this->pendingCU);
+    STRING_EOF(this->ptr, this->end);
 }
 
 static UBool string_seekable(void *UNUSED(data))

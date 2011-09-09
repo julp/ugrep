@@ -12,7 +12,6 @@ typedef struct {
     UConverter *ucnv;
     char *start, *ptr, *end;
     size_t len;
-    UChar pendingCU;
 } compressedfd_t;
 
 #ifdef HAVE_ZLIB
@@ -61,7 +60,6 @@ static void *compressedgz_open(error_t **error, const char *filename, int fd)
     this->len = ret;
     this->end = this->start + this->len;
     this->ucnv = NULL;
-    this->pendingCU = 0;
 
     return this;
 
@@ -112,7 +110,6 @@ static void *compressedbz2_open(error_t **error, const char *filename, int fd)
     this->len = ret;
     this->end = this->start + this->len;
     this->ucnv = NULL;
-    this->pendingCU = 0;
 
     return this;
 
@@ -139,7 +136,7 @@ static int32_t compressed_readuchars(error_t **error, void *data, UChar *buffer,
 {
     FETCH_DATA(data, this, compressedfd_t);
 
-    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len, this->pendingCU);
+    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len);
 }
 
 static int32_t compressed_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
@@ -153,7 +150,7 @@ static void compressed_rewind(void *data, int32_t signature_length)
 {
     FETCH_DATA(data, this, compressedfd_t);
 
-    STRING_REWIND(this->start, this->ptr, signature_length, this->pendingCU);
+    STRING_REWIND(this->start, this->ptr, signature_length);
 }
 
 static UBool compressed_readline(error_t **error, void *data, UString *ustr)
@@ -195,7 +192,7 @@ static UBool compressed_eof(void *data)
 {
     FETCH_DATA(data, this, compressedfd_t);
 
-    STRING_EOF(this->ptr, this->end, this->pendingCU);
+    STRING_EOF(this->ptr, this->end);
 }
 
 static UBool compressed_seekable(void *UNUSED(data))

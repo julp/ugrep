@@ -72,6 +72,7 @@ void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
     this->size = 0;
     this->lineno = 0;
     this->binary = FALSE;
+    this->pendingCU = 0;
 }
 
 reader_imp_t *reader_get_by_name(const char *name)
@@ -129,15 +130,29 @@ UBool reader_eof(reader_t *this) /* NONNULL(1) */
 {
     require_else_return_false(NULL != this);
 
-    return this->imp->eof(this->priv_imp);
+    return 0 == this->pendingCU && this->imp->eof(this->priv_imp);
 }
 
 int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t max_len) /* NONNULL(1, 3) */
 {
+    int32_t count;
+
     require_else_return_val(NULL != this, -1);
     require_else_return_val(NULL != buffer, -1);
+    require_else_return_val(max_len >= 2, -1);
 
-    return this->imp->readuchars(error, this->priv_imp, buffer, max_len);
+    if (0 != this->pendingCU) {
+        *buffer = this->pendingCU;
+        this->pendingCU = 0;
+        count = this->imp->readuchars(error, this->priv_imp, buffer + 1, max_len - 1) + 1;
+    } else {
+        count = this->imp->readuchars(error, this->priv_imp, buffer, max_len);
+    }
+    if ((size_t) count == max_len && !U16_IS_SINGLE(buffer[count - 1]) && U16_IS_LEAD(buffer[count - 1])) {
+        this->pendingCU = buffer[--count];
+    }
+
+    return count;
 }
 
 UBool reader_readline(reader_t *this, error_t **error, UString *ustr) /* NONNULL(1, 3) */
@@ -236,6 +251,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
         goto failed;
     }
 
+    this->pendingCU = 0;
     //encoding = NULL;
     encoding = this->default_encoding;
     status = U_ZERO_ERROR;
