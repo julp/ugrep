@@ -32,7 +32,7 @@ enum {
 UBool cFlag = FALSE;
 UBool fFlag = FALSE;
 
-UChar32 delim = 0x0000;
+UChar32 delim = 0x09;
 UString *ustr = NULL;
 
 /* ========== getopt stuff ========== */
@@ -224,9 +224,22 @@ int main(int argc, char **argv)
                 debug("parseFields = %d", parseFields(optarg));
                 break;
             case 'd':
-                // assumes u_countChar32 == 1
-                // change delimiter
+            {
+                UChar *uarg;
+                int32_t uarg_len;
+
+                if (NULL == (uarg = local_to_uchar(optarg, &uarg_len, &error))) {
+                    print_error(error);
+                    return UCUT_EXIT_FAILURE;
+                }
+                if (1 != u_countChar32(uarg, uarg_len)) {
+                    fprintf(stderr, "Delimiter is not a single character\n");
+                    return UCUT_EXIT_FAILURE;
+                }
+                U16_GET_UNSAFE(uarg, 0, delim);
+                free(uarg);
                 break;
+            }
             case 'f':
                 fFlag = TRUE;
                 debug("parseFields = %d", parseFields(optarg));
