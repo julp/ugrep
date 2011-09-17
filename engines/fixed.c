@@ -17,8 +17,6 @@ typedef struct {
 static void pattern_destroy(fixed_pattern_t *p)
 {
     if (NULL != p->usearch) {
-        ucol_close(usearch_getCollator(p->usearch));
-        // ubrk_close(usearch_getBreakIterator(p->usearch)); // done by usearch_close
         usearch_close(p->usearch);
     }
     ustring_destroy(p->pattern);
@@ -34,7 +32,6 @@ static void *engine_fixed_compile(error_t **error, const UChar *upattern, int32_
     p->flags = flags;
     p->usearch = NULL;
     if (IS_WORD_BOUNDED(flags) || (IS_CASE_INSENSITIVE(flags) && !IS_WHOLE_LINE(flags))) {
-        UCollator *ucol;
         UErrorCode status;
         UBreakIterator *ubrk;
 
@@ -48,27 +45,20 @@ static void *engine_fixed_compile(error_t **error, const UChar *upattern, int32_
                 return NULL;
             }
         }
-        ucol = ucol_open(NULL, &status);
+        p->usearch = usearch_open(upattern, length, USEARCH_FAKE_USTR, uloc_getDefault(), ubrk, &status);
         if (U_FAILURE(status)) {
             if (NULL != ubrk) {
                 ubrk_close(ubrk);
             }
             pattern_destroy(p);
-            icu_error_set(error, FATAL, status, "ucol_open");
+            icu_error_set(error, FATAL, status, "usearch_open");
             return NULL;
         }
         if (IS_CASE_INSENSITIVE(flags)) {
+            UCollator *ucol;
+
+            ucol = usearch_getCollator(p->usearch);
             ucol_setStrength(ucol, UCOL_PRIMARY);
-        }
-        p->usearch = usearch_openFromCollator(upattern, length, USEARCH_FAKE_USTR, ucol, ubrk, &status);
-        if (U_FAILURE(status)) {
-            if (NULL != ubrk) {
-                ubrk_close(ubrk);
-            }
-            ucol_close(ucol);
-            pattern_destroy(p);
-            icu_error_set(error, FATAL, status, "usearch_openFromCollator");
-            return NULL;
         }
     }
 
@@ -97,7 +87,6 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
         return NULL;
     }
     if (IS_WORD_BOUNDED(flags) || (IS_CASE_INSENSITIVE(flags) && !IS_WHOLE_LINE(flags))) {
-        UCollator *ucol;
         UBreakIterator *ubrk;
 
         ubrk = NULL;
@@ -109,27 +98,20 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
                 return NULL;
             }
         }
-        ucol = ucol_open(NULL, &status);
+        p->usearch = usearch_open(p->pattern->ptr, p->pattern->len, USEARCH_FAKE_USTR, uloc_getDefault(), ubrk, &status);
         if (U_FAILURE(status)) {
             if (NULL != ubrk) {
                 ubrk_close(ubrk);
             }
             pattern_destroy(p);
-            icu_error_set(error, FATAL, status, "ucol_open");
+            icu_error_set(error, FATAL, status, "usearch_open");
             return NULL;
         }
         if (IS_CASE_INSENSITIVE(flags)) {
+            UCollator *ucol;
+
+            ucol = usearch_getCollator(p->usearch);
             ucol_setStrength(ucol, UCOL_PRIMARY);
-        }
-        p->usearch = usearch_openFromCollator(p->pattern->ptr, p->pattern->len, USEARCH_FAKE_USTR, ucol, ubrk, &status);
-        if (U_FAILURE(status)) {
-            if (NULL != ubrk) {
-                ubrk_close(ubrk);
-            }
-            ucol_close(ucol);
-            pattern_destroy(p);
-            icu_error_set(error, FATAL, status, "usearch_openFromCollator");
-            return NULL;
         }
     }
 
