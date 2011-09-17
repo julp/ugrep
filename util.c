@@ -253,6 +253,15 @@ INITIALIZER_P(ustdio_init)
         ustdout = u_finit(stdout, NULL, NULL);
         ustderr = u_finit(stderr, NULL, NULL);
     }
+    {
+        UErrorCode status;
+
+        status = U_ZERO_ERROR;
+        ucnv_setSubstChars(u_fgetConverter(ustdout), "?", 1, &status);
+        if (U_FAILURE(status)) {
+            icu_msg(FATAL, status, "ucnv_setSubstChars");
+        }
+    }
 
     debug("system locale = " YELLOW("%s"), u_fgetlocale(ustdout));
     debug("system codepage = " YELLOW("%s"), u_fgetcodepage(ustdout));
