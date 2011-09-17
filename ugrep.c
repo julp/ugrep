@@ -1079,11 +1079,13 @@ int main(int argc, char **argv)
     UBool rFlag = FALSE;
 #endif /* !WITHOUT_FTS */
     uint32_t flags;
+    int strength;
     error_t *error;
     int pattern_type; // -E/F
 
     ret = 0;
     matches = 0;
+    strength = 0;
     error = NULL;
     wFlag = FALSE;
     iFlag = FALSE;
@@ -1193,6 +1195,7 @@ int main(int argc, char **argv)
                 break;
             case 'i':
                 iFlag = TRUE;
+                strength++;
                 break;
             case 'l':
                 lFlag = TRUE;
@@ -1285,7 +1288,7 @@ int main(int argc, char **argv)
         if (argc < 1) {
             usage();
         } else {
-            if (!add_patternC(&error, patterns, *argv++, pattern_type, flags)) {
+            if (!add_patternC(&error, patterns, *argv++, pattern_type, strength | flags)) {
                 print_error(error);
             }
             argc--;

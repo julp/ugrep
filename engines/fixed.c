@@ -58,7 +58,7 @@ static void *engine_fixed_compile(error_t **error, const UChar *upattern, int32_
             UCollator *ucol;
 
             ucol = usearch_getCollator(p->usearch);
-            ucol_setStrength(ucol, UCOL_PRIMARY);
+            ucol_setStrength(ucol, (flags & ~OPT_MASK) > 1 ? UCOL_SECONDARY : UCOL_PRIMARY);
         }
     }
 
@@ -111,7 +111,7 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
             UCollator *ucol;
 
             ucol = usearch_getCollator(p->usearch);
-            ucol_setStrength(ucol, UCOL_PRIMARY);
+            ucol_setStrength(ucol, (flags & ~OPT_MASK) > 1 ? UCOL_SECONDARY : UCOL_PRIMARY);
         }
     }
 

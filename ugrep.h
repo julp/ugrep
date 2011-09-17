@@ -9,11 +9,10 @@
 # include "intervals.h"
 # include "fixed_circular_list.h"
 
-enum {
-    OPT_CASE_INSENSITIVE = 1,
-    OPT_WORD_BOUND       = 2,
-    OPT_WHOLE_LINE_MATCH = 4
-} /*engine_flag_t*/;
+# define OPT_CASE_INSENSITIVE 0x00010000
+# define OPT_WORD_BOUND       0x00020000
+# define OPT_WHOLE_LINE_MATCH 0x00040000
+# define OPT_MASK             0xFFFF0000
 
 # define IS_CASE_INSENSITIVE(flags) ((flags & OPT_CASE_INSENSITIVE))
 # define IS_WHOLE_LINE(flags)       ((flags & OPT_WHOLE_LINE_MATCH))
