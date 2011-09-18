@@ -12,8 +12,13 @@ declare -r DATADIR="${TESTDIR}/data"
 
 . ${TESTDIR}/assert.sh.inc
 
-FILE="${DATADIR}/utf8_eleve.txt"
-UFILE="${DATADIR}/iso88591_eleve.txt"
+if [ "${UGREP_SYSTEM}" == 'UTF-8' ]; then
+    FILE="${DATADIR}/utf8_eleve.txt"
+    UFILE="${DATADIR}/iso88591_eleve.txt"
+else
+    FILE="${DATADIR}/iso88591_eleve.txt"
+    UFILE="${DATADIR}/utf8_eleve.txt"
+fi
 
 ARGS='--color=never -HnA 2 -B 3 after_context ugrep.c'
 assertOutputValueEx "-A 2 -B 3 (without -v)" "LC_ALL=C ./ugrep ${ARGS} 2>/dev/null" "grep ${ARGS}"

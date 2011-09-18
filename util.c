@@ -44,7 +44,7 @@ UChar *local_to_uchar(const char *cargv, int32_t *uargv_length, error_t **error)
     int32_t allocated;
 
     status = U_ZERO_ERROR;
-    ucnv = ucnv_open(NULL, &status);
+    ucnv = ucnv_open(util_get_stdin_encoding(), &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ucnv_open");
         return NULL;
@@ -397,7 +397,25 @@ void util_apply(void)
         ucnv_setDefaultName(system_encoding);
     }
     ustdout = u_finit(stdout, NULL, outputs_encoding);
+    {
+        UErrorCode status;
+
+        status = U_ZERO_ERROR;
+        ucnv_setSubstChars(u_fgetConverter(ustdout), "?", 1, &status);
+        if (U_FAILURE(status)) {
+            icu_msg(FATAL, status, "ucnv_setSubstChars");
+        }
+    }
     ustderr = u_finit(stderr, NULL, outputs_encoding);
+    {
+        UErrorCode status;
+
+        status = U_ZERO_ERROR;
+        ucnv_setSubstChars(u_fgetConverter(ustderr), "?", 1, &status);
+        if (U_FAILURE(status)) {
+            icu_msg(FATAL, status, "ucnv_setSubstChars");
+        }
+    }
     if (NULL == stdin_encoding) {
         if (stdin_is_tty()) {
             stdin_encoding = outputs_encoding;

@@ -177,15 +177,30 @@ void reader_set_user_data(reader_t *this, void *data) /* NONNULL(1) */
 
 UBool reader_open_stdin(reader_t *this, error_t **error) /* NONNULL(1) */
 {
+    UBool ret;
+    const char *encoding = NULL;
+
     require_else_return_false(NULL != this);
 
     reader_init(this, "stdio");
 
-    return reader_open(this, error, "-");
+    ret = reader_open(this, error, "-");
+    if (!this->imp->set_encoding(error, this->priv_imp, util_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
+        return FALSE;
+    }
+#ifdef DEBUG
+    if (NULL != (encoding = this->imp->get_encoding(NULL, this->priv_imp))) {
+        debug("%s, file encoding = %s", this->sourcename, encoding);
+    }
+#endif /* DEBUG */
+
+    return ret;
 }
 
 UBool reader_open_string(reader_t *this, error_t **error, const char *string) /* NONNULL(1, 3) */
 {
+    const char *encoding = NULL;
+
     require_else_return_false(NULL != this);
     require_else_return_false(NULL != string);
 
@@ -198,6 +213,11 @@ UBool reader_open_string(reader_t *this, error_t **error, const char *string) /*
     if (!this->imp->set_encoding(error, this->priv_imp, util_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
         return FALSE;
     }
+#ifdef DEBUG
+    if (NULL != (encoding = this->imp->get_encoding(NULL, this->priv_imp))) {
+        debug("%s, file encoding = %s", this->sourcename, encoding);
+    }
+#endif /* DEBUG */
 
     return TRUE;
 }
