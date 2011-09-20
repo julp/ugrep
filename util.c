@@ -263,19 +263,6 @@ static const char *stdin_encoding = NULL;
  *                      stdin
  **/
 
-INITIALIZER_P(util_init)
-{
-#ifdef _MSC_VER
-    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
-    if (stdout_is_tty()) {
-        char cp[30] = { 0 };
-
-        snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
-        outputs_encoding = strdup(cp); // TODO: leak
-    }
-#endif /* _MSC_VER */
-}
-
 #if 0
 UBool util_override_system_codepage(const char *encoding)
 {
@@ -404,3 +391,24 @@ void util_open_stdio(void)
     ustderr = u_finit(stderr, NULL, NULL); // don't use u_fadopt on std(in|out|err)
 }
 #endif
+
+INITIALIZER_P(util_init)
+{
+    char *tmp;
+
+    if (NULL != (tmp = getenv("UGREP_SYSTEM"))) {
+        util_set_system_encoding(tmp);
+    }
+    if (NULL != (tmp = getenv("UGREP_OUTPUT"))) {
+        util_set_outputs_encoding(tmp);
+    }
+#ifdef _MSC_VER
+    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
+    if (NULL == outputs_encoding && stdout_is_tty()) {
+        char cp[30] = { 0 };
+
+        snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
+        outputs_encoding = strdup(cp); // TODO: leak
+    }
+#endif /* _MSC_VER */
+}
