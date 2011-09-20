@@ -1141,6 +1141,7 @@ int main(int argc, char **argv)
                     long val;
                     char *endptr;
 
+                    errno = 0;
                     val = strtol(optarg, &endptr, 10);
                     if (0 != errno || endptr == optarg || *endptr != '\0' || val </*=*/ 0) {
                         fprintf(stderr, "Context out of range\n");
