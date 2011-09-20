@@ -24,7 +24,6 @@ void util_set_inputs_encoding(const char *);
 void util_set_outputs_encoding(const char *);
 void util_set_stdin_encoding(const char *);
 void util_set_system_encoding(const char *);
-//void ustdio_init(void);
 # ifndef _MSC_VER
 INITIALIZER_DECL(ustdio_init);
 # endif /* !_MSC_VER */
