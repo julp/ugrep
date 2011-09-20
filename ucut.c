@@ -38,15 +38,16 @@ UString *ustr = NULL;
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = CHAR_MAX + 1,
+    BINARY_OPT = CHAR_MAX + 1/*,
     INPUT_OPT,
-    READER_OPT
+    READER_OPT*/
 };
 
 static char optstr[] = "d:f:";
 
 static struct option long_options[] =
 {
+    GETOPT_COMMON_OPTIONS,
     {"bytes",           required_argument, NULL, 'b'}, // no sense? ignore?
     {"characters",      required_argument, NULL, 'c'},
     {"delimiter",       required_argument, NULL, 'd'},
@@ -244,7 +245,7 @@ int main(int argc, char **argv)
                 fFlag = TRUE;
                 debug("parseFields = %d", parseFields(optarg));
                 break;
-            case READER_OPT:
+            /*case READER_OPT:
                 if (!reader_set_imp_by_name(&reader, optarg)) {
                     fprintf(stderr, "Unknown reader\n");
                     return UCUT_EXIT_USAGE;
@@ -252,9 +253,11 @@ int main(int argc, char **argv)
                 break;
             case INPUT_OPT:
                 reader_set_default_encoding(&reader, optarg);
-                break;
+                break;*/
             default:
-                usage();
+                if (!util_opt_parse(c, optarg, &reader)) {
+                    usage();
+                }
                 break;
         }
     }

@@ -24,6 +24,23 @@ int verbosity = WARN;
 
 int exit_failure_value = 0;
 
+UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
+{
+    switch (c) {
+        case READER_OPT:
+            if (!reader_set_imp_by_name(reader, optarg)) {
+                fprintf(stderr, "Unknown reader\n");
+                return FALSE;
+            }
+            return TRUE;
+        case INPUT_OPT:
+            reader_set_default_encoding(reader, optarg);
+            return TRUE;
+        default:
+            return FALSE;
+    }
+}
+
 UBool stdout_is_tty(void)
 {
     return (isatty(STDOUT_FILENO));

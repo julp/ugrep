@@ -36,9 +36,9 @@ int binbehave = BIN_FILE_SKIP;
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = CHAR_MAX + 1,
+    BINARY_OPT = CHAR_MAX + 1/*,
     INPUT_OPT,
-    READER_OPT
+    READER_OPT*/
 };
 
 #ifndef WITHOUT_FTS
@@ -50,8 +50,12 @@ static char optstr[] = "AEHTVbehnqstuv";
 static struct option long_options[] =
 {
     {"binary-files",        required_argument, NULL, BINARY_OPT}, // grep
+#if 0
     {"input",               required_argument, NULL, INPUT_OPT}, // grep
     {"reader",              required_argument, NULL, READER_OPT}, // grep
+#else
+    GETOPT_COMMON_OPTIONS,
+#endif
     {"show-all",            no_argument,       NULL, 'A'},
     {"show-ends",           no_argument,       NULL, 'E'},
     {"with-filename",       no_argument,       NULL, 'H'}, // grep
@@ -299,7 +303,7 @@ int main(int argc, char **argv)
                     return UCAT_EXIT_USAGE;
                 }
                 break;
-            case READER_OPT:
+            /*case READER_OPT:
                 if (!reader_set_imp_by_name(&reader, optarg)) {
                     fprintf(stderr, "Unknown reader\n");
                     return UCAT_EXIT_USAGE;
@@ -307,9 +311,11 @@ int main(int argc, char **argv)
                 break;
             case INPUT_OPT:
                 reader_set_default_encoding(&reader, optarg);
-                break;
+                break;*/
             default:
-                usage();
+                if (!util_opt_parse(c, optarg, &reader)) {
+                    usage();
+                }
                 break;
         }
     }

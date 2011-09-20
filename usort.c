@@ -31,8 +31,8 @@ UBool uFlag = FALSE;
 
 enum {
     BINARY_OPT = CHAR_MAX + 1,
-    INPUT_OPT,
-    READER_OPT,
+    /*INPUT_OPT,
+    READER_OPT,*/
     MIN_OPT,
     MAX_OPT
 };
@@ -48,8 +48,8 @@ static char optstr[] = "bfnru";
 static struct option long_options[] =
 {
     {"binary-files",          required_argument, NULL, BINARY_OPT},
-    {"input",                 required_argument, NULL, INPUT_OPT},
-    {"reader" ,               required_argument, NULL, READER_OPT},
+    /*{"input",                 required_argument, NULL, INPUT_OPT},
+    {"reader" ,               required_argument, NULL, READER_OPT},*/
     {"min",                   no_argument,       NULL, MIN_OPT},
     {"max",                   no_argument,       NULL, MAX_OPT},
     {"ignore-leading-blanks", no_argument,       NULL, 'b'},
@@ -224,7 +224,7 @@ Insensible aux accents et à la casse : Collator::STRENGTH à Collator::PRIMARY 
             case MAX_OPT:
                 wanted = MAX_ONLY;
                 break;
-            case READER_OPT:
+            /*case READER_OPT:
                 if (!reader_set_imp_by_name(&reader, optarg)) {
                     fprintf(stderr, "Unknown reader\n");
                     return USORT_EXIT_USAGE;
@@ -232,9 +232,11 @@ Insensible aux accents et à la casse : Collator::STRENGTH à Collator::PRIMARY 
                 break;
             case INPUT_OPT:
                 reader_set_default_encoding(&reader, optarg);
-                break;
+                break;*/
             default:
-                usage();
+                if (!util_opt_parse(c, optarg, &reader)) {
+                    usage();
+                }
                 break;
         }
     }

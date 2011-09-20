@@ -175,11 +175,11 @@ static UBool is_patternC(const char *pattern)
 
 enum {
     BINARY_OPT = CHAR_MAX + 1,
-    INPUT_OPT,
+    //INPUT_OPT,
 // #ifndef NO_COLOR
     COLOR_OPT,
 // #endif /* !NO_COLOR */
-    READER_OPT
+    //READER_OPT
 };
 
 #ifndef WITHOUT_FTS
@@ -195,8 +195,9 @@ static struct option long_options[] =
     {"colour",              required_argument, NULL, COLOR_OPT},
 // #endif /* !NO_COLOR */
     {"binary-files",        required_argument, NULL, BINARY_OPT},
-    {"input",               required_argument, NULL, INPUT_OPT},
-    {"reader",              required_argument, NULL, READER_OPT},
+    /*{"input",               required_argument, NULL, INPUT_OPT},
+    {"reader",              required_argument, NULL, READER_OPT},*/
+    GETOPT_COMMON_OPTIONS,
     {"after-context",       required_argument, NULL, 'A'},
     {"before-context",      required_argument, NULL, 'B'},
     {"context",             required_argument, NULL, 'C'},
@@ -1250,7 +1251,7 @@ int main(int argc, char **argv)
                     return UGREP_EXIT_USAGE;
                 }
                 break;
-            case READER_OPT:
+            /*case READER_OPT:
                 if (!reader_set_imp_by_name(&reader, optarg)) {
                     fprintf(stderr, "Unknown reader\n");
                     return UGREP_EXIT_USAGE;
@@ -1258,9 +1259,11 @@ int main(int argc, char **argv)
                 break;
             case INPUT_OPT:
                 reader_set_default_encoding(&reader, optarg);
-                break;
+                break;*/
             default:
-                usage();
+                if (!util_opt_parse(c, optarg, &reader)) {
+                    usage();
+                }
                 break;
         }
         lastc = c;
