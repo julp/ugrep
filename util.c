@@ -234,37 +234,6 @@ int32_t u_rtrim(UChar *s, int32_t s_length, UChar *what, int32_t what_length)
     return _u_trim(s, s_length, what, what_length, TRIM_RIGHT);
 }
 
-INITIALIZER_P(ustdio_init)
-{
-#if 0
-#ifdef _MSC_VER
-    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
-    if (stdout_is_tty()) {
-        char cp[30] = "";
-
-        snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
-        ustdout = u_finit(stdout, NULL, cp);
-        ustderr = u_finit(stderr, NULL, cp);
-        /**
-         * /!\ Don't use ustdout or ustderr before following lines (it includes debug macro) /!\
-         **/
-        ustdout = u_finit(stdout, NULL, cp);
-        ustderr = u_finit(stderr, NULL, cp);
-    } else
-#endif /* _MSC_VER */
-    {
-        /**
-         * /!\ Don't use ustdout or ustderr before following lines (it includes debug macro) /!\
-         **/
-        ustdout = u_finit(stdout, NULL, NULL);
-        ustderr = u_finit(stderr, NULL, NULL);
-    }
-
-    debug("system locale = " YELLOW("%s"), u_fgetlocale(ustdout));
-    debug("system codepage = " YELLOW("%s"), u_fgetcodepage(ustdout));
-#endif
-}
-
 /**
  * 1 inputs in general
  * 2 outputs (stdout/stderr)
@@ -275,14 +244,6 @@ static const char *system_encoding = NULL;
 static const char *inputs_encoding = NULL;
 static const char *outputs_encoding = NULL;
 static const char *stdin_encoding = NULL;
-
-// il faut les passer à reader encore ... (ou alors il les demande via des helpers - c'est encore mieux)
-
-// Dans la mesure du possible:
-// - ne pas changer l'encodage system
-// - ne pas utiliser NULL comme nom de codepage
-// ???
-
 
 /**
  *                          SYSTEM
