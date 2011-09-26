@@ -132,6 +132,13 @@ static void compressed_close(void *data)
     free(this->start);
 }
 
+static UBool compressed_readuchar32(error_t **error, void *data, UChar32 *c)
+{
+    FETCH_DATA(data, this, compressedfd_t);
+
+    STRING_READUCHAR32(error, this->ucnv, this->ptr, this->end, c);
+}
+
 static int32_t compressed_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
 {
     FETCH_DATA(data, this, compressedfd_t);
@@ -210,6 +217,7 @@ reader_imp_t gz_reader_imp =
     compressed_close,
     compressed_eof,
     compressed_seekable,
+    compressed_readuchar32,
     compressed_readline,
     compressed_readbytes,
     compressed_readuchars,
@@ -230,6 +238,7 @@ reader_imp_t bz2_reader_imp =
     compressed_close,
     compressed_eof,
     compressed_seekable,
+    compressed_readuchar32,
     compressed_readline,
     compressed_readbytes,
     compressed_readuchars,

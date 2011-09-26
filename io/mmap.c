@@ -108,6 +108,13 @@ static void mmap_close(void *data)
 #endif /* _MSC_VER */
 }
 
+static UBool mmap_readuchar32(error_t **error, void *data, UChar32 *c)
+{
+    FETCH_DATA(data, this, mmfd_t);
+
+    STRING_READUCHAR32(error, this->ucnv, this->ptr, this->end, c);
+}
+
 static int32_t mmap_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
 {
     FETCH_DATA(data, this, mmfd_t);
@@ -185,6 +192,7 @@ reader_imp_t mmap_reader_imp =
     mmap_close,
     mmap_eof,
     mmap_seekable,
+    mmap_readuchar32,
     mmap_readline,
     mmap_readbytes,
     mmap_readuchars,

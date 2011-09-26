@@ -25,6 +25,13 @@ static void *string_open(error_t **UNUSED(error), const char *buffer, int length
     return this;
 }
 
+static UBool string_readuchar32(error_t **error, void *data, UChar32 *c)
+{
+    FETCH_DATA(data, this, string_input_t);
+
+    STRING_READUCHAR32(error, this->ucnv, this->ptr, this->end, c);
+}
+
 static int32_t string_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
 {
     FETCH_DATA(data, this, string_input_t);
@@ -101,6 +108,7 @@ reader_imp_t string_reader_imp =
     NULL,
     string_eof,
     string_seekable,
+    string_readuchar32,
     string_readline,
     string_readbytes,
     string_readuchars,

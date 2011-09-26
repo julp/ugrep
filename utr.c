@@ -21,7 +21,8 @@
  * Voluntarily small for development/test
  * Unit: code unit/UChar, so minimum is 2 not 1! (don't take care of trailing \0)
  **/
-# define IN_BUFFER_SIZE 2
+// # define IN_BUFFER_SIZE 2
+# define IN_BUFFER_SIZE 40
 #else
 # define IN_BUFFER_SIZE 1024
 #endif

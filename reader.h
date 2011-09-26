@@ -8,6 +8,12 @@ enum {
     BIN_FILE_TEXT
 };
 
+#define MAX_NFC_FACTOR  3
+#define MAX_NFKC_FACTOR 18
+
+#define UTF16_MAX_NFC_FACTOR  (U16_MAX_LENGTH * MAX_NFC_FACTOR)
+#define UTF16_MAX_NFKC_FACTOR (U16_MAX_LENGTH * MAX_NFKC_FACTOR)
+
 typedef struct {
     const char *sourcename;
     const char *default_encoding;
@@ -21,6 +27,8 @@ typedef struct {
     size_t lineno;
     UBool binary;
     UChar pendingCU;
+    UChar *auxiliaryPtr;
+    UChar auxiliaryBuffer[UTF16_MAX_NFKC_FACTOR];
 } reader_t;
 
 #define DEFAULT_READER_NAME "mmap"
