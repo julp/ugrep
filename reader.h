@@ -9,10 +9,10 @@ enum {
 };
 
 #define MAX_NFC_FACTOR  3
-#define MAX_NFKC_FACTOR 18
+#define MAX_NFD_FACTOR 18
 
-#define UTF16_MAX_NFC_FACTOR  (U16_MAX_LENGTH * MAX_NFC_FACTOR)
-#define UTF16_MAX_NFKC_FACTOR (U16_MAX_LENGTH * MAX_NFKC_FACTOR)
+#define UTF16_MAX_NFC_FACTOR (U16_MAX_LENGTH * MAX_NFC_FACTOR)
+#define UTF16_MAX_NFD_FACTOR (U16_MAX_LENGTH * MAX_NFD_FACTOR)
 
 typedef struct {
     const char *sourcename;
@@ -26,8 +26,8 @@ typedef struct {
     size_t size;
     size_t lineno;
     UBool binary;
-    int32_t nfkc_count;
-    UChar nfkc_buffer[UTF16_MAX_NFKC_FACTOR];
+    int32_t nfd_count;
+    UChar nfd_buffer[UTF16_MAX_NFD_FACTOR];
 } reader_t;
 
 #define DEFAULT_READER_NAME "mmap"

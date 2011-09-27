@@ -72,8 +72,8 @@ void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
     this->size = 0;
     this->lineno = 0;
     this->binary = FALSE;
-    this->nfkc_count = 0;
-    // *this->nfkc_buffer = 0;
+    this->nfd_count = 0;
+    // *this->nfd_buffer = 0;
 }
 
 reader_imp_t *reader_get_by_name(const char *name)
@@ -131,42 +131,28 @@ UBool reader_eof(reader_t *this) /* NONNULL(1) */
 {
     require_else_return_false(NULL != this);
 
-    return 0 == this->nfkc_count && this->imp->eof(this->priv_imp);
+    return 0 == this->nfd_count && this->imp->eof(this->priv_imp);
 }
 
 #include <unicode/unorm.h>
 
-#if 1
 #define append_uchar32_decomposed(/*reader_t **/ this, /*UChar32*/ c, /*UErrorCode*/ status) \
     do {                                                                                     \
         int32_t tmp_len, i;                                                                  \
+        UChar tmp[UTF16_MAX_NFD_FACTOR + 1] = { 0 };                                         \
         UChar cp[U16_MAX_LENGTH + 1] = { 0 };                                                \
                                                                                              \
         i = 0;                                                                               \
         U16_APPEND_UNSAFE(cp, i, c);                                                         \
-        assert(this->nfkc_count + i < ARRAY_SIZE(this->nfkc_buffer));                        \
-        u_memcpy(this->nfkc_buffer + this->nfkc_count, cp, i);                               \
-        this->nfkc_count += i;                                                               \
-    } while (0);
-#else
-#define append_uchar32_decomposed(/*reader_t **/ this, /*UChar32*/ c, /*UErrorCode*/ status) \
-    do {                                                                                     \
-        int32_t tmp_len, i;                                                                  \
-        UChar tmp[UTF16_MAX_NFKC_FACTOR + 1] = { 0 };                                        \
-        UChar cp[U16_MAX_LENGTH + 1] = { 0 };                                                \
-                                                                                             \
-        i = 0;                                                                               \
-        U16_APPEND_UNSAFE(cp, i, c);                                                         \
-        tmp_len = unorm_normalize(cp, i, UNORM_NFKC, 0, tmp, ARRAY_SIZE(tmp), &status);      \
+        tmp_len = unorm_normalize(cp, i, UNORM_NFD, 0, tmp, ARRAY_SIZE(tmp), &status);       \
         if (U_FAILURE(status)) {                                                             \
             icu_error_set(error, FATAL, status, "unorm_normalize");                          \
             return -1;                                                                       \
         }                                                                                    \
-        assert(tmp_len < ARRAY_SIZE(this->nfkc_buffer));                                     \
-        u_memcpy(this->nfkc_buffer + this->nfkc_count, tmp, tmp_len);                        \
-        this->nfkc_count += tmp_len;                                                         \
+        assert(tmp_len < ARRAY_SIZE(this->nfd_buffer));                                      \
+        u_memcpy(this->nfd_buffer + this->nfd_count, tmp, tmp_len);                          \
+        this->nfd_count += tmp_len;                                                          \
     } while (0);
-#endif
 
 int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t max_len) /* NONNULL(1, 3) */
 {
@@ -185,25 +171,25 @@ int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t
     status = U_ZERO_ERROR;
     while (count < max_len) {
         if (this->imp->eof(this->priv_imp)) {
-            if (0 != this->nfkc_count) {
+            if (0 != this->nfd_count) {
                 int32_t tmp_len;
                 UChar tmp[UTF16_MAX_NFC_FACTOR + 1] = { 0 };
 
-                tmp_len = unorm_normalize(this->nfkc_buffer, this->nfkc_count, UNORM_NFC, 0, tmp, ARRAY_SIZE(tmp), &status);
+                tmp_len = unorm_normalize(this->nfd_buffer, this->nfd_count, UNORM_NFC, 0, tmp, ARRAY_SIZE(tmp), &status);
                 if (U_FAILURE(status)) {
                     icu_error_set(error, FATAL, status, "unorm_normalize");
                     return -1;
                 }
                 u_memcpy(p, tmp, tmp_len);
                 count += tmp_len;
-                this->nfkc_count = 0;
+                this->nfd_count = 0;
             }
             break;
         }
         if (!this->imp->readuchar32(error, this->priv_imp, &c)) {
             return -1;
         }
-        if (this->nfkc_count > 0 && UNORM_YES == u_getIntPropertyValue(c, UCHAR_NFC_QUICK_CHECK /* UCHAR_NFKC_QUICK_CHECK */)) {
+        if (this->nfd_count > 0 && UNORM_YES == u_getIntPropertyValue(c, UCHAR_NFC_QUICK_CHECK)) {
             if (max_len - count < UTF16_MAX_NFC_FACTOR) {
                 append_uchar32_decomposed(this, c, status);
 
@@ -212,7 +198,7 @@ int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t
                 int32_t tmp_len;
                 UChar tmp[UTF16_MAX_NFC_FACTOR + 1] = { 0 };
 
-                tmp_len = unorm_normalize(this->nfkc_buffer, this->nfkc_count, UNORM_NFC, 0, tmp, ARRAY_SIZE(tmp), &status);
+                tmp_len = unorm_normalize(this->nfd_buffer, this->nfd_count, UNORM_NFC, 0, tmp, ARRAY_SIZE(tmp), &status);
                 if (U_FAILURE(status)) {
                     icu_error_set(error, FATAL, status, "unorm_normalize");
                     return -1;
@@ -221,7 +207,7 @@ int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t
                 u_memcpy(p, tmp, tmp_len);
                 p += tmp_len;
                 count += tmp_len;
-                this->nfkc_count = 0;
+                this->nfd_count = 0;
             }
         }
         append_uchar32_decomposed(this, c, status);
@@ -326,8 +312,8 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
         goto failed;
     }
 
-    this->nfkc_count = 0;
-    // *this->nfkc_buffer = 0;
+    this->nfd_count = 0;
+    // *this->nfd_buffer = 0;
     //encoding = NULL;
     encoding = this->default_encoding;
     status = U_ZERO_ERROR;
