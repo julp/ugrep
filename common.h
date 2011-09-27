@@ -97,7 +97,9 @@ extern char *__progname;
         }                                                                                                       \
     } while (0);
 
+# include <assert.h>
 # ifdef DEBUG
+#  undef NDEBUG
 #  define require_else_return(expr)                                                                                        \
     do {                                                                                                                   \
         if (EXPECTED(expr)) {                                                                                              \
@@ -121,6 +123,9 @@ extern char *__progname;
 #  define require_else_return_true(expr)  require_else_return_val(expr, TRUE)
 #  define require_else_return_false(expr) require_else_return_val(expr, FALSE)
 # else
+#  ifndef NDEBUG
+#   define NDEBUG
+#  endif /* !NDEBUG */
 #  define require_else_return(expr)
 #  define require_else_return_val(expr, val)
 #  define require_else_return_null(expr)

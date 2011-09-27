@@ -19,10 +19,10 @@
 #ifdef DEBUG
 /**
  * Voluntarily small for development/test
- * Unit: code unit/UChar, so minimum is 2 not 1! (don't take care of trailing \0)
+ * Unit: code unit/UChar, so minimum is the maximum length (in code unit) of a NFC normalized code point (don't take care of trailing \0)
  **/
-// # define IN_BUFFER_SIZE 2
-# define IN_BUFFER_SIZE 40
+//# define IN_BUFFER_SIZE 40
+# define IN_BUFFER_SIZE UTF16_MAX_NFC_FACTOR
 #else
 # define IN_BUFFER_SIZE 1024
 #endif
@@ -536,7 +536,7 @@ int main(int argc, char **argv)
         if (-1 == (in_length = reader_readuchars(&reader, &error, in, IN_BUFFER_SIZE))) {
             print_error(error);
         }
-// debug("in_length = %d", in_length);
+debug("in_length = %d", in_length);
         // don't append a nul character: work with lengths (needed for correct titlecasing)
         if (SET == set1_type || FILTER_FUNCTION == set1_type) {
             int i;

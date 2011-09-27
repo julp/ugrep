@@ -72,8 +72,8 @@ void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
     this->size = 0;
     this->lineno = 0;
     this->binary = FALSE;
-    *this->auxiliaryBuffer = 0;
-    this->pendingCU = 0;
+    this->nfkc_count = 0;
+    // *this->nfkc_buffer = 0;
 }
 
 reader_imp_t *reader_get_by_name(const char *name)
@@ -131,10 +131,42 @@ UBool reader_eof(reader_t *this) /* NONNULL(1) */
 {
     require_else_return_false(NULL != this);
 
-    return 0 == this->pendingCU && this->imp->eof(this->priv_imp);
+    return 0 == this->nfkc_count && this->imp->eof(this->priv_imp);
 }
 
 #include <unicode/unorm.h>
+
+#if 1
+#define append_uchar32_decomposed(/*reader_t **/ this, /*UChar32*/ c, /*UErrorCode*/ status) \
+    do {                                                                                     \
+        int32_t tmp_len, i;                                                                  \
+        UChar cp[U16_MAX_LENGTH + 1] = { 0 };                                                \
+                                                                                             \
+        i = 0;                                                                               \
+        U16_APPEND_UNSAFE(cp, i, c);                                                         \
+        assert(this->nfkc_count + i < ARRAY_SIZE(this->nfkc_buffer));                        \
+        u_memcpy(this->nfkc_buffer + this->nfkc_count, cp, i);                               \
+        this->nfkc_count += i;                                                               \
+    } while (0);
+#else
+#define append_uchar32_decomposed(/*reader_t **/ this, /*UChar32*/ c, /*UErrorCode*/ status) \
+    do {                                                                                     \
+        int32_t tmp_len, i;                                                                  \
+        UChar tmp[UTF16_MAX_NFKC_FACTOR + 1] = { 0 };                                        \
+        UChar cp[U16_MAX_LENGTH + 1] = { 0 };                                                \
+                                                                                             \
+        i = 0;                                                                               \
+        U16_APPEND_UNSAFE(cp, i, c);                                                         \
+        tmp_len = unorm_normalize(cp, i, UNORM_NFKC, 0, tmp, ARRAY_SIZE(tmp), &status);      \
+        if (U_FAILURE(status)) {                                                             \
+            icu_error_set(error, FATAL, status, "unorm_normalize");                          \
+            return -1;                                                                       \
+        }                                                                                    \
+        assert(tmp_len < ARRAY_SIZE(this->nfkc_buffer));                                     \
+        u_memcpy(this->nfkc_buffer + this->nfkc_count, tmp, tmp_len);                        \
+        this->nfkc_count += tmp_len;                                                         \
+    } while (0);
+#endif
 
 int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t max_len) /* NONNULL(1, 3) */
 {
@@ -142,105 +174,58 @@ int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t
 
     require_else_return_val(NULL != this, -1);
     require_else_return_val(NULL != buffer, -1);
-    //require_else_return_val(max_len >= 2, -1);
+    require_else_return_val(max_len >= UTF16_MAX_NFC_FACTOR, -1);
 
-    /*if (0 != this->pendingCU) {
-        *buffer = this->pendingCU;
-        this->pendingCU = 0;
-        count = this->imp->readuchars(error, this->priv_imp, buffer + 1, max_len - 1) + 1;
-    } else {
-        count = this->imp->readuchars(error, this->priv_imp, buffer, max_len);
-    }
-    if ((size_t) count == max_len && !U16_IS_SINGLE(buffer[count - 1]) && U16_IS_LEAD(buffer[count - 1])) {
-        this->pendingCU = buffer[--count];
-    }*/
-    {
-        UChar32 c;
-        UChar *p, *q; // TODO: q => this->auxiliaryPtr ?
-        UErrorCode status;
+    UChar *p;
+    UChar32 c;
+    UErrorCode status;
 
-        count = 0;
-        p = buffer;
-        status = U_ZERO_ERROR;
-        while (count < max_len) {
-            q = this->auxiliaryBuffer;
-            if (this->imp->eof(this->priv_imp)) {
-debug("%d (EOF)", __LINE__);
-                if (0 != *this->auxiliaryBuffer) {
-                    int32_t tmp_len;
-                    UChar tmp[UTF16_MAX_NFC_FACTOR + 1] = { 0 };
+    count = 0;
+    p = buffer;
+    status = U_ZERO_ERROR;
+    while (count < max_len) {
+        if (this->imp->eof(this->priv_imp)) {
+            if (0 != this->nfkc_count) {
+                int32_t tmp_len;
+                UChar tmp[UTF16_MAX_NFC_FACTOR + 1] = { 0 };
 
-debug("%d (EOF > auxiliaryBuffer != \"\")", __LINE__);
-                    tmp_len = unorm_normalize(this->auxiliaryBuffer, q - this->auxiliaryBuffer, UNORM_NFC, 0, tmp, ARRAY_SIZE(tmp), &status);
-                    if (U_FAILURE(status)) {
-                        icu_error_set(error, FATAL, status, "unorm_normalize");
-                        return -1;
-                    }
-                    u_memcpy(p, tmp, tmp_len);
-                    count += tmp_len;
-                    return count;
-                }
-            }
-            if (!this->imp->readuchar32(error, this->priv_imp, &c)) {
-                return -1;
-            }
-debug("%08X", c);
-            {
-                int i = 0;
-                U16_APPEND_UNSAFE(q, i, c);
-                q += i;
-            }
-// when we met a QC=YES code point: we NFC-compose the previous grapheme
-            if (UNORM_YES == u_getIntPropertyValue(c, UCHAR_NFKC_QUICK_CHECK)) { // NFC ou NFKC ?
-                if (max_len - count < UTF16_MAX_NFC_FACTOR) {
-debug("%d max_len = %d, count = %d (capacity may become insufficient)", __LINE__, max_len, count);
-                    return count; // break; ?
-                } else {
-                    int32_t tmp_len;
-                    UChar tmp[UTF16_MAX_NFC_FACTOR + 1] = { 0 };
-
-                    tmp_len = unorm_normalize(this->auxiliaryBuffer, q - this->auxiliaryBuffer, UNORM_NFC, 0, tmp, ARRAY_SIZE(tmp), &status);
-                    if (U_FAILURE(status)) {
-                        icu_error_set(error, FATAL, status, "unorm_normalize");
-                        return -1;
-                    }
-debug(">%.*S< >%S< %d, %d", q - this->auxiliaryBuffer, this->auxiliaryBuffer, tmp, tmp_len, count);
-                    u_memcpy(p, tmp, tmp_len);
-                    p += tmp_len;
-                    count += tmp_len;
-                }
-            } else {
-                if (0 == count) {
-                    error_set(error, FATAL, "stream starts with non stable code points");
+                tmp_len = unorm_normalize(this->nfkc_buffer, this->nfkc_count, UNORM_NFC, 0, tmp, ARRAY_SIZE(tmp), &status);
+                if (U_FAILURE(status)) {
+                    icu_error_set(error, FATAL, status, "unorm_normalize");
                     return -1;
-                } else {
-                    int32_t tmp_len, i;
-                    UChar tmp[UTF16_MAX_NFKC_FACTOR + 1] = { 0 };
-                    UChar cp[U16_MAX_LENGTH + 1] = { 0 };
-
-                    i = 0;
-                    U16_APPEND_UNSAFE(cp, i, c);
-                    tmp_len = unorm_normalize(cp, i, UNORM_NFKC, 0, tmp, ARRAY_SIZE(tmp), &status);
-                    if (U_FAILURE(status)) {
-                        icu_error_set(error, FATAL, status, "unorm_normalize");
-                        return -1;
-                    }
-                    u_memcpy(q, tmp, tmp_len);
-                    q += tmp_len;
                 }
+                u_memcpy(p, tmp, tmp_len);
+                count += tmp_len;
+                this->nfkc_count = 0;
+            }
+            break;
+        }
+        if (!this->imp->readuchar32(error, this->priv_imp, &c)) {
+            return -1;
+        }
+        if (this->nfkc_count > 0 && UNORM_YES == u_getIntPropertyValue(c, UCHAR_NFC_QUICK_CHECK /* UCHAR_NFKC_QUICK_CHECK */)) {
+            if (max_len - count < UTF16_MAX_NFC_FACTOR) {
+                append_uchar32_decomposed(this, c, status);
+
+                break;
+            } else {
+                int32_t tmp_len;
+                UChar tmp[UTF16_MAX_NFC_FACTOR + 1] = { 0 };
+
+                tmp_len = unorm_normalize(this->nfkc_buffer, this->nfkc_count, UNORM_NFC, 0, tmp, ARRAY_SIZE(tmp), &status);
+                if (U_FAILURE(status)) {
+                    icu_error_set(error, FATAL, status, "unorm_normalize");
+                    return -1;
+                }
+                assert(tmp_len < max_len - (p - buffer));
+                u_memcpy(p, tmp, tmp_len);
+                p += tmp_len;
+                count += tmp_len;
+                this->nfkc_count = 0;
             }
         }
+        append_uchar32_decomposed(this, c, status);
     }
-    {
-        int i;
-        UChar32 c;
-
-        for (i = 0; i < count; /* none */) {
-            U16_NEXT(buffer, i, count, c);
-            debug("%05X %.*S\n", c, U16_LENGTH(c), buffer + i - U16_LENGTH(c));
-        }
-    }
-
 
     return count;
 }
@@ -341,8 +326,8 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
         goto failed;
     }
 
-    *this->auxiliaryBuffer = 0;
-    this->pendingCU = 0;
+    this->nfkc_count = 0;
+    // *this->nfkc_buffer = 0;
     //encoding = NULL;
     encoding = this->default_encoding;
     status = U_ZERO_ERROR;

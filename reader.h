@@ -26,9 +26,8 @@ typedef struct {
     size_t size;
     size_t lineno;
     UBool binary;
-    UChar pendingCU;
-    UChar *auxiliaryPtr;
-    UChar auxiliaryBuffer[UTF16_MAX_NFKC_FACTOR];
+    int32_t nfkc_count;
+    UChar nfkc_buffer[UTF16_MAX_NFKC_FACTOR];
 } reader_t;
 
 #define DEFAULT_READER_NAME "mmap"
