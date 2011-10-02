@@ -302,7 +302,6 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
                     }
                     ucsdet_close(csd);
                 }
-                debug("%s, file encoding = %s", filename, encoding);
                 //this->encoding = encoding;
             } else {
                 icu_error_set(error, WARN, status, "ucnv_detectUnicodeSignature");
