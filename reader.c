@@ -216,14 +216,51 @@ int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t
     return count;
 }
 
+#define recompose_in_ustring(this, ustr) \
+    do { \
+        int32_t tmp_len; \
+        UChar tmp[UTF16_MAX_NFC_FACTOR + 1] = { 0 }; \
+ \
+        tmp_len = unorm_normalize(this->nfd_buffer, this->nfd_count, UNORM_NFC, 0, tmp, ARRAY_SIZE(tmp), &status); \
+        if (U_FAILURE(status)) { \
+            icu_error_set(error, FATAL, status, "unorm_normalize"); \
+            return FALSE; \
+        } \
+        ustring_append_string_len(ustr, tmp, tmp_len); \
+        this->nfd_count = 0; \
+    } while (0);
+
 UBool reader_readline(reader_t *this, error_t **error, UString *ustr) /* NONNULL(1, 3) */
 {
+    UChar32 c;
+    UErrorCode status;
+
     require_else_return_false(NULL != this);
     require_else_return_false(NULL != ustr);
 
     ustring_truncate(ustr);
 
-    return this->imp->readline(error, this->priv_imp, ustr);
+    status = U_ZERO_ERROR;
+    do {
+        if (this->imp->eof(this->priv_imp)) {
+            break;
+        }
+        if (!this->imp->readuchar32(error, this->priv_imp, &c)) {
+            return FALSE;
+        }
+        if (this->nfd_count > 0 && UNORM_YES == u_getIntPropertyValue(c, UCHAR_NFC_QUICK_CHECK)) {
+            recompose_in_ustring(this, ustr);
+        }
+        append_uchar32_decomposed(this, c, status);
+    } while (U_LF != c);
+
+    if (0 != this->nfd_count) {
+        recompose_in_ustring(this, ustr);
+    }
+
+    return TRUE;
+
+    //return this->imp->readline(error, this->priv_imp, ustr);
 }
 
 void reader_close(reader_t *this) /* NONNULL(1) */

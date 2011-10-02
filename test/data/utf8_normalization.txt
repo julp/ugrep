@@ -1,0 +1,5 @@
+NFC:
+J'ai 23 élèves dans ma classe.
+
+NFD:
+Il y a 12 élèves en CP.
