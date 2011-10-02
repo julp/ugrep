@@ -6,13 +6,8 @@ declare -ri FALSE=1
 trap "rm -f /tmp/${PPID}.*" EXIT ERR SIGINT
 
 UGREP_OPTS="--input=UTF-8 --stdin=UTF-8"
-if [ -n "${UGREP_OUTPUT}" ]; then
-    UGREP_OPTS="--output=${UGREP_OUTPUT} ${UGREP_OPTS}"
-fi
-if [ -n "${UGREP_SYSTEM}" ]; then
-    UGREP_OPTS="--system=${UGREP_SYSTEM} ${UGREP_OPTS}"
-else
-    UGREP_SYSTEM='UTF-8'
+if [ -z "${UGREP_SYSTEM}" ]; then
+    export UGREP_SYSTEM='UTF-8'
 fi
 #echo "UGREP_OPTS = ${UGREP_OPTS}"
 
