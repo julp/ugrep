@@ -50,6 +50,11 @@ endif(NO_COLOR)
 #
 # message(STATUS DEBUG = ${DEBUG})
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "BSD$")
+    add_definitions(-DBSD=1)
+    set(EXTRA_LIBS ${EXTRA_LIBS} "util")
+endif(${CMAKE_SYSTEM_NAME} MATCHES "BSD$")
+
 if(ZLIB_FOUND)
     set(EXTRA_SOURCES ${EXTRA_SOURCES} io/uncompressio.c)
     include_directories(${ZLIB_INCLUDE_DIR})

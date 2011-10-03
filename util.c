@@ -396,6 +396,35 @@ INITIALIZER_P(util_init)
 {
     char *tmp;
 
+#ifdef BSD
+{
+#include <sys/types.h>
+#include <pwd.h>
+#include <login_cap.h>
+
+    login_cap_t *lc;
+    struct passwd *pwd;
+
+    if (NULL != (pwd = getpwuid(getuid()))) {
+        if (NULL != (lc = login_getuserclass(pwd))) {
+            if (NULL != (tmp = login_getcapstr(lc, "charset", NULL, NULL))) {
+                util_set_system_encoding(tmp);
+            }
+            login_close(lc);
+        } else {
+            if (NULL != (lc = login_getpwclass(pwd))) {
+                if (NULL != (tmp = login_getcapstr(lc, "charset", NULL, NULL))) {
+                    util_set_system_encoding(tmp);
+                }
+                login_close(lc);
+            }
+        }
+    }
+    if (NULL != (tmp = getenv("MM_CHARSET"))) {
+        util_set_system_encoding(tmp);
+    }
+}
+#endif /* BSD */
     if (NULL != (tmp = getenv("UGREP_SYSTEM"))) {
         util_set_system_encoding(tmp);
     }
