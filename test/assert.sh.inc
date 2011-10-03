@@ -35,7 +35,7 @@ assertOutputValue() {
     fi
     __assertTrue "$1" "[[ \`$2\` ${4:-==} '$3' ]]"
 
-    if [ $? -ne $TRUE ]; then
+    if [ $? -ne $TRUE -a -n "${DEBUG}" ]; then
         X=$(${2% 2> /dev/null})
         echo "Get    : '$X'"
         echo "Expect : '$3'"
@@ -69,7 +69,7 @@ assertOutputValueEx() {
 
     assertExitValue "$1" "diff -quN ${tmp1} ${tmp2} > /dev/null" $TRUE
 
-    if [ $? -ne $TRUE ]; then
+    if [ $? -ne $TRUE -a -n "${DEBUG}" ]; then
         diff --text -uN "${tmp1}" "${tmp2}"
     fi
 
@@ -91,7 +91,7 @@ assertOutputValueExIgnoreBlanks() {
 
     assertExitValue "$1" "diff -bquN ${tmp1} ${tmp2} > /dev/null" $TRUE
 
-    if [ $? -ne $TRUE ]; then
+    if [ $? -ne $TRUE -a -n "${DEBUG}" ]; then
         diff --text -uN ${tmp1} ${tmp2}
     fi
 
