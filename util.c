@@ -10,7 +10,7 @@ char __progname[_MAX_PATH] = "<unknown>";
 #include "common.h"
 
 #ifdef _MSC_VER
-INITIALIZER_DECL(ustdio_init);
+INITIALIZER_DECL(util_init);
 #endif /* _MSC_VER */
 
 UFILE *ustdout = NULL;
