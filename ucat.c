@@ -36,9 +36,7 @@ int binbehave = BIN_FILE_SKIP;
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = CHAR_MAX + 1/*,
-    INPUT_OPT,
-    READER_OPT*/
+    BINARY_OPT = CHAR_MAX + 1
 };
 
 #ifndef WITHOUT_FTS
@@ -49,32 +47,27 @@ static char optstr[] = "AEHTVbehnqstuv";
 
 static struct option long_options[] =
 {
-    {"binary-files",        required_argument, NULL, BINARY_OPT}, // grep
-#if 0
-    {"input",               required_argument, NULL, INPUT_OPT}, // grep
-    {"reader",              required_argument, NULL, READER_OPT}, // grep
-#else
     GETOPT_COMMON_OPTIONS,
-#endif
+    {"binary-files",        required_argument, NULL, BINARY_OPT}, // grep
     {"show-all",            no_argument,       NULL, 'A'},
     {"show-ends",           no_argument,       NULL, 'E'},
     {"with-filename",       no_argument,       NULL, 'H'}, // grep
 #ifndef WITHOUT_FTS
-    {"recursive",           no_argument,       NULL, 'R'}, // grep
+    {"recursive",        no_argument,       NULL, 'R'}, // grep
 #endif /* !WITHOUT_FTS */
-    {"show-tabs",           no_argument,       NULL, 'T'},
-    {"version",             no_argument,       NULL, 'V'},
-    {"number-nonblank",     no_argument,       NULL, 'b'},
-    {"no-filename",         no_argument,       NULL, 'h'}, // grep
-    {"number",              no_argument,       NULL, 'n'},
-    {"quiet",               no_argument,       NULL, 'q'}, // grep
-    {"silent",              no_argument,       NULL, 'q'}, // grep
+    {"show-tabs",        no_argument,       NULL, 'T'},
+    {"version",          no_argument,       NULL, 'V'},
+    {"number-nonblank",  no_argument,       NULL, 'b'},
+    {"no-filename",      no_argument,       NULL, 'h'}, // grep
+    {"number",           no_argument,       NULL, 'n'},
+    {"quiet",            no_argument,       NULL, 'q'}, // grep
+    {"silent",           no_argument,       NULL, 'q'}, // grep
 #ifndef WITHOUT_FTS
-    {"recursive",           no_argument,       NULL, 'r'}, // grep
+    {"recursive",        no_argument,       NULL, 'r'}, // grep
 #endif /* !WITHOUT_FTS */
-    {"squeeze-blank",       no_argument,       NULL, 's'},
-    {"show-no-printing",    no_argument,       NULL, 'v'},
-    {NULL,                  no_argument,       NULL, 0}
+    {"squeeze-blank",    no_argument,       NULL, 's'},
+    {"show-no-printing", no_argument,       NULL, 'v'},
+    {NULL,               no_argument,       NULL, 0}
 };
 
 static void usage(void)
@@ -303,15 +296,6 @@ int main(int argc, char **argv)
                     return UCAT_EXIT_USAGE;
                 }
                 break;
-            /*case READER_OPT:
-                if (!reader_set_imp_by_name(&reader, optarg)) {
-                    fprintf(stderr, "Unknown reader\n");
-                    return UCAT_EXIT_USAGE;
-                }
-                break;
-            case INPUT_OPT:
-                reader_set_default_encoding(&reader, optarg);
-                break;*/
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
                     usage();
@@ -321,6 +305,8 @@ int main(int argc, char **argv)
     }
     argc -= optind;
     argv += optind;
+
+    util_apply();
 
     reader_set_binary_behavior(&reader, binbehave);
 

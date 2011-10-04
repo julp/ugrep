@@ -55,7 +55,7 @@ UString *ustring_convert_argv_from_local(const char *cargv, error_t **error)
     int32_t cargv_length;
 
     status = U_ZERO_ERROR;
-    ucnv = ucnv_open(NULL, &status);
+    ucnv = ucnv_open(util_get_stdin_encoding(), &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ucnv_open");
         return NULL;

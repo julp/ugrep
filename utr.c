@@ -151,18 +151,10 @@ static const simple_translate_func_t simple_case_mapping[UCASE_COUNT] = {
 
 /* ========== getopt stuff ========== */
 
-/*enum {
-    INPUT_OPT = CHAR_MAX + 1,
-    READER_OPT
-};*/
-
 static char optstr[] = "Ccdst";
 
 static struct option long_options[] =
 {
-    // only apply to stdin (not string from argv, always converted from system encoding)
-    /*{"input",           required_argument, NULL, INPUT_OPT},
-    {"reader",          required_argument, NULL, READER_OPT},*/
     GETOPT_COMMON_OPTIONS,
     {"complement",      no_argument,       NULL, 'c'},
     {"delete",          no_argument,       NULL, 'd'},
@@ -364,15 +356,6 @@ int main(int argc, char **argv)
                 fprintf(stderr, "utr version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
                 break;
-            /*case READER_OPT:
-                if (!reader_set_imp_by_name(&reader, optarg)) {
-                    fprintf(stderr, "Unknown reader\n");
-                    return UTR_EXIT_USAGE;
-                }
-                break;
-            case INPUT_OPT:
-                reader_set_default_encoding(&reader, optarg);
-                break;*/
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
                     usage();
@@ -382,6 +365,8 @@ int main(int argc, char **argv)
     }
     argc -= optind;
     argv += optind;
+
+    util_apply();
 
     if (dFlag) {
         switch (argc) {

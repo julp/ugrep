@@ -50,19 +50,19 @@ declare -r DSLLI=$'\xF0\x90\x90\xA8' # 10428, Ll
 
 . ${TESTDIR}/assert.sh.inc
 
-assertOutputValue "tr 1 CU => 0" "./utr -d [abcde] ${INPUT} 2> /dev/null" "${A}${B}${C}${D}${E}"
-assertOutputValue "tr 2 CU => 0" "./utr -d [${A}${B}${C}${D}${E}] ${INPUT} 2> /dev/null" "abcde"
+assertOutputValue "tr 1 CU => 0" "./utr ${UGREP_OPTS} -d [abcde] ${INPUT} 2> /dev/null" "${A}${B}${C}${D}${E}"
+assertOutputValue "tr 2 CU => 0" "./utr ${UGREP_OPTS} -d [${A}${B}${C}${D}${E}] ${INPUT} 2> /dev/null" "abcde"
 
-assertOutputValue "tr 1 CU => 1" "./utr abcde 12345 ${INPUT} 2> /dev/null" "1${A}2${B}3${C}4${D}5${E}"
-assertOutputValue "tr 2 CU => 1" "./utr ${A}${B}${C}${D}${E} 12345 ${INPUT} 2> /dev/null" "a1b2c3d4e5"
+assertOutputValue "tr 1 CU => 1" "./utr ${UGREP_OPTS} abcde 12345 ${INPUT} 2> /dev/null" "1${A}2${B}3${C}4${D}5${E}"
+assertOutputValue "tr 2 CU => 1" "./utr ${UGREP_OPTS} ${A}${B}${C}${D}${E} 12345 ${INPUT} 2> /dev/null" "a1b2c3d4e5"
 
-assertOutputValue "tr 1 CU => 2" "./utr abcde ${N1}${N2}${N3}${N4}${N5} ${INPUT} 2> /dev/null" "${N1}${A}${N2}${B}${N3}${C}${N4}${D}${N5}${E}"
-assertOutputValue "tr 2 CU => 2" "./utr ${A}${B}${C}${D}${E} ${N1}${N2}${N3}${N4}${N5} ${INPUT} 2> /dev/null" "a${N1}b${N2}c${N3}d${N4}e${N5}"
+assertOutputValue "tr 1 CU => 2" "./utr ${UGREP_OPTS} abcde ${N1}${N2}${N3}${N4}${N5} ${INPUT} 2> /dev/null" "${N1}${A}${N2}${B}${N3}${C}${N4}${D}${N5}${E}"
+assertOutputValue "tr 2 CU => 2" "./utr ${UGREP_OPTS} ${A}${B}${C}${D}${E} ${N1}${N2}${N3}${N4}${N5} ${INPUT} 2> /dev/null" "a${N1}b${N2}c${N3}d${N4}e${N5}"
 
-assertOutputValue "tr eliminate by function" "./utr -d fn:isalpha ${A}${N1}${B}${N2}${C}${N3} 2> /dev/null" "${N1}${N2}${N3}"
-assertOutputValue "tr eliminate by set" "./utr -d \"[\p{Lu}]\" ${A}${N1}${B}${N2}${C}${N3} 2> /dev/null" "${N1}${N2}${N3}"
+assertOutputValue "tr eliminate by function" "./utr ${UGREP_OPTS} -d fn:isalpha ${A}${N1}${B}${N2}${C}${N3} 2> /dev/null" "${N1}${N2}${N3}"
+assertOutputValue "tr eliminate by set" "./utr ${UGREP_OPTS} -d \"[\p{Lu}]\" ${A}${N1}${B}${N2}${C}${N3} 2> /dev/null" "${N1}${N2}${N3}"
 
-assertOutputValue "tr function lower => upper (1/2 => 2 CU)" "./utr fn:islower fn:toupper ${N1}${DSLLI}${N2} 2> /dev/null" "${N1}${DCLLI}${N2}"
-assertOutputValue "tr replace by one (2 CU)" "./utr ${N1}${C}${A}a${B} ${DCLLI} ${INPUT} 2> /dev/null" "${DCLLI}${DCLLI}b${DCLLI}c${DCLLI}d${D}e${E}"
+assertOutputValue "tr function lower => upper (1/2 => 2 CU)" "./utr ${UGREP_OPTS} fn:islower fn:toupper ${N1}${DSLLI}${N2} 2> /dev/null" "${N1}${DCLLI}${N2}"
+assertOutputValue "tr replace by one (2 CU)" "./utr ${UGREP_OPTS} ${N1}${C}${A}a${B} ${DCLLI} ${INPUT} 2> /dev/null" "${DCLLI}${DCLLI}b${DCLLI}c${DCLLI}d${D}e${E}"
 
 exit $?

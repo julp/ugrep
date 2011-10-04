@@ -59,7 +59,7 @@ void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
     require_else_return(NULL != this);
 
     this->sourcename = NULL;
-    this->default_encoding = NULL;
+    this->default_encoding = util_get_inputs_encoding();
     if (NULL != name) {
         reader_set_imp_by_name(this, name);
     } else {
@@ -192,15 +192,30 @@ void reader_set_user_data(reader_t *this, void *data) /* NONNULL(1) */
 
 UBool reader_open_stdin(reader_t *this, error_t **error) /* NONNULL(1) */
 {
+    UBool ret;
+    const char *encoding = NULL;
+
     require_else_return_false(NULL != this);
 
     reader_init(this, "stdio");
 
-    return reader_open(this, error, "-");
+    ret = reader_open(this, error, "-");
+    if (!this->imp->set_encoding(error, this->priv_imp, util_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
+        return FALSE;
+    }
+#ifdef DEBUG
+    if (NULL != (encoding = this->imp->get_encoding(NULL, this->priv_imp))) {
+        debug("%s, file encoding = %s", this->sourcename, encoding);
+    }
+#endif /* DEBUG */
+
+    return ret;
 }
 
 UBool reader_open_string(reader_t *this, error_t **error, const char *string) /* NONNULL(1, 3) */
 {
+    const char *encoding = NULL;
+
     require_else_return_false(NULL != this);
     require_else_return_false(NULL != string);
 
@@ -210,9 +225,14 @@ UBool reader_open_string(reader_t *this, error_t **error, const char *string) /*
     if (NULL == (this->priv_imp = this->imp->open(error, string, -1))) {
         return FALSE;
     }
-    if (!this->imp->set_encoding(error, this->priv_imp, NULL)) { /* NULL <=> inherit system encoding */
+    if (!this->imp->set_encoding(error, this->priv_imp, util_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
         return FALSE;
     }
+#ifdef DEBUG
+    if (NULL != (encoding = this->imp->get_encoding(NULL, this->priv_imp))) {
+        debug("%s, file encoding = %s", this->sourcename, encoding);
+    }
+#endif /* DEBUG */
 
     return TRUE;
 }
@@ -253,7 +273,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
 
     this->pendingCU = 0;
     //encoding = NULL;
-    encoding = this->default_encoding;
+    encoding = util_get_inputs_encoding();
     status = U_ZERO_ERROR;
     this->lineno = 0;
     this->binary = FALSE;

@@ -12,14 +12,19 @@ declare -r DATADIR="${TESTDIR}/data"
 
 . ${TESTDIR}/assert.sh.inc
 
-FILE="${DATADIR}/utf8_eleve.txt"
-UFILE="${DATADIR}/iso88591_eleve.txt"
+if [ "${UGREP_SYSTEM}" == 'UTF-8' ]; then
+    FILE="${DATADIR}/utf8_eleve.txt"
+    UFILE="${DATADIR}/iso88591_eleve.txt"
+else
+    FILE="${DATADIR}/iso88591_eleve.txt"
+    UFILE="${DATADIR}/utf8_eleve.txt"
+fi
 
-assertExitValue "exit value with error" "./ucat ${FILE} /unexistant ${FILE} &> /dev/null" 0 "-gt"
-assertExitValue "exit value without error" "./ucat ${FILE} ${UFILE} &> /dev/null" 0
+assertExitValue "exit value with error" "./ucat ${UGREP_OPTS} ${FILE} /unexistant ${FILE} &> /dev/null" 0 "-gt"
+assertExitValue "exit value without error" "./ucat ${UGREP_OPTS} ${FILE} ${UFILE} &> /dev/null" 0
 
 for ARGS in "-b" "-s" "-n" "-bs" "-ns"; do
-    assertOutputValueExIgnoreBlanks "${ARGS}" "./ucat ${ARGS} ${UFILE} 2> /dev/null" "cat ${ARGS} ${FILE}"
+    assertOutputValueExIgnoreBlanks "${ARGS}" "./ucat ${UGREP_OPTS} ${ARGS} ${UFILE} 2> /dev/null" "cat ${ARGS} ${FILE}"
 done
 
 exit $?

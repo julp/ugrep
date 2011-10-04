@@ -5,6 +5,12 @@ declare -ri FALSE=1
 
 trap "rm -f /tmp/${PPID}.*" EXIT ERR SIGINT
 
+UGREP_OPTS="--input=UTF-8 --stdin=UTF-8"
+if [ -z "${UGREP_SYSTEM}" ]; then
+    export UGREP_SYSTEM='UTF-8'
+fi
+#echo "UGREP_OPTS = ${UGREP_OPTS}"
+
 __assertTrue() {
     if eval $2; then
         printf "%s, %s: [ \e[%d;01m%s\e[0m ]\n" `basename $0` "$1" 32 OK

@@ -10,7 +10,7 @@ char __progname[_MAX_PATH] = "<unknown>";
 #include "common.h"
 
 #ifdef _MSC_VER
-INITIALIZER_DECL(ustdio_init);
+INITIALIZER_DECL(util_init);
 #endif /* _MSC_VER */
 
 UFILE *ustdout = NULL;
@@ -34,7 +34,16 @@ UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
             }
             return TRUE;
         case INPUT_OPT:
-            reader_set_default_encoding(reader, optarg);
+            util_set_inputs_encoding(optarg);
+            return TRUE;
+        case STDIN_OPT:
+            util_set_stdin_encoding(optarg);
+            return TRUE;
+        case OUTPUT_OPT:
+            util_set_outputs_encoding(optarg);
+            return TRUE;
+        case SYSTEM_OPT:
+            util_set_system_encoding(optarg);
             return TRUE;
         default:
             return FALSE;
@@ -44,6 +53,11 @@ UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
 UBool stdout_is_tty(void)
 {
     return (isatty(STDOUT_FILENO));
+}
+
+UBool stdin_is_tty(void)
+{
+    return (isatty(STDIN_FILENO));
 }
 
 UChar *local_to_uchar(const char *cargv, int32_t *uargv_length, error_t **error)
@@ -56,7 +70,7 @@ UChar *local_to_uchar(const char *cargv, int32_t *uargv_length, error_t **error)
     int32_t allocated;
 
     status = U_ZERO_ERROR;
-    ucnv = ucnv_open(NULL, &status);
+    ucnv = ucnv_open(util_get_stdin_encoding(), &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ucnv_open");
         return NULL;
@@ -246,30 +260,117 @@ int32_t u_rtrim(UChar *s, int32_t s_length, UChar *what, int32_t what_length)
     return _u_trim(s, s_length, what, what_length, TRIM_RIGHT);
 }
 
-INITIALIZER_P(ustdio_init)
-{
-#ifdef _MSC_VER
-    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
-    if (stdout_is_tty()) {
-        char cp[30] = "";
+/**
+ * 1 inputs in general
+ * 2 outputs (stdout/stderr)
+ * 3 stdin as special input case (if absent, inherits from 1 if !stdin_is_tty, 2 if stdin_is_tty, else default)
+ **/
 
-        snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
-        ustdout = u_finit(stdout, NULL, cp);
-        ustderr = u_finit(stderr, NULL, cp);
-        /**
-         * /!\ Don't use ustdout or ustderr before following lines (it includes debug macro) /!\
-         **/
-        ustdout = u_finit(stdout, NULL, cp);
-        ustderr = u_finit(stderr, NULL, cp);
-    } else
-#endif /* _MSC_VER */
-    {
-        /**
-         * /!\ Don't use ustdout or ustderr before following lines (it includes debug macro) /!\
-         **/
-        ustdout = u_finit(stdout, NULL, NULL);
-        ustderr = u_finit(stderr, NULL, NULL);
+static const char *system_encoding = NULL;
+static const char *inputs_encoding = NULL;
+static const char *outputs_encoding = NULL;
+static const char *stdin_encoding = NULL;
+
+/**
+ *                          SYSTEM
+ *                          /    \
+ *                         /     \
+ *                        /      \
+ * outputs (stdout and stderr)   inputs in general
+ *                       /        \
+ *                      /         \
+ *                     /          \
+ *    if(stdin_is_tty) \          / if(!stdin_is_tty)
+ *                     \         /
+ *                     \        /
+ *                     \       /
+ *                     \      /
+ *                     \     /
+ *                      stdin
+ **/
+
+#if 0
+UBool util_override_system_codepage(const char *encoding)
+{
+    const char *found;
+
+    found = ucnv_getDefaultName();
+    if (!strcmp(found, encoding)) {
+        return TRUE; // same encoding as found by ICU
+    } else {
+        ucnv_setDefaultName(encoding);
+        return !strcmp(found, ucnv_getDefaultName());
     }
+}
+#endif
+
+static UBool util_check_encoding(const char *encoding)
+{
+    UConverter *ucnv;
+    UErrorCode status;
+
+    ucnv = NULL;
+    status = U_ZERO_ERROR;
+    ucnv_open(encoding, &status);
+    if (U_FAILURE(status)) {
+        return FALSE;
+    }
+    ucnv_close(ucnv);
+    return TRUE;
+}
+
+void util_set_system_encoding(const char *encoding)
+{
+    if (util_check_encoding(encoding)) {
+        system_encoding = encoding;
+    } else {
+        fprintf(stderr, "invalid systeme encoding '%s', skip\n", encoding);
+    }
+}
+
+const char *util_get_inputs_encoding(void)
+{
+    return inputs_encoding;
+}
+
+void util_set_inputs_encoding(const char *encoding)
+{
+    if (util_check_encoding(encoding)) {
+        inputs_encoding = encoding;
+    } else {
+        fprintf(stderr, "invalid encoding '%s' for inputs, skip\n", encoding);
+    }
+}
+
+void util_set_outputs_encoding(const char *encoding)
+{
+    if (util_check_encoding(encoding)) {
+        outputs_encoding = encoding;
+    } else {
+        fprintf(stderr, "invalid encoding '%s' for outputs, skip\n", encoding);
+    }
+}
+
+const char *util_get_stdin_encoding(void)
+{
+    return inputs_encoding;
+}
+
+void util_set_stdin_encoding(const char *encoding)
+{
+    if (util_check_encoding(encoding)) {
+        stdin_encoding = encoding;
+    } else {
+        fprintf(stderr, "invalid encoding '%s' for stdin, skip\n", encoding);
+    }
+}
+
+void util_apply(void)
+{
+    if (NULL != system_encoding) {
+        ucnv_setDefaultName(system_encoding);
+    }
+    ustdout = u_finit(stdout, NULL, outputs_encoding);
     {
         UErrorCode status;
 
@@ -279,7 +380,90 @@ INITIALIZER_P(ustdio_init)
             icu_msg(FATAL, status, "ucnv_setSubstChars");
         }
     }
+    ustderr = u_finit(stderr, NULL, outputs_encoding);
+    {
+        UErrorCode status;
 
-    debug("system locale = " YELLOW("%s"), u_fgetlocale(ustdout));
-    debug("system codepage = " YELLOW("%s"), u_fgetcodepage(ustdout));
+        status = U_ZERO_ERROR;
+        ucnv_setSubstChars(u_fgetConverter(ustderr), "?", 1, &status);
+        if (U_FAILURE(status)) {
+            icu_msg(FATAL, status, "ucnv_setSubstChars");
+        }
+    }
+    if (NULL == stdin_encoding) {
+        if (stdin_is_tty()) {
+            stdin_encoding = outputs_encoding;
+        } else {
+            stdin_encoding = inputs_encoding;
+        }
+    }
+#ifdef DEBUG
+    debug("system encoding = " YELLOW("%s"), ucnv_getDefaultName());
+    debug("outputs encoding = " YELLOW("%s"), u_fgetcodepage(ustdout));
+#endif /* DEBUG */
+}
+
+#if 0
+void util_open_stdio(void)
+{
+    if (NULL != ustdout) { // just in case
+        u_fclose(ustdout);
+    }
+    ustdout = u_finit(stdout, NULL, NULL); // don't use u_fadopt on std(in|out|err)
+
+    if (NULL != ustderr) { // just in case
+        u_fclose(ustderr);
+    }
+    ustderr = u_finit(stderr, NULL, NULL); // don't use u_fadopt on std(in|out|err)
+}
+#endif
+
+INITIALIZER_P(util_init)
+{
+    const char *tmp;
+
+#ifdef BSD
+{
+#include <sys/types.h>
+#include <pwd.h>
+#include <login_cap.h>
+
+    login_cap_t *lc;
+    struct passwd *pwd;
+
+    if (NULL != (pwd = getpwuid(getuid()))) {
+        if (NULL != (lc = login_getuserclass(pwd))) {
+            if (NULL != (tmp = login_getcapstr(lc, "charset", NULL, NULL))) {
+                util_set_system_encoding(tmp);
+            }
+            login_close(lc);
+        } else {
+            if (NULL != (lc = login_getpwclass(pwd))) {
+                if (NULL != (tmp = login_getcapstr(lc, "charset", NULL, NULL))) {
+                    util_set_system_encoding(tmp);
+                }
+                login_close(lc);
+            }
+        }
+    }
+    if (NULL != (tmp = getenv("MM_CHARSET"))) {
+        util_set_system_encoding(tmp);
+    }
+}
+#endif /* BSD */
+    if (NULL != (tmp = getenv("UGREP_SYSTEM"))) {
+        util_set_system_encoding(tmp);
+    }
+    if (NULL != (tmp = getenv("UGREP_OUTPUT"))) {
+        util_set_outputs_encoding(tmp);
+    }
+#ifdef _MSC_VER
+    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
+    if (NULL == outputs_encoding && stdout_is_tty()) {
+        char cp[30] = { 0 };
+
+        snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
+        outputs_encoding = strdup(cp); // TODO: leak
+    }
+#endif /* _MSC_VER */
 }

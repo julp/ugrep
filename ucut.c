@@ -38,9 +38,7 @@ UString *ustr = NULL;
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = CHAR_MAX + 1/*,
-    INPUT_OPT,
-    READER_OPT*/
+    BINARY_OPT = CHAR_MAX + 1
 };
 
 static char optstr[] = "d:f:";
@@ -245,15 +243,6 @@ int main(int argc, char **argv)
                 fFlag = TRUE;
                 debug("parseFields = %d", parseFields(optarg));
                 break;
-            /*case READER_OPT:
-                if (!reader_set_imp_by_name(&reader, optarg)) {
-                    fprintf(stderr, "Unknown reader\n");
-                    return UCUT_EXIT_USAGE;
-                }
-                break;
-            case INPUT_OPT:
-                reader_set_default_encoding(&reader, optarg);
-                break;*/
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
                     usage();
@@ -263,6 +252,8 @@ int main(int argc, char **argv)
     }
     argc -= optind;
     argv += optind;
+
+    util_apply();
 
     if (cFlag && fFlag) {
         usage();
