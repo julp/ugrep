@@ -11,268 +11,82 @@
 
 #include <errno.h>
 
-#ifndef EWOULDBLOCK
-# define EWOULDBLOCK WSAEWOULDBLOCK
-#endif
-#ifndef EINPROGRESS
-# define EINPROGRESS WSAEINPROGRESS
-#endif
-#ifndef EALREADY
-# define EALREADY WSAEALREADY
-#endif
-#ifndef ENOTSOCK
-# define ENOTSOCK WSAENOTSOCK
-#endif
-#ifndef EDESTADDRREQ
-# define EDESTADDRREQ WSAEDESTADDRREQ
-#endif
-#ifndef EMSGSIZE
-# define EMSGSIZE WSAEMSGSIZE
-#endif
-#ifndef EPROTOTYPE
-# define EPROTOTYPE WSAEPROTOTYPE
-#endif
-#ifndef ENOPROTOOPT
-# define ENOPROTOOPT WSAENOPROTOOPT
-#endif
-#ifndef EPROTONOSUPPORT
-# define EPROTONOSUPPORT WSAEPROTONOSUPPORT
-#endif
-#ifndef ESOCKTNOSUPPORT
-# define ESOCKTNOSUPPORT WSAESOCKTNOSUPPORT
-#endif
-#ifndef EOPNOTSUPP
-# define EOPNOTSUPP WSAEOPNOTSUPP
-#endif
-#ifndef EPFNOSUPPORT
-# define EPFNOSUPPORT WSAEPFNOSUPPORT
-#endif
-#ifndef EAFNOSUPPORT
-# define EAFNOSUPPORT WSAEAFNOSUPPORT
-#endif
-#ifndef EADDRINUSE
-# define EADDRINUSE WSAEADDRINUSE
-#endif
-#ifndef EADDRNOTAVAIL
-# define EADDRNOTAVAIL WSAEADDRNOTAVAIL
-#endif
-#ifndef ENETDOWN
-# define ENETDOWN WSAENETDOWN
-#endif
-#ifndef ENETUNREACH
-# define ENETUNREACH WSAENETUNREACH
-#endif
-#ifndef ENETRESET
-# define ENETRESET WSAENETRESET
-#endif
-#ifndef ECONNABORTED
-# define ECONNABORTED WSAECONNABORTED
-#endif
-#ifndef ECONNRESET
-# define ECONNRESET WSAECONNRESET
-#endif
-#ifndef ENOBUFS
-# define ENOBUFS WSAENOBUFS
-#endif
-#ifndef EISCONN
-# define EISCONN WSAEISCONN
-#endif
-#ifndef ENOTCONN
-# define ENOTCONN WSAENOTCONN
-#endif
-#ifndef ESHUTDOWN
-# define ESHUTDOWN WSAESHUTDOWN
-#endif
-#ifndef ETOOMANYREFS
-# define ETOOMANYREFS WSAETOOMANYREFS
-#endif
-#ifndef ETIMEDOUT
-# define ETIMEDOUT WSAETIMEDOUT
-#endif
-#ifndef ECONNREFUSED
-# define ECONNREFUSED WSAECONNREFUSED
-#endif
-#ifndef ELOOP
-# define ELOOP WSAELOOP
-#endif
-#ifndef EHOSTDOWN
-# define EHOSTDOWN WSAEHOSTDOWN
-#endif
-#ifndef EHOSTUNREACH
-# define EHOSTUNREACH WSAEHOSTUNREACH
-#endif
-#ifndef EPROCLIM
-# define EPROCLIM WSAEPROCLIM
-#endif
-#ifndef EUSERS
-# define EUSERS WSAEUSERS
-#endif
-#ifndef EDQUOT
-# define EDQUOT WSAEDQUOT
-#endif
-#ifndef ESTALE
-# define ESTALE WSAESTALE
-#endif
-#ifndef EREMOTE
-# define EREMOTE WSAEREMOTE
-#endif
-
-#ifndef ERROR_PIPE_LOCAL
-# define ERROR_PIPE_LOCAL 229L
-#endif
-
-static struct {
-    DWORD winerr;
-    int err;
-} errmap[] = {
-    {ERROR_INVALID_FUNCTION,          EINVAL},
-    {ERROR_FILE_NOT_FOUND,            ENOENT},
-    {ERROR_PATH_NOT_FOUND,            ENOENT},
-    {ERROR_TOO_MANY_OPEN_FILES,       EMFILE},
-    {ERROR_ACCESS_DENIED,             EACCES},
-    {ERROR_INVALID_HANDLE,            EBADF},
-    {ERROR_ARENA_TRASHED,             ENOMEM},
-    {ERROR_NOT_ENOUGH_MEMORY,         ENOMEM},
-    {ERROR_INVALID_BLOCK,             ENOMEM},
-    {ERROR_BAD_ENVIRONMENT,           E2BIG},
-    {ERROR_BAD_FORMAT,                ENOEXEC},
-    {ERROR_INVALID_ACCESS,            EINVAL},
-    {ERROR_INVALID_DATA,              EINVAL},
-    {ERROR_INVALID_DRIVE,             ENOENT},
-    {ERROR_CURRENT_DIRECTORY,         EACCES},
-    {ERROR_NOT_SAME_DEVICE,           EXDEV},
-    {ERROR_NO_MORE_FILES,             ENOENT},
-    {ERROR_WRITE_PROTECT,             EROFS},
-    {ERROR_BAD_UNIT,                  ENODEV},
-    {ERROR_NOT_READY,                 ENXIO},
-    {ERROR_BAD_COMMAND,               EACCES},
-    {ERROR_CRC,                       EACCES},
-    {ERROR_BAD_LENGTH,                EACCES},
-    {ERROR_SEEK,                      EIO},
-    {ERROR_NOT_DOS_DISK,              EACCES},
-    {ERROR_SECTOR_NOT_FOUND,          EACCES},
-    {ERROR_OUT_OF_PAPER,              EACCES},
-    {ERROR_WRITE_FAULT,               EIO},
-    {ERROR_READ_FAULT,                EIO},
-    {ERROR_GEN_FAILURE,               EACCES},
-    {ERROR_LOCK_VIOLATION,            EACCES},
-    {ERROR_SHARING_VIOLATION,         EACCES},
-    {ERROR_WRONG_DISK,                EACCES},
-    {ERROR_SHARING_BUFFER_EXCEEDED,   EACCES},
-    {ERROR_BAD_NETPATH,               ENOENT},
-    {ERROR_NETWORK_ACCESS_DENIED,     EACCES},
-    {ERROR_BAD_NET_NAME,              ENOENT},
-    {ERROR_FILE_EXISTS,               EEXIST},
-    {ERROR_CANNOT_MAKE,               EACCES},
-    {ERROR_FAIL_I24,                  EACCES},
-    {ERROR_INVALID_PARAMETER,         EINVAL},
-    {ERROR_NO_PROC_SLOTS,             EAGAIN},
-    {ERROR_DRIVE_LOCKED,              EACCES},
-    {ERROR_BROKEN_PIPE,               EPIPE},
-    {ERROR_DISK_FULL,                 ENOSPC},
-    {ERROR_INVALID_TARGET_HANDLE,     EBADF},
-    {ERROR_INVALID_HANDLE,            EINVAL},
-    {ERROR_WAIT_NO_CHILDREN,          ECHILD},
-    {ERROR_CHILD_NOT_COMPLETE,        ECHILD},
-    {ERROR_DIRECT_ACCESS_HANDLE,      EBADF},
-    {ERROR_NEGATIVE_SEEK,             EINVAL},
-    {ERROR_SEEK_ON_DEVICE,            EACCES},
-    {ERROR_DIR_NOT_EMPTY,             ENOTEMPTY},
-    {ERROR_DIRECTORY,                 ENOTDIR},
-    {ERROR_NOT_LOCKED,                EACCES},
-    {ERROR_BAD_PATHNAME,              ENOENT},
-    {ERROR_MAX_THRDS_REACHED,         EAGAIN},
-    {ERROR_LOCK_FAILED,               EACCES},
-    {ERROR_ALREADY_EXISTS,            EEXIST},
-    {ERROR_INVALID_STARTING_CODESEG,  ENOEXEC},
-    {ERROR_INVALID_STACKSEG,          ENOEXEC},
-    {ERROR_INVALID_MODULETYPE,        ENOEXEC},
-    {ERROR_INVALID_EXE_SIGNATURE,     ENOEXEC},
-    {ERROR_EXE_MARKED_INVALID,        ENOEXEC},
-    {ERROR_BAD_EXE_FORMAT,            ENOEXEC},
-    {ERROR_ITERATED_DATA_EXCEEDS_64k, ENOEXEC},
-    {ERROR_INVALID_MINALLOCSIZE,      ENOEXEC},
-    {ERROR_DYNLINK_FROM_INVALID_RING, ENOEXEC},
-    {ERROR_IOPL_NOT_ENABLED,          ENOEXEC},
-    {ERROR_INVALID_SEGDPL,            ENOEXEC},
-    {ERROR_AUTODATASEG_EXCEEDS_64k,   ENOEXEC},
-    {ERROR_RING2SEG_MUST_BE_MOVABLE,  ENOEXEC},
-    {ERROR_RELOC_CHAIN_XEEDS_SEGLIM,  ENOEXEC},
-    {ERROR_INFLOOP_IN_RELOC_CHAIN,    ENOEXEC},
-    {ERROR_FILENAME_EXCED_RANGE,      ENOENT},
-    {ERROR_NESTING_NOT_ALLOWED,       EAGAIN},
-    {ERROR_PIPE_LOCAL,                EPIPE},
-    {ERROR_BAD_PIPE,                  EPIPE},
-    {ERROR_PIPE_BUSY,                 EAGAIN},
-    {ERROR_NO_DATA,                   EPIPE},
-    {ERROR_PIPE_NOT_CONNECTED,        EPIPE},
-    {ERROR_OPERATION_ABORTED,         EINTR},
-    {ERROR_NOT_ENOUGH_QUOTA,          ENOMEM},
-    {ERROR_MOD_NOT_FOUND,             ENOENT},
-    {WSAEINTR,                        EINTR},
-    {WSAEBADF,                        EBADF},
-    {WSAEACCES,                       EACCES},
-    {WSAEFAULT,                       EFAULT},
-    {WSAEINVAL,                       EINVAL},
-    {WSAEMFILE,                       EMFILE},
-    {WSAEWOULDBLOCK,                  EWOULDBLOCK},
-    {WSAEINPROGRESS,                  EINPROGRESS},
-    {WSAEALREADY,                     EALREADY},
-    {WSAENOTSOCK,                     ENOTSOCK},
-    {WSAEDESTADDRREQ,                 EDESTADDRREQ},
-    {WSAEMSGSIZE,                     EMSGSIZE},
-    {WSAEPROTOTYPE,                   EPROTOTYPE},
-    {WSAENOPROTOOPT,                  ENOPROTOOPT},
-    {WSAEPROTONOSUPPORT,              EPROTONOSUPPORT},
-    {WSAESOCKTNOSUPPORT,              ESOCKTNOSUPPORT},
-    {WSAEOPNOTSUPP,                   EOPNOTSUPP},
-    {WSAEPFNOSUPPORT,                 EPFNOSUPPORT},
-    {WSAEAFNOSUPPORT,                 EAFNOSUPPORT},
-    {WSAEADDRINUSE,                   EADDRINUSE},
-    {WSAEADDRNOTAVAIL,                EADDRNOTAVAIL},
-    {WSAENETDOWN,                     ENETDOWN},
-    {WSAENETUNREACH,                  ENETUNREACH},
-    {WSAENETRESET,                    ENETRESET},
-    {WSAECONNABORTED,                 ECONNABORTED},
-    {WSAECONNRESET,                   ECONNRESET},
-    {WSAENOBUFS,                      ENOBUFS},
-    {WSAEISCONN,                      EISCONN},
-    {WSAENOTCONN,                     ENOTCONN},
-    {WSAESHUTDOWN,                    ESHUTDOWN},
-    {WSAETOOMANYREFS,                 ETOOMANYREFS},
-    {WSAETIMEDOUT,                    ETIMEDOUT},
-    {WSAECONNREFUSED,                 ECONNREFUSED},
-    {WSAELOOP,                        ELOOP},
-    {WSAENAMETOOLONG,                 ENAMETOOLONG},
-    {WSAEHOSTDOWN,                    EHOSTDOWN},
-    {WSAEHOSTUNREACH,                 EHOSTUNREACH},
-    {WSAEPROCLIM,                     EPROCLIM},
-    {WSAENOTEMPTY,                    ENOTEMPTY},
-    {WSAEUSERS,                       EUSERS},
-    {WSAEDQUOT,                       EDQUOT},
-    {WSAESTALE,                       ESTALE},
-    {WSAEREMOTE,                      EREMOTE}/*,*/
-};
-
-static int map_errno(DWORD winerr)
+static int getlasterror2errno(DWORD errcode)
 {
-    int i;
+    switch (errcode) {
+        case 0:
+            return 0;
 
-    if (winerr == 0) {
-        return 0;
+        case ERROR_FILE_TOO_LARGE:
+            return EFBIG;
+
+        case ERROR_TOO_MANY_OPEN_FILES:
+            return EMFILE;
+
+        case ERROR_BUSY:
+        case ERROR_BUSY_DRIVE:
+        case ERROR_PATH_BUSY:
+            return EBUSY;
+
+        case ERROR_FILE_NOT_FOUND:
+        case ERROR_PATH_NOT_FOUND:
+            return ENOENT;
+
+        case ERROR_ACCESS_DENIED:
+            return EACCESS;
+
+        case ERROR_INVALID_HANDLE:
+            return EBADF;
+
+        case ERROR_NOT_ENOUGH_MEMORY:
+        case ERROR_OUTOFMEMORY:
+            return ENOMEM;
+
+        case ERROR_INVALID_NAME:
+        case ERROR_BAD_ARGUMENTS:
+            return EINVAL;
+
+        case ERROR_DIRECTORY:
+            return ENOTDIR;
+
+        case ERROR_LABEL_TOO_LONG:
+        case ERROR_BUFFER_OVERFLOW:
+            return ENAMETOOLONG;
+
+        case ERROR_DIR_NOT_EMPTY:
+            return ENOTEMPTY;
+
+        case ERROR_SEEK:
+        case ERROR_READ_FAULT:
+        case ERROR_WRITE_FAULT:
+            return EIO;
+
+        case ERROR_WRITE_PROTECT:
+            return EROFS;
+
+        case ERROR_NEGATIVE_SEEK:
+            return ESPIPE;
+
+        case ERROR_ALREADY_EXISTS:
+        case ERROR_FILE_EXISTS:
+            return EEXIST;
+
+        case ERROR_INVALID_FLAG_NUMBER:
+        case ERROR_INVALID_PARAMETER:
+        case ERROR_BAD_ARGUMENTS:
+            return EINVAL;
+
+        case ERROR_NO_DATA:
+        case ERROR_PIPE_NOT_CONNECTED:
+            return EPIPE;
+
+        case ERROR_INVALID_ADDRESS:
+            return EFAULT;
+
+        default:
+            debug("Unmapped code: %d (0x%X)", errcode, errcode);
+            return EINVAL;
     }
-
-    for (i = 0; i < (int)(sizeof(errmap) / sizeof(*errmap)); i++) {
-        if (errmap[i].winerr == winerr) {
-            return errmap[i].err;
-        }
-    }
-
-    if (winerr >= WSABASEERR) {
-        return winerr;
-    }
-
-    return EINVAL;
 }
 
 struct _dir {
@@ -512,9 +326,9 @@ int fchdir(void *x, int fd)
 int chdir(const char *path)
 {
     if (!SetCurrentDirectoryA(path)) {
-        errno = map_errno(GetLastError());
+        errno = getlasterror2errno(GetLastError());
         return -1;
     }
-    
+
     return 0;
 }
