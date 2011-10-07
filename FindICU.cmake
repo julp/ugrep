@@ -1,8 +1,11 @@
 # This module can find the International Components for Unicode (ICU) Library
 #
+# Requirements:
+# - CMake >= 2.8.3
+#
 # The following variables will be defined for your use:
 #   - ICU_FOUND             : were all of your specified components found (include dependencies)?
-#   - ICU_INCLUDE_DIR       : ICU include directory
+#   - ICU_INCLUDE_DIRS      : ICU include directory
 #   - ICU_LIBRARIES         : ICU libraries
 #   - ICU_VERSION           : complete version of ICU (x.y.z)
 #   - ICU_MAJOR_VERSION     : major version of ICU
@@ -26,11 +29,20 @@
 #      target_link_libraries(myapp ${ICU_LIBRARIES})
 #   endif()
 
+#=============================================================================
+# Copyright (c) 2011, julp
+#
+# Distributed under the OSI-approved BSD License
+#
+# This software is distributed WITHOUT ANY WARRANTY; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#=============================================================================
+
 find_package(PkgConfig)
 
 ########## Private ##########
 function(icudebug _varname)
-    if (ICU_DEBUG)
+    if(ICU_DEBUG)
         message("${_varname} = ${${_varname}}")
     endif(ICU_DEBUG)
 endfunction(icudebug)
@@ -52,7 +64,7 @@ declare_icu_component(lx   iculx)         # Paragraph Layout library
 ########## Public ##########
 set(ICU_FOUND TRUE)
 set(ICU_LIBRARIES )
-set(ICU_INCLUDES_DIR )
+set(ICU_INCLUDE_DIRS )
 set(ICU_DEFINITIONS )
 foreach(_icu_component ${IcuComponents})
     string(TOUPPER "${_icu_component}" _icu_upper_component)
@@ -67,14 +79,14 @@ else()
     list(REMOVE_DUPLICATES ICU_FIND_COMPONENTS)
     foreach(_icu_component ${ICU_FIND_COMPONENTS})
         if(NOT DEFINED "IcuComponents_${_icu_component}")
-            message(FATAL_ERROR "Unknwon ICU component: ${_icu_component}")
+            message(FATAL_ERROR "Unknown ICU component: ${_icu_component}")
         endif()
     endforeach(_icu_component)
 endif()
 
 # Includes
 find_path(
-    ICU_INCLUDE_DIR
+    ICU_INCLUDE_DIRS
     NAMES unicode/utypes.h
     DOC "Include directories for ICU"
 )
@@ -119,8 +131,8 @@ endforeach(_icu_component)
 list(REMOVE_DUPLICATES ICU_LIBRARIES)
 
 if(ICU_FOUND)
-    if(EXISTS "${ICU_INCLUDE_DIR}/unicode/uvernum.h")
-        file(READ "${ICU_INCLUDE_DIR}/unicode/uvernum.h" _icu_contents)
+    if(EXISTS "${ICU_INCLUDE_DIRS}/unicode/uvernum.h")
+        file(READ "${ICU_INCLUDE_DIRS}/unicode/uvernum.h" _icu_contents)
 #     else()
 #         todo
     endif()
@@ -131,21 +143,21 @@ if(ICU_FOUND)
     set(ICU_VERSION "${ICU_MAJOR_VERSION}.${ICU_MINOR_VERSION}.${ICU_PATCH_VERSION}")
 endif(ICU_FOUND)
 
-if(ICU_INCLUDE_DIR)
+if(ICU_INCLUDE_DIRS)
     include(FindPackageHandleStandardArgs)
     if(ICU_FIND_REQUIRED AND NOT ICU_FIND_QUIETLY)
-        find_package_handle_standard_args(ICU REQUIRED_VARS ICU_LIBRARIES ICU_INCLUDE_DIR VERSION_VAR ICU_VERSION)
+        find_package_handle_standard_args(ICU REQUIRED_VARS ICU_LIBRARIES ICU_INCLUDE_DIRS VERSION_VAR ICU_VERSION)
     else()
-        find_package_handle_standard_args(ICU "ICU not found" ICU_LIBRARIES ICU_INCLUDE_DIR)
+        find_package_handle_standard_args(ICU "ICU not found" ICU_LIBRARIES ICU_INCLUDE_DIRS)
     endif()
-else(ICU_INCLUDE_DIR)
+else(ICU_INCLUDE_DIRS)
     if(ICU_FIND_REQUIRED AND NOT ICU_FIND_QUIETLY)
         message(FATAL_ERROR "Could not find ICU include directory")
     endif()
-endif(ICU_INCLUDE_DIR)
+endif(ICU_INCLUDE_DIRS)
 
 mark_as_advanced(
-    ICU_INCLUDES_DIR
+    ICU_INCLUDE_DIRS
     ICU_LIBRARIES
     ICU_DEFINITIONS
     ICU_VERSION
@@ -168,7 +180,7 @@ icudebug("ICU_IO_FOUND")
 icudebug("ICU_LE_FOUND")
 icudebug("ICU_LX_FOUND")
 # Linking
-icudebug("ICU_INCLUDE_DIR")
+icudebug("ICU_INCLUDE_DIRS")
 icudebug("ICU_LIBRARIES")
 # Version
 icudebug("ICU_MAJOR_VERSION")
