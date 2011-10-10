@@ -14,7 +14,7 @@
 static int getlasterror2errno(DWORD errcode)
 {
     switch (errcode) {
-        case 0:
+        case ERROR_SUCCESS:
             return 0;
 
         case ERROR_FILE_TOO_LARGE:
@@ -33,7 +33,7 @@ static int getlasterror2errno(DWORD errcode)
             return ENOENT;
 
         case ERROR_ACCESS_DENIED:
-            return EACCESS;
+            return EACCES;
 
         case ERROR_INVALID_HANDLE:
             return EBADF;
@@ -43,7 +43,6 @@ static int getlasterror2errno(DWORD errcode)
             return ENOMEM;
 
         case ERROR_INVALID_NAME:
-        case ERROR_BAD_ARGUMENTS:
             return EINVAL;
 
         case ERROR_DIRECTORY:
