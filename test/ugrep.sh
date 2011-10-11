@@ -20,17 +20,17 @@ else
     UFILE="${DATADIR}/utf8_eleve.txt"
 fi
 
-ARGS='--color=never -HnA 2 -B 3 after_context ugrep.c'
+ARGS='--color=never -HnA 2 -B 3 after_context bin/ugrep.c'
 assertOutputValueEx "-A 2 -B 3 (without -v)" "LC_ALL=C ./ugrep ${UGREP_OPTS} ${ARGS} 2>/dev/null" "grep ${ARGS}"
 assertOutputValueEx "-A 2 -B 3 (with -v)" "LC_ALL=C ./ugrep ${UGREP_OPTS} -v ${ARGS} 2>/dev/null" "grep -v ${ARGS}"
 
-#ARGS='--color=never -HnA 4 -B 6 after_context ugrep.c'
+#ARGS='--color=never -HnA 4 -B 6 after_context bin/ugrep.c'
 #assertOutputValueEx "-A 4 -B 6 (without -v)" "LC_ALL=C ./ugrep ${UGREP_OPTS} ${ARGS} 2>/dev/null" "grep ${ARGS}"
 
-ARGS='--color=never -HnA 6 -B 4 after_context ugrep.c'
+ARGS='--color=never -HnA 6 -B 4 after_context bin/ugrep.c'
 assertOutputValueEx "-A 6 -B 4 (without -v)" "LC_ALL=C ./ugrep ${UGREP_OPTS} ${ARGS} 2>/dev/null" "grep ${ARGS}"
 
-ARGS='--color=never -HnA 4 -B 6 "^[^{}]*$" ugrep.c'
+ARGS='--color=never -HnA 4 -B 6 "^[^{}]*$" bin/ugrep.c'
 assertOutputValueEx "-A 4 -B 6 (with -v)" "LC_ALL=C ./ugrep ${UGREP_OPTS} -v ${ARGS} 2>/dev/null" "grep -v ${ARGS}"
 
 ARGS='élève'

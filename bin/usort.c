@@ -9,7 +9,7 @@
 #include <unicode/ucol.h>
 
 #include "common.h"
-#include "rbtree.h"
+#include "struct/rbtree.h"
 
 
 enum {
@@ -30,7 +30,7 @@ UBool uFlag = FALSE;
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = CHAR_MAX + 1,
+    BINARY_OPT = GETOPT_SPECIFIC,
     MIN_OPT,
     MAX_OPT
 };

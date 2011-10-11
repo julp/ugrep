@@ -36,7 +36,7 @@ int binbehave = BIN_FILE_SKIP;
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = CHAR_MAX + 1
+    BINARY_OPT = GETOPT_SPECIFIC
 };
 
 #ifndef WITHOUT_FTS

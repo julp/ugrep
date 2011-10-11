@@ -38,7 +38,7 @@ UString *ustr = NULL;
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = CHAR_MAX + 1
+    BINARY_OPT = GETOPT_SPECIFIC
 };
 
 static char optstr[] = "d:f:";

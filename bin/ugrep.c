@@ -174,7 +174,7 @@ static UBool is_patternC(const char *pattern)
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = CHAR_MAX + 1,
+    BINARY_OPT = GETOPT_SPECIFIC,
 // #ifndef NO_COLOR
     COLOR_OPT,
 // #endif /* !NO_COLOR */
