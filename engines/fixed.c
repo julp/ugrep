@@ -68,16 +68,10 @@ static void *engine_fixed_compile(error_t **error, const UChar *upattern, int32_
 static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_t flags)
 {
     int32_t len;
-    UConverter *ucnv;
     UErrorCode status;
     fixed_pattern_t *p;
 
     status = U_ZERO_ERROR;
-    ucnv = ucnv_open(NULL, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ucnv_open");
-        return NULL;
-    }
     len = strlen(pattern);
     p = mem_new(*p);
     p->flags = flags;
