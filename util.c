@@ -27,6 +27,12 @@ int exit_failure_value = 0;
 UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
 {
     switch (c) {
+        case NFNONE_OPT:
+        case NFD_OPT:
+        case NFC_OPT:
+            // TODO
+            debug("Not yet implemented");
+            return TRUE;
         case READER_OPT:
             if (!reader_set_imp_by_name(reader, optarg)) {
                 fprintf(stderr, "Unknown reader\n");

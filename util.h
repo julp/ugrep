@@ -16,6 +16,9 @@ extern int exit_failure_value;
     {"stdin",  required_argument, NULL, STDIN_OPT},  \
     {"output", required_argument, NULL, OUTPUT_OPT}, \
     {"system", required_argument, NULL, SYSTEM_OPT}, \
+    {"nfnone", no_argument,       NULL, NFNONE_OPT}, \
+    {"nfd",    no_argument,       NULL, NFD_OPT},    \
+    {"nfc",    no_argument,       NULL, NFC_OPT},    \
     {"reader", required_argument, NULL, READER_OPT}
 
 enum {
@@ -23,6 +26,9 @@ enum {
     STDIN_OPT,
     OUTPUT_OPT,
     SYSTEM_OPT,
+    NFNONE_OPT,
+    NFD_OPT,
+    NFC_OPT,
     READER_OPT
 };
 
