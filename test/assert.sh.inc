@@ -9,6 +9,9 @@ UGREP_OPTS="--input=UTF-8 --stdin=UTF-8"
 if [ -z "${UGREP_SYSTEM}" ]; then
     export UGREP_SYSTEM='UTF-8'
 fi
+if [ -n "${READER}" ]; then
+    UGREP_OPTS="${UGREP_OPTS} --reader=${READER}"
+fi
 #echo "UGREP_OPTS = ${UGREP_OPTS}"
 
 __assertTrue() {
