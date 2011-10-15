@@ -810,7 +810,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
                 }
                 //if (pattern_matches > 0 && (lFlag || (!vFlag && fd->binary && BIN_FILE_BIN == binbehave))) {
                 if (pattern_matches && (lFlag || (reader->binary && BIN_FILE_BIN == binbehave))) {
-                    debug("file skipping");
+                    debug("file skipping (%s)", reader->sourcename);
                     arg_matches = 1;
                     goto endfile; // no need to continue (file level)
                 }
