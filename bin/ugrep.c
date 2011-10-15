@@ -160,6 +160,7 @@ static UBool is_pattern(const UChar *pattern)
         0x007c, // |
         0x003a, // :
         0x002d, // -
+        0x002e, // .
         0
     };
 
@@ -168,7 +169,7 @@ static UBool is_pattern(const UChar *pattern)
 
 static UBool is_patternC(const char *pattern)
 {
-    return (NULL != strpbrk(pattern, "\\+*?[^]$(){}=!<>|:-"));
+    return (NULL != strpbrk(pattern, "\\+*?[^]$(){}=!<>|:-."));
 }
 
 /* ========== getopt stuff ========== */
