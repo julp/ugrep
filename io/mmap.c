@@ -8,14 +8,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <string.h>
 #include <errno.h>
 
 #include "common.h"
-
-/*#ifndef SIZE_T_MAX
-#  define SIZE_T_MAX (~((size_t) 0))
-#endif*/ /* !SIZE_T_MAX */
 
 typedef struct {
 #ifdef _MSC_VER
@@ -24,30 +19,24 @@ typedef struct {
     int fd;
 #endif /* _MSC_VER */
     size_t len;
-    char *start, *end, *ptr;
-    UConverter *ucnv;
-} mmfd_t;
+    const char *start, *end, *ptr;
+} MMAP;
 
-static void *mmap_open(error_t **error, const char *filename, int fd)
+static void *mmap_dopen(error_t **error, int fd, const char * const filename)
 {
-    mmfd_t *this = NULL;
+    MMAP *this;
     struct stat st;
 
     this = mem_new(*this);
 
     this->ptr = this->start = NULL;
     this->len = 0;
-    this->ucnv = NULL;
     this->fd = -1;
 
     if (-1 == (fstat(fd, &st))) {
         error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
         goto free;
     }
-    /*if (st.st_size > SIZE_T_MAX) {
-        error_set(error, WARN, "%s too big (size > %dz)", filename, SIZE_T_MAX);
-        goto close;
-    }*/
     if (!S_ISREG(st.st_mode)) {
         error_set(error, WARN, "%s is not a regular file", filename);
         goto close;
@@ -77,7 +66,6 @@ static void *mmap_open(error_t **error, const char *filename, int fd)
 
     this->ptr = this->start;
     this->end = this->start + this->len;
-    this->ucnv = NULL;
 
     return this;
 
@@ -92,105 +80,65 @@ free:
     return NULL;
 }
 
-static void mmap_close(void *data)
+static void mmap_close(void *fp)
 {
-    FETCH_DATA(data, this, mmfd_t);
+    MMAP *this;
 
-    if (NULL != this->ucnv) {
-        ucnv_close(this->ucnv);
-    }
+    this = (MMAP *) fp;
 #ifdef _MSC_VER
     UnmapViewOfFile(this->start);
     CloseHandle(this->fd);
 #else
-    munmap(this->start, this->len);
+    munmap((void *) this->start, this->len);
     close(this->fd);
 #endif /* _MSC_VER */
+    free(this);
 }
 
-static int32_t mmap_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
+// copy of string_eof
+static UBool mmap_eof(void *fp)
 {
-    FETCH_DATA(data, this, mmfd_t);
+    MMAP *this;
 
-    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len);
+    this = (MMAP *) fp;
+
+    return this->ptr >= this->end;
 }
 
-static int32_t mmap_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
+// copy of string_rewindTo
+static void mmap_rewindTo(void *fp, int32_t signature_length)
 {
-    FETCH_DATA(data, this, mmfd_t);
+    MMAP *this;
 
-    STRING_READUCHARS32(error, this->ucnv, this->ptr, this->end, buffer, max_len);
+    this = (MMAP *) fp;
+    this->ptr = this->start + signature_length;
 }
 
-static void mmap_rewind(void *data, int32_t signature_length)
+// copy of string_readBytes
+static int32_t mmap_readBytes(void *fp, error_t **UNUSED(error), char *buffer, size_t max_len)
 {
-    FETCH_DATA(data, this, mmfd_t);
+    int n;
+    MMAP *this;
 
-    STRING_REWIND(this->start, this->ptr, signature_length);
+    this = (MMAP *) fp;
+    if ((size_t) (this->end - this->ptr) > max_len) {
+        n = max_len;
+    } else {
+        n = this->end - this->ptr;
+    }
+    memcpy(buffer, this->ptr, n);
+    this->ptr += n;
+
+    return n;
 }
-
-static UBool mmap_readline(error_t **error, void *data, UString *ustr)
-{
-    FETCH_DATA(data, this, mmfd_t);
-
-    STRING_READLINE(error, this->ucnv, this->ptr, this->end, ustr);
-}
-
-static size_t mmap_readbytes(void *data, char *buffer, size_t max_len)
-{
-    FETCH_DATA(data, this, mmfd_t);
-
-    STRING_READBYTES(this->ptr, this->end, buffer, max_len);
-}
-
-static UBool mmap_has_encoding(void *data)
-{
-    FETCH_DATA(data, this, mmfd_t);
-
-    STRING_HAS_ENCODING(this->ucnv);
-}
-
-static const char *mmap_get_encoding(error_t **error, void *data)
-{
-    FETCH_DATA(data, this, mmfd_t);
-
-    STRING_GET_ENCODING(error, this->ucnv);
-}
-
-static UBool mmap_set_encoding(error_t **error, void *data, const char *encoding)
-{
-    FETCH_DATA(data, this, mmfd_t);
-
-    STRING_SET_ENCODING(error, this->ucnv, encoding);
-}
-
-static UBool mmap_eof(void *data)
-{
-    FETCH_DATA(data, this, mmfd_t);
-
-    STRING_EOF(this->ptr, this->end);
-}
-
-static UBool mmap_seekable(void *UNUSED(data))
-{
-    STRING_SEEKABLE();
-}
-
 
 reader_imp_t mmap_reader_imp =
 {
     FALSE,
     "mmap",
-    mmap_open,
+    mmap_dopen,
     mmap_close,
     mmap_eof,
-    mmap_seekable,
-    mmap_readline,
-    mmap_readbytes,
-    mmap_readuchars,
-    mmap_readuchars32,
-    mmap_has_encoding,
-    mmap_get_encoding,
-    mmap_set_encoding,
-    mmap_rewind
+    mmap_readBytes,
+    mmap_rewindTo
 };

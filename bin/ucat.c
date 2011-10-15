@@ -247,7 +247,7 @@ int main(int argc, char **argv)
                 TFlag = TRUE;
                 break;
             case 'V':
-                fprintf(stderr, "ucat version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
+                fprintf(stderr, "BSD ucat version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
                 break;
             case 'b':

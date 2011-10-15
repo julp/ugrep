@@ -138,9 +138,14 @@ extern char *__progname;
 # define STR_LEN(str)      (sizeof(str) - 1)
 # define STR_SIZE(str)     sizeof(str)
 
-# define U_BS  0x0008 /* backspace */
-# define U_CR  0x000D /* \r */
-# define U_LF  0x000A /* \n */
+# define U_BS 0x0008 /* Backspace */
+# define U_CR 0x000D /* Carriage Return - \r */
+# define U_LF 0x000A /* Line Feed - \n */
+# define U_VT 0x000B /* Vertical Tabulation */
+# define U_FF 0x000C /* Form Feed */
+# define U_NL 0x0085 /* Next Line */
+# define U_LS 0x2028 /* Line Separator */
+# define U_PS 0x2029 /* Paragraph Separator */
 
 # if defined(DEBUG) && !defined(_MSC_VER)
 #  define RED(str)    "\33[1;31m" str "\33[0m"
@@ -152,7 +157,7 @@ extern char *__progname;
 #  define YELLOW(str) str
 # endif /* DEBUG && !_MSC_VER */
 
-typedef void *(*func_ctor_t)(void); /* Constructor callback */
+typedef void *(*func_ctor_t)(void);  /* Constructor callback */
 typedef void (*func_dtor_t)(void *); /* Destructor callback */
 
 # ifndef MAX
@@ -174,10 +179,11 @@ typedef void (*func_dtor_t)(void *); /* Destructor callback */
 # define U16_32_NFC_MAX_EXPANSION_FACTOR 3
 # define U16_32_NFD_MAX_EXPANSION_FACTOR 4
 
+# define COPYRIGHT "\nCopyright (C) 2010-2011, julp\n"
+
 # include "alloc.h"
 # include "error.h"
 # include "ustring.h"
-# include "reader_imp.h"
 # include "reader.h"
 # include "util.h"
 

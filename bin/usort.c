@@ -212,7 +212,7 @@ Insensible aux accents et à la casse : Collator::STRENGTH à Collator::PRIMARY 
                 uFlag = TRUE;
                 break;
             case 'V':
-                fprintf(stderr, "usort version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
+                fprintf(stderr, "BSD usort version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
                 break;
             case MIN_OPT:

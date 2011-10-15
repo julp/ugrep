@@ -1,8 +1,9 @@
 #include <limits.h>
+#include <ctype.h>
+
+#include <unicode/uloc.h>
 
 #include "common.h"
-
-#include <unicode/ubrk.h>
 
 #ifdef DEBUG
 # define USTRING_INITIAL_LENGTH 1 /* Voluntarily small for development/test */
@@ -81,7 +82,7 @@ static void _ustring_maybe_expand_of(UString *ustr, size_t additional_length) /*
     require_else_return(NULL != ustr);
 
     if (ustr->len + additional_length >= ustr->allocated) {
-        //debug("Expand from %d to %d effective UChar", ustr->allocated, ustr->allocated*2);
+        //debug("Expand from %d to %d effective UChar", ustr->allocated, ustr->allocated * 2);
         ustr->allocated = nearest_power(ustr->len + additional_length);
         ustr->ptr = mem_renew(ustr->ptr, *ustr->ptr, ustr->allocated + 1);
     }
@@ -104,6 +105,14 @@ void ustring_destroy(UString *ustr) /* NONNULL() */
 
     free(ustr->ptr);
     free(ustr);
+}
+
+void ustring_append_char32(UString *ustr, UChar32 c) /* NONNULL() */
+{
+    _ustring_maybe_expand_of(ustr, 2);
+
+    U16_APPEND_UNSAFE(ustr->ptr, ustr->len, c);
+    ustr->ptr[ustr->len] = 0;
 }
 
 void ustring_append_char(UString *ustr, UChar c) /* NONNULL() */
@@ -141,11 +150,21 @@ void ustring_chomp(UString *ustr) /* NONNULL() */
     require_else_return(NULL != ustr);
 
     if (ustr->len > 0) {
-        if (U_LF == ustr->ptr[ustr->len - 1]) {
-            ustr->ptr[--ustr->len] = 0;
-            if (ustr->len > 0 && U_CR == ustr->ptr[ustr->len - 1]) {
+        switch (ustr->ptr[ustr->len - 1]) {
+            case U_CR:
+            case U_VT:
+            case U_FF:
+            case U_NL:
+            case U_LS:
+            case U_PS:
                 ustr->ptr[--ustr->len] = 0;
-            }
+                break;
+            case U_LF:
+                ustr->ptr[--ustr->len] = 0;
+                if (ustr->len > 0 && U_CR == ustr->ptr[ustr->len - 1]) {
+                    ustr->ptr[--ustr->len] = 0;
+                }
+                break;
         }
     }
 }
@@ -359,21 +378,36 @@ void ustring_rtrim(UString *ustr) /* NONNULL() */
     ustr->len = u_rtrim(ustr->ptr, ustr->len, NULL, -1);
 }
 
-typedef int32_t (*func_full_case_mapping_t)(UChar *, int32_t, const UChar *, int32_t, UBreakIterator *ubrk, const char *, UErrorCode *);
-
-static int32_t u_strFoldCaseEx(UChar *dest, int32_t destCapacity, const UChar *src, int32_t srcLength, UBreakIterator *UNUSED(ubrk), const char *UNUSED(locale), UErrorCode *status)
+static UBool uloc_is_turkic(const char *locale)
 {
-    return u_strFoldCase(dest, destCapacity, src, srcLength, U_FOLD_CASE_DEFAULT, status);
+    if (NULL == locale) {
+        locale = uloc_getDefault();
+    }
+    if (NULL != locale) {
+        if (strlen(locale) >= 2) {
+            if (
+                ('a' == tolower(locale[0]) && 'z' == tolower(locale[1]) && ('_' == locale[2] || '\0' == locale[2]))
+                ||
+                ('t' == tolower(locale[0]) && 'r' == tolower(locale[1]) && ('_' == locale[2] || '\0' == locale[2]))
+            ) {
+                return TRUE;
+            }
+        }
+    }
+
+    return FALSE;
 }
 
-static int32_t u_strToLowerEx(UChar *dest, int32_t destCapacity, const UChar *src, int32_t srcLength, UBreakIterator *UNUSED(ubrk), const char *locale, UErrorCode *status)
+typedef int32_t (*func_full_case_mapping_t)(UChar *, int32_t, const UChar *, int32_t, const char *, UErrorCode *);
+
+static int32_t u_strFoldCaseEx(UChar *dest, int32_t destCapacity, const UChar *src, int32_t srcLength, const char *locale, UErrorCode *status)
 {
-    return u_strToLower(dest, destCapacity, src, srcLength, locale, status);
+    return u_strFoldCase(dest, destCapacity, src, srcLength, uloc_is_turkic(locale) ? U_FOLD_CASE_EXCLUDE_SPECIAL_I : U_FOLD_CASE_DEFAULT, status);
 }
 
-static int32_t u_strToUpperEx(UChar *dest, int32_t destCapacity, const UChar *src, int32_t srcLength, UBreakIterator *UNUSED(ubrk), const char *locale, UErrorCode *status)
+static int32_t u_strToTitleEx(UChar *dest, int32_t destCapacity, const UChar *src, int32_t srcLength, const char *locale, UErrorCode *status)
 {
-    return u_strToUpper(dest, destCapacity, src, srcLength, locale, status);
+    return u_strToTitle(dest, destCapacity, src, srcLength, NULL, locale, status);
 }
 
 struct case_mapping_t {
@@ -384,12 +418,12 @@ struct case_mapping_t {
 static const struct case_mapping_t unicode_case_mapping[UCASE_COUNT] = {
     { NULL,            NULL },
     { "u_strFoldCase", u_strFoldCaseEx },
-    { "u_strToLower",  u_strToLowerEx },
-    { "u_strToUpper",  u_strToUpperEx },
-    { "u_strToTitle",  u_strToTitle }
+    { "u_strToLower",  u_strToLower },
+    { "u_strToUpper",  u_strToUpper },
+    { "u_strToTitle",  u_strToTitleEx }
 };
 
-UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct, UBreakIterator *ubrk, error_t **error) /* NONNULL(1) */
+UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct, error_t **error) /* NONNULL(1) */
 {
     int32_t len;
     UErrorCode status;
@@ -405,13 +439,13 @@ UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct,
         ustr->ptr[ustr->len] = 0;
         return TRUE;
     }
-    len = unicode_case_mapping[ct].func(NULL, 0, src, src_len, ubrk, NULL, &status);
+    len = unicode_case_mapping[ct].func(NULL, 0, src, src_len, NULL, &status);
     if (U_BUFFER_OVERFLOW_ERROR != status) {
         return FALSE;
     }
     status = U_ZERO_ERROR;
     _ustring_maybe_expand_to(ustr, len);
-    ustr->len = unicode_case_mapping[ct].func(ustr->ptr, ustr->allocated + 1, src, src_len, ubrk, NULL, &status);
+    ustr->len = unicode_case_mapping[ct].func(ustr->ptr, ustr->allocated + 1, src, src_len, NULL, &status);
     if (U_FAILURE(status)) {
         error_set(error, FATAL, "ICU Error \"%s\" from %s()", u_errorName(status), unicode_case_mapping[ct].name);
         return FALSE;

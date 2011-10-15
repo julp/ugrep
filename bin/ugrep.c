@@ -768,7 +768,6 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
                 return 1;
             }
             pattern_matches = 0;
-            reader->lineno++;
             ustring_chomp(ustr);
             if (BIN_FILE_TEXT == binbehave) {
                 ustring_dump(ustr);
@@ -1172,7 +1171,7 @@ int main(int argc, char **argv)
                 break;
 #endif /* !WITHOUT_FTS */
             case 'V':
-                fprintf(stderr, "ugrep version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
+                fprintf(stderr, "BSD ugrep version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
                 break;
             case 'c':

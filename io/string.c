@@ -1,112 +1,68 @@
-#include <unistd.h>
-#include <stdio.h>
-#include <unicode/ustdio.h>
-#include <errno.h>
-
 #include "common.h"
 
 typedef struct {
     size_t length;
-    UConverter *ucnv;
-    char *start, *end, *ptr;
-} string_input_t;
+    const char *start, *end, *ptr;
+} STRING;
 
-
-static void *string_open(error_t **UNUSED(error), const char *buffer, int length) // "hack" for now
+void *string_open(const char *buffer, int length)
 {
-    string_input_t *this;
+    STRING *this;
 
     this = mem_new(*this);
     this->ptr = this->start = buffer;
     this->length = length < 0 ? strlen(buffer) : (size_t) length;
     this->end = this->start + this->length;
-    this->ucnv = NULL;
 
     return this;
 }
 
-static int32_t string_readuchars(error_t **error, void *data, UChar *buffer, size_t max_len)
+static void string_close(void *fp)
 {
-    FETCH_DATA(data, this, string_input_t);
-
-    STRING_READUCHARS(error, this->ucnv, this->ptr, this->end, buffer, max_len);
+    free(fp);
 }
 
-static int32_t string_readuchars32(error_t **error, void *data, UChar32 *buffer, size_t max_len)
+static UBool string_eof(void *fp)
 {
-    FETCH_DATA(data, this, string_input_t);
+    STRING *this;
 
-    STRING_READUCHARS32(error, this->ucnv, this->ptr, this->end, buffer, max_len);
+    this = (STRING *) fp;
+
+    return this->ptr >= this->end;
 }
 
-static void string_rewind(void *data, int32_t signature_length)
+static void string_rewindTo(void *fp, int32_t signature_length)
 {
-    FETCH_DATA(data, this, string_input_t);
+    STRING *this;
 
-    STRING_REWIND(this->start, this->ptr, signature_length);
+    this = (STRING *) fp;
+    this->ptr = this->start + signature_length;
 }
 
-static UBool string_readline(error_t **error, void *data, UString *ustr)
+static int32_t string_readBytes(void *fp, error_t **UNUSED(error), char *buffer, size_t max_len)
 {
-    FETCH_DATA(data, this, string_input_t);
+    int n;
+    STRING *this;
 
-    STRING_READLINE(error, this->ucnv, this->ptr, this->end, ustr);
-}
+    this = (STRING *) fp;
+    if ((size_t) (this->end - this->ptr) > max_len) {
+        n = max_len;
+    } else {
+        n = this->end - this->ptr;
+    }
+    memcpy(buffer, this->ptr, n);
+    this->ptr += n;
 
-static size_t string_readbytes(void *data, char *buffer, size_t max_len)
-{
-    FETCH_DATA(data, this, string_input_t);
-
-    STRING_READBYTES(this->ptr, this->end, buffer, max_len);
-}
-
-static UBool string_has_encoding(void *data)
-{
-    FETCH_DATA(data, this, string_input_t);
-
-    STRING_HAS_ENCODING(this->ucnv);
-}
-
-static const char *string_get_encoding(error_t **error, void *data)
-{
-    FETCH_DATA(data, this, string_input_t);
-
-    STRING_GET_ENCODING(error, this->ucnv);
-}
-
-static UBool string_set_encoding(error_t **error, void *data, const char *encoding)
-{
-    FETCH_DATA(data, this, string_input_t);
-
-    STRING_SET_ENCODING(error, this->ucnv, encoding);
-}
-
-static UBool string_eof(void *data)
-{
-    FETCH_DATA(data, this, string_input_t);
-
-    STRING_EOF(this->ptr, this->end);
-}
-
-static UBool string_seekable(void *UNUSED(data))
-{
-    STRING_SEEKABLE();
+    return n;
 }
 
 reader_imp_t string_reader_imp =
 {
     TRUE,
     "string",
-    string_open,
     NULL,
+    string_close,
     string_eof,
-    string_seekable,
-    string_readline,
-    string_readbytes,
-    string_readuchars,
-    string_readuchars32,
-    string_has_encoding,
-    string_get_encoding,
-    string_set_encoding,
-    string_rewind
+    string_readBytes,
+    string_rewindTo
 };
