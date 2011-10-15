@@ -208,7 +208,7 @@ int main(int argc, char **argv)
     //ustdio_init();
 
 #if defined(HAVE_BZIP2) || defined(HAVE_ZLIB)
-    switch (__progname[0]) {
+    switch (__progname[1]) {
 # ifdef HAVE_BZIP2
         case 'b':
             if ('z' == __progname[1]) {
