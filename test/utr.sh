@@ -44,6 +44,14 @@ declare -r N5=$'\xF0\x9D\x9F\x93'
 declare -r DCLLI=$'\xF0\x90\x90\x80' # 10400, Lu
 declare -r DSLLI=$'\xF0\x90\x90\xA8' # 10428, Ll
 
+declare -r GRAVE=$'\xCC\x80'
+declare -r ACUTE=$'\xCC\x81'
+
+declare -r E_ACUTE_NFD="e${ACUTE}"
+declare -r E_GRAVE_NFD="e${GRAVE}"
+declare -r A_ACUTE_NFD="a${ACUTE}"
+declare -r A_GRAVE_NFD="a${GRAVE}"
+
 # Full case not "supported"
 # declare -r LSFI=$'\xEF\xAC\x81' # FB01, Ll
 # declare -r FI=$'\x66\x69' # F + I
@@ -64,5 +72,7 @@ assertOutputValue "tr eliminate by set" "./utr ${UGREP_OPTS} -d \"[\p{Lu}]\" ${A
 
 assertOutputValue "tr function lower => upper (1/2 => 2 CU)" "./utr ${UGREP_OPTS} fn:islower fn:toupper ${N1}${DSLLI}${N2} 2> /dev/null" "${N1}${DCLLI}${N2}"
 assertOutputValue "tr replace by one (2 CU)" "./utr ${UGREP_OPTS} ${N1}${C}${A}a${B} ${DCLLI} ${INPUT} 2> /dev/null" "${DCLLI}${DCLLI}b${DCLLI}c${DCLLI}d${D}e${E}"
+
+assertOutputValue "tr grapheme replacement" "./utr ${UGREP_OPTS} ${E_ACUTE_NFD} X ${E_ACUTE_NFD}${A_ACUTE_NFD} 2> /dev/null" "X${A_ACUTE_NFD}"
 
 exit $?
