@@ -4,6 +4,9 @@
 
 // const UChar b[] = {0x005c, 0x0062, U_NUL};
 
+static const UChar _UREGEXP_FAKE_USTR[] = { 0 };
+#define UREGEXP_FAKE_USTR _UREGEXP_FAKE_USTR, 0
+
 static void *engine_re_compile(error_t **error, const UChar *upattern, int32_t length, uint32_t flags)
 {
     UParseError pe;
@@ -66,6 +69,8 @@ static engine_return_t engine_re_match(error_t **error, void *data, const UStrin
         icu_error_set(error, FATAL, status, "uregex_find");
         return ENGINE_FAILURE;
     }
+    uregex_setText(uregex, UREGEXP_FAKE_USTR, &status);
+    assert(U_SUCCESS(status));
 
     return (ret ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
@@ -108,11 +113,8 @@ static engine_return_t engine_re_match_all(error_t **error, void *data, const US
         icu_error_set(error, FATAL, status, "uregex_findNext");
         return ENGINE_FAILURE;
     }
-    /*uregex_reset(uregex, 0, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "uregex_reset");
-        return ENGINE_FAILURE;
-    }*/
+    uregex_setText(uregex, UREGEXP_FAKE_USTR, &status);
+    assert(U_SUCCESS(status));
 
     return (matches ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
@@ -134,6 +136,8 @@ static engine_return_t engine_re_whole_line_match(error_t **error, void *data, c
         icu_error_set(error, FATAL, status, "uregex_matches");
         return ENGINE_FAILURE;
     }
+    uregex_setText(uregex, UREGEXP_FAKE_USTR, &status);
+    assert(U_SUCCESS(status));
 
     return (ret ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
 }
