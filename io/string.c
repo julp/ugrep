@@ -31,12 +31,14 @@ static UBool string_eof(void *fp)
     return this->ptr >= this->end;
 }
 
-static void string_rewindTo(void *fp, int32_t signature_length)
+static UBool string_rewindTo(void *fp, error_t **UNUSED(error), int32_t signature_length)
 {
     STRING *this;
 
     this = (STRING *) fp;
     this->ptr = this->start + signature_length;
+
+    return TRUE;
 }
 
 static int32_t string_readBytes(void *fp, error_t **UNUSED(error), char *buffer, size_t max_len)

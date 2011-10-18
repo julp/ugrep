@@ -43,12 +43,12 @@ if(ZLIB_FOUND)
     set(HAVE_ZLIB TRUE)
 endif(ZLIB_FOUND)
 
-# if(BZIP2_FOUND)
-#     set(EXTRA_SOURCES ${EXTRA_SOURCES} io/bzip2.c)
-#     include_directories(${BZIP2_INCLUDE_DIR})
-#     set(EXTRA_LIBS ${EXTRA_LIBS} ${BZIP2_LIBRARIES})
-#     set(HAVE_BZIP2 TRUE)
-# endif(BZIP2_FOUND)
+if(BZIP2_FOUND)
+    set(EXTRA_SOURCES ${EXTRA_SOURCES} io/bzip2.c)
+    include_directories(${BZIP2_INCLUDE_DIR})
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${BZIP2_LIBRARIES})
+    set(HAVE_BZIP2 TRUE)
+endif(BZIP2_FOUND)
 
 if(MSVC)
     file(GLOB EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/win32/*.c)
@@ -62,7 +62,7 @@ configure_file(
 )
 
 message("==> CMAKE_BUILD_TYPE : ${CMAKE_BUILD_TYPE}")
-# message("==> BZIP2 : ${BZIP2_FOUND}")
+message("==> BZIP2 : ${BZIP2_FOUND}")
 message("==> ICU   : ${ICU_VERSION}")
 message("==> ZLIB  : ${ZLIB_VERSION_STRING}")
 

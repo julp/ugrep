@@ -21,6 +21,9 @@ extern reader_imp_t string_reader_imp;
 #ifdef HAVE_ZLIB
 extern reader_imp_t zlib_reader_imp;
 #endif /* HAVE_ZLIB */
+#ifdef HAVE_BZIP2
+extern reader_imp_t bzip2_reader_imp;
+#endif /* HAVE_BZIP2 */
 
 static const reader_imp_t *available_readers[] = {
     &mmap_reader_imp,
@@ -28,6 +31,9 @@ static const reader_imp_t *available_readers[] = {
 #ifdef HAVE_ZLIB
     &zlib_reader_imp,
 #endif /* HAVE_ZLIB */
+#ifdef HAVE_BZIP2
+    &bzip2_reader_imp,
+#endif /* HAVE_BZIP2 */
     NULL
 };
 
@@ -168,6 +174,9 @@ int32_t reader_readuchars32(reader_t *this, error_t **error, UChar32 *buffer, in
 {
     int32_t i, available;
 
+    require_else_return_val(NULL != this, -1);
+    require_else_return_val(NULL != buffer, -1);
+
     for (i = 0; i < maxLen; i++) {
         if ((this->utf16.externalEnd - this->utf16.ptr) < 2) {
             if ((available = fill_buffer(this, error)) < 1) {
@@ -187,30 +196,31 @@ int32_t reader_readuchars32(reader_t *this, error_t **error, UChar32 *buffer, in
     return i;
 }
 
-// TODO: rewrite
-#if 0
-int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, size_t max_len) /* NONNULL(1, 3) */
+int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, int32_t maxLen) /* NONNULL(1, 3) */
 {
-    int32_t count;
+    int32_t count, available, copyLen;
 
     require_else_return_val(NULL != this, -1);
     require_else_return_val(NULL != buffer, -1);
-    require_else_return_val(max_len >= 2, -1);
+    require_else_return_val(maxLen >= 2, -1);
 
-    if (0 != this->pendingCU) {
-        *buffer = this->pendingCU;
-        this->pendingCU = 0;
-        count = this->imp->readuchars(error, this->fp, buffer + 1, max_len - 1) + 1;
-    } else {
-        count = this->imp->readuchars(error, this->fp, buffer, max_len);
-    }
-    if ((size_t) count == max_len && !U16_IS_SINGLE(buffer[count - 1]) && U16_IS_LEAD(buffer[count - 1])) {
-        this->pendingCU = buffer[--count];
+    count = 0;
+    while (count < maxLen) {
+        if ((this->utf16.externalEnd - this->utf16.ptr) < 2) {
+            if ((available = fill_buffer(this, error)) < 1) {
+                if (-1 == available) {
+                    count = -1;
+                }
+                break;
+            }
+        }
+        copyLen = MIN(maxLen - count, available);
+        u_memcpy(buffer + count, this->utf16.ptr, copyLen);
+        this->utf16.ptr += copyLen;
     }
 
     return count;
 }
-#endif
 
 /* ==================== private misc helpers ==================== */
 
@@ -241,16 +251,26 @@ static UBool reader_is_seekable(reader_t *this)
     return STDIN_FILENO != this->fd;
 }
 
-static void reader_rewind(reader_t *this)
-{
-    require_else_return(NULL != this);
-
 #ifndef NO_PHYSICAL_REWIND
-    this->imp->rewindTo(this->fp, this->signature_length);
+static UBool reader_rewind(reader_t *this, error_t **error)
+#else
+static UBool reader_rewind(reader_t *this, error_t **UNUSED(error))
+#endif /* !NO_PHYSICAL_REWIND */
+{
+    require_else_return_false(NULL != this);
+
+    this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.ptr = this->utf16.buffer;
+#ifndef NO_PHYSICAL_REWIND
+    UBool ret;
+
+    ret = this->imp->rewindTo(this->fp, error, this->signature_length);
+
+    return ret;
 #else
     this->byte.ptr = this->byte.buffer + this->signature_length;
-#endif /* NO_PHYSICAL_REWIND */
-    this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.ptr = this->utf16.buffer;
+
+    return TRUE;
+#endif /* !NO_PHYSICAL_REWIND */
 }
 
 /* ==================== public implementation getter/setter ==================== */
@@ -530,7 +550,9 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
     debug("%s, file encoding = %s", this->sourcename, this->encoding);
 #endif /* DEBUG */
     if (reader_is_seekable(this)) {
-        reader_rewind(this);
+        if (!reader_rewind(this, error)) {
+            goto failed;
+        }
         if (BIN_FILE_TEXT != this->binbehave) {
             int32_t ubuffer_len;
             UChar32 ubuffer[MAX_BIN_REL_LEN + 1];
@@ -546,7 +568,9 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
                     goto failed;
                 }
             }
-            reader_rewind(this);
+            if (!reader_rewind(this, error)) {
+                goto failed;
+            }
         }
     }
 

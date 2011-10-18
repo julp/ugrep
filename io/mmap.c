@@ -106,12 +106,14 @@ static UBool mmap_eof(void *fp)
 }
 
 // copy of string_rewindTo
-static void mmap_rewindTo(void *fp, int32_t signature_length)
+static UBool mmap_rewindTo(void *fp, error_t **UNUSED(error), int32_t signature_length)
 {
     MMAP *this;
 
     this = (MMAP *) fp;
     this->ptr = this->start + signature_length;
+
+    return TRUE;
 }
 
 // copy of string_readBytes

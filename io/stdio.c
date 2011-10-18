@@ -27,11 +27,14 @@ static UBool stdio_eof(void *fp)
     return feof((FILE *) fp);
 }
 
-static void stdio_rewindTo(void *fp, int32_t signature_length)
+static UBool stdio_rewindTo(void *fp, error_t **error, int32_t signature_length)
 {
     if (0 != fseek((FILE *) fp, (long) signature_length, SEEK_SET)) {
-        // TODO: error
+        error_set(error, WARN, "fseek failed: %s", strerror(errno));
+        return FALSE;
     }
+
+    return TRUE;
 }
 
 static int32_t stdio_readBytes(void *fp, error_t **error, char *buffer, size_t max_len)

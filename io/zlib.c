@@ -21,13 +21,26 @@ static void zlib_close(void *fp)
 
 static UBool zlib_eof(void *fp)
 {
+// debug("eof = %d", gzeof((gzFile *) fp));
     return gzeof((gzFile *) fp);
 }
 
-static void zlib_rewindTo(void *fp, int32_t signature_length)
+static UBool zlib_rewindTo(void *fp, error_t **error, int32_t signature_length)
 {
-    // TODO: error
-    assert(signature_length == gzseek((gzFile *) fp, signature_length, SEEK_SET));
+    if (signature_length != gzseek((gzFile *) fp, signature_length, SEEK_SET)) {
+        int errnum;
+        const char *zerrstr;
+
+        zerrstr = gzerror((gzFile *) fp, &errnum);
+        if (Z_ERRNO == errnum) {
+            error_set(error, WARN, "zlib external error from gzseek(): %s", strerror(errno));
+        } else {
+            error_set(error, WARN, "zlib internal error from gzseek(): %s", zerrstr);
+        }
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 static int32_t zlib_readBytes(void *fp, error_t **error, char *buffer, size_t max_len)
@@ -45,6 +58,7 @@ static int32_t zlib_readBytes(void *fp, error_t **error, char *buffer, size_t ma
             error_set(error, WARN, "zlib internal error from gzread(): %s", zerrstr);
         }
     }
+// debug("asked = %d, get = %d", max_len, ret);
 
     return ret;
 }

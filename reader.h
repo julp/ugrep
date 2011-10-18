@@ -15,7 +15,9 @@ typedef struct {
     void (*close)(void *);
     UBool (*eof)(void *);
     int32_t (*readBytes)(void *, error_t **, char *, size_t);
-    void (*rewindTo)(void *, int32_t);
+# ifndef NO_PHYSICAL_REWIND
+    UBool (*rewindTo)(void *, error_t **, int32_t);
+# endif /* !NO_PHYSICAL_REWIND */
 } reader_imp_t;
 
 # ifdef DEBUG
@@ -68,7 +70,8 @@ UBool reader_open(reader_t *, error_t **, const char *) NONNULL(1, 3);
 UBool reader_open_stdin(reader_t *, error_t **) NONNULL(1);
 UBool reader_open_string(reader_t *, error_t **, const char *) NONNULL(1, 3);
 UBool reader_readline(reader_t *, error_t **, UString *) NONNULL(1, 3);
-int32_t reader_readuchars(reader_t *, error_t **, UChar *, size_t) NONNULL(1, 3);
+int32_t reader_readuchars(reader_t *, error_t **, UChar *, int32_t) NONNULL(1, 3);
+int32_t reader_readuchars32(reader_t *, error_t **, UChar32 *, int32_t) NONNULL(1, 3);
 void reader_set_binary_behavior(reader_t *, int) NONNULL(1);
 void reader_set_default_encoding(reader_t *, const char *) NONNULL(1);
 UBool reader_set_encoding(reader_t *, error_t **, const char *) NONNULL(1);
