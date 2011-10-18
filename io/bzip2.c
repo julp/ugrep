@@ -50,7 +50,8 @@ static UBool bzip2_eof(void *fp)
     return this->eof;
 }
 
-#define SIG_MAX_LEN 5
+#ifndef NO_PHYSICAL_REWIND
+# define SIG_MAX_LEN 5
 static UBool bzip2_rewindTo(void *fp, error_t **error, int32_t signature_length)
 {
     BZIP2 *this;
@@ -86,6 +87,7 @@ static UBool bzip2_rewindTo(void *fp, error_t **error, int32_t signature_length)
 
     return TRUE;
 }
+#endif /* !NO_PHYSICAL_REWIND */
 
 static int32_t bzip2_readBytes(void *fp, error_t **error, char *buffer, size_t max_len)
 {
@@ -119,6 +121,8 @@ reader_imp_t bzip2_reader_imp =
     bzip2_dopen,
     bzip2_close,
     bzip2_eof,
-    bzip2_readBytes,
-    bzip2_rewindTo
+    bzip2_readBytes
+#ifndef NO_PHYSICAL_REWIND
+    , bzip2_rewindTo
+#endif /* !NO_PHYSICAL_REWIND */
 };

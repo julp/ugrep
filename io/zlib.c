@@ -25,6 +25,7 @@ static UBool zlib_eof(void *fp)
     return gzeof((gzFile *) fp);
 }
 
+#ifndef NO_PHYSICAL_REWIND
 static UBool zlib_rewindTo(void *fp, error_t **error, int32_t signature_length)
 {
     if (signature_length != gzseek((gzFile *) fp, signature_length, SEEK_SET)) {
@@ -42,6 +43,7 @@ static UBool zlib_rewindTo(void *fp, error_t **error, int32_t signature_length)
 
     return TRUE;
 }
+#endif /* !NO_PHYSICAL_REWIND */
 
 static int32_t zlib_readBytes(void *fp, error_t **error, char *buffer, size_t max_len)
 {
@@ -70,6 +72,8 @@ reader_imp_t zlib_reader_imp =
     zlib_dopen,
     zlib_close,
     zlib_eof,
-    zlib_readBytes,
-    zlib_rewindTo
+    zlib_readBytes
+#ifndef NO_PHYSICAL_REWIND
+    , zlib_rewindTo
+#endif /* !NO_PHYSICAL_REWIND */
 };

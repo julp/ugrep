@@ -27,6 +27,7 @@ static UBool stdio_eof(void *fp)
     return feof((FILE *) fp);
 }
 
+#ifndef NO_PHYSICAL_REWIND
 static UBool stdio_rewindTo(void *fp, error_t **error, int32_t signature_length)
 {
     if (0 != fseek((FILE *) fp, (long) signature_length, SEEK_SET)) {
@@ -36,6 +37,7 @@ static UBool stdio_rewindTo(void *fp, error_t **error, int32_t signature_length)
 
     return TRUE;
 }
+#endif /* !NO_PHYSICAL_REWIND */
 
 static int32_t stdio_readBytes(void *fp, error_t **error, char *buffer, size_t max_len)
 {
@@ -56,6 +58,8 @@ reader_imp_t stdio_reader_imp =
     stdio_dopen,
     stdio_close,
     stdio_eof,
-    stdio_readBytes,
-    stdio_rewindTo
+    stdio_readBytes
+#ifndef NO_PHYSICAL_REWIND
+    , stdio_rewindTo
+#endif /* !NO_PHYSICAL_REWIND */
 };

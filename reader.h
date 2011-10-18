@@ -8,6 +8,22 @@ enum {
     BIN_FILE_TEXT
 };
 
+# define MIN_CONFIDENCE  39   // Minimum confidence for a match (in percents)
+# define MAX_ENC_REL_LEN 4096 // Maximum relevant length for encoding analyse (in bytes)
+# define MAX_BIN_REL_LEN 1024 // Maximum relevant length for binary analyse (in code points)
+
+# ifdef DEBUG
+#  define CHAR_BUFFER_SIZE  8
+#  define UCHAR_BUFFER_SIZE 8
+# else
+#  define CHAR_BUFFER_SIZE  BUFSIZ
+#  define UCHAR_BUFFER_SIZE BUFSIZ
+# endif /* DEBUG */
+
+// # if (CHAR_BUFFER_SIZE > MAX_ENC_REL_LEN) && (UCHAR_BUFFER_SIZE > (4 * MAX_BIN_REL_LEN))
+// #  define NO_PHYSICAL_REWIND 1
+// # endif
+
 typedef struct {
     UBool internal;
     const char *name;
@@ -19,14 +35,6 @@ typedef struct {
     UBool (*rewindTo)(void *, error_t **, int32_t);
 # endif /* !NO_PHYSICAL_REWIND */
 } reader_imp_t;
-
-# ifdef DEBUG
-#  define CHAR_BUFFER_SIZE  8
-#  define UCHAR_BUFFER_SIZE 8
-# else
-#  define CHAR_BUFFER_SIZE  BUFSIZ
-#  define UCHAR_BUFFER_SIZE BUFSIZ
-#endif /* DEBUG */
 
 typedef struct {
     const char *encoding;

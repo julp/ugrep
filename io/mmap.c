@@ -106,6 +106,7 @@ static UBool mmap_eof(void *fp)
 }
 
 // copy of string_rewindTo
+#ifndef NO_PHYSICAL_REWIND
 static UBool mmap_rewindTo(void *fp, error_t **UNUSED(error), int32_t signature_length)
 {
     MMAP *this;
@@ -115,6 +116,7 @@ static UBool mmap_rewindTo(void *fp, error_t **UNUSED(error), int32_t signature_
 
     return TRUE;
 }
+#endif /* !NO_PHYSICAL_REWIND */
 
 // copy of string_readBytes
 static int32_t mmap_readBytes(void *fp, error_t **UNUSED(error), char *buffer, size_t max_len)
@@ -141,6 +143,8 @@ reader_imp_t mmap_reader_imp =
     mmap_dopen,
     mmap_close,
     mmap_eof,
-    mmap_readBytes,
-    mmap_rewindTo
+    mmap_readBytes
+#ifndef NO_PHYSICAL_REWIND
+    , mmap_rewindTo
+#endif /* !NO_PHYSICAL_REWIND */
 };

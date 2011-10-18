@@ -9,10 +9,6 @@
 
 #include "common.h"
 
-#define MIN_CONFIDENCE  39   // Minimum confidence for a match (in percents)
-#define MAX_ENC_REL_LEN 4096 // Maximum relevant length for encoding analyse (in bytes)
-#define MAX_BIN_REL_LEN 4096 // Maximum relevant length for binary analyse
-
 /* ==================== global ==================== */
 
 extern reader_imp_t mmap_reader_imp;
@@ -43,32 +39,32 @@ void *string_open(const char *buffer, int length);
 
 static int32_t fill_buffer(reader_t *this, error_t **error)
 {
+    size_t utf16diff, bytesdiff;
     UChar *utf16Ptr;
     UErrorCode status;
     int32_t bytesAvailable, bytesRead, utf16Length, maxBytesToRead;
 
     utf16Length = 0;
     status = U_ZERO_ERROR;
-    if (this->utf16.ptr > this->utf16.buffer) {
-        size_t diff;
-
-        diff = this->utf16.ptr - this->utf16.buffer;
+    utf16diff = this->utf16.ptr - this->utf16.buffer;
+    if (0 != utf16diff) {
         u_memmove(this->utf16.buffer, this->utf16.ptr, this->utf16.internalEnd - this->utf16.ptr);
-        this->utf16.internalEnd -= diff;
-        this->utf16.externalEnd -= diff;
+        this->utf16.internalEnd -= utf16diff;
+        this->utf16.externalEnd -= utf16diff;
         this->utf16.ptr = this->utf16.buffer;
     }
-    if (this->byte.ptr > this->byte.buffer) {
+    bytesdiff = this->byte.ptr - this->byte.buffer;
+    if (0 != bytesdiff) {
         memmove(this->byte.buffer, this->byte.ptr, this->byte.ptr - this->byte.end);
-        this->byte.end -= this->byte.ptr - this->byte.buffer;
+        this->byte.end -= bytesdiff;
         this->byte.ptr = this->byte.buffer;
     }
     bytesAvailable = this->byte.limit - this->byte.end;
     maxBytesToRead = MIN(bytesAvailable / (2 * ucnv_getMinCharSize(this->ucnv)), CHAR_BUFFER_SIZE);
-    if (-1 == (bytesRead = this->imp->readBytes(this->fp, error, this->byte.ptr, maxBytesToRead/*bytesAvailable*/))) {
+    if (-1 == (bytesRead = this->imp->readBytes(this->fp, error, this->byte.ptr, maxBytesToRead))) {
         return -1;
     }
-    this->byte.end += bytesRead;
+    this->byte.end = this->byte.ptr + bytesRead;
     utf16Ptr = this->utf16.ptr;
     ucnv_toUnicode(
         this->ucnv,
@@ -267,6 +263,8 @@ static UBool reader_rewind(reader_t *this, error_t **UNUSED(error))
 
     return ret;
 #else
+//     ucnv_reset(this->ucnv);
+//     ucnv_resetToUnicode(this->ucnv);
     this->byte.ptr = this->byte.buffer + this->signature_length;
 
     return TRUE;
@@ -496,6 +494,10 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
 
     if (reader_is_seekable(this)) {
         if ((buffer_len = this->imp->readBytes(this->fp, error, buffer, MAX_ENC_REL_LEN)) > 0) {
+#ifdef NO_PHYSICAL_REWIND
+            memcpy(this->byte.buffer, buffer, buffer_len);
+            this->byte.end = this->byte.buffer + buffer_len;
+#endif /* NO_PHYSICAL_REWIND */
             buffer[buffer_len] = '\0';
             encoding = ucnv_detectUnicodeSignature(buffer, buffer_len, &this->signature_length, &status);
             if (U_SUCCESS(status)) {

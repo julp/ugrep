@@ -31,6 +31,7 @@ static UBool string_eof(void *fp)
     return this->ptr >= this->end;
 }
 
+#ifndef NO_PHYSICAL_REWIND
 static UBool string_rewindTo(void *fp, error_t **UNUSED(error), int32_t signature_length)
 {
     STRING *this;
@@ -40,6 +41,7 @@ static UBool string_rewindTo(void *fp, error_t **UNUSED(error), int32_t signatur
 
     return TRUE;
 }
+#endif /* !NO_PHYSICAL_REWIND */
 
 static int32_t string_readBytes(void *fp, error_t **UNUSED(error), char *buffer, size_t max_len)
 {
@@ -65,6 +67,8 @@ reader_imp_t string_reader_imp =
     NULL,
     string_close,
     string_eof,
-    string_readBytes,
-    string_rewindTo
+    string_readBytes
+#ifndef NO_PHYSICAL_REWIND
+    , string_rewindTo
+#endif /* !NO_PHYSICAL_REWIND */
 };
