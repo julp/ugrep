@@ -71,9 +71,7 @@ void slist_pool_destroy(slist_pool_t *l) /* NONNULL() */
     slist_element_t *el;
 
     require_else_return(NULL != l);
-# ifdef DEBUG
-    debug("%d elements was recycled by garbage", l->recycled);
-# endif /* DEBUG */
+
     if (NULL != (el = l->head)) {
         while (NULL != el) {
             slist_element_t *tmp = el;
