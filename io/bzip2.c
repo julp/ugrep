@@ -37,7 +37,7 @@ static void bzip2_close(void *fp)
 
     this = (BZIP2 *) fp;
     BZ2_bzReadClose(&bzerror, this->fp);
-    fclose(this->fp);
+    fclose(this->f);
     free(this);
 }
 
