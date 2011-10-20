@@ -40,6 +40,7 @@ void ustring_prepend_string(UString *, const UChar *) NONNULL();
 void ustring_prepend_string_len(UString *, const UChar *, int32_t) NONNULL();
 void ustring_rtrim(UString *) NONNULL();
 UString *ustring_sized_new(size_t) WARN_UNUSED_RESULT;
+void ustring_sprintf(UString *ustr, const char *format, ...) NONNULL(1, 2);
 void ustring_subreplace_len(UString *, const UChar *, size_t, size_t, size_t) NONNULL();
 void ustring_sync(const UString *, UString *, double) NONNULL();
 void ustring_trim(UString *) NONNULL();

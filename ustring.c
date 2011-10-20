@@ -454,3 +454,26 @@ UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct,
         return TRUE;
     }
 }
+
+void ustring_sprintf(UString *ustr, const char *format, ...) /* NONNULL(1, 2) */
+{
+    va_list args;
+    int32_t ret;
+
+    require_else_return(NULL != ustr);
+    require_else_return(NULL != format);
+
+    va_start(args, format);
+    if ((ret = u_vsnprintf(ustr->ptr, ustr->allocated, format, args)) > (int32_t) ustr->allocated) {
+        do {
+            ustr->allocated *= 2;
+            ustr->ptr = mem_renew(ustr->ptr, *ustr->ptr, ustr->allocated + 1);
+            va_start(args, format);
+            ret = u_vsnprintf(ustr->ptr, ustr->allocated, format, args);
+            va_end(args);
+        } while (ret > (int32_t) ustr->allocated);
+    } else {
+        va_end(args);
+    }
+    ustr->len = ret;
+}
