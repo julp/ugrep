@@ -184,7 +184,7 @@ typedef void (*func_dtor_t)(void *); /* Destructor callback */
 # include "alloc.h"
 # include "error.h"
 # include "ustring.h"
-# include "reader.h"
+# include "io/reader.h"
 # include "util.h"
 
 #endif /* !COMMON_H */
