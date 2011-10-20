@@ -73,6 +73,7 @@ assertOutputValue "tr eliminate by set" "./utr ${UGREP_OPTS} -d \"[\p{Lu}]\" ${A
 assertOutputValue "tr function lower => upper (1/2 => 2 CU)" "./utr ${UGREP_OPTS} fn:islower fn:toupper ${N1}${DSLLI}${N2} 2> /dev/null" "${N1}${DCLLI}${N2}"
 assertOutputValue "tr replace by one (2 CU)" "./utr ${UGREP_OPTS} ${N1}${C}${A}a${B} ${DCLLI} ${INPUT} 2> /dev/null" "${DCLLI}${DCLLI}b${DCLLI}c${DCLLI}d${D}e${E}"
 
+assertOutputValue "tr grapheme deletion" "./utr ${UGREP_OPTS} -d ${E_ACUTE_NFD} ${E_ACUTE_NFD}${A_ACUTE_NFD} 2> /dev/null" "${A_ACUTE_NFD}"
 assertOutputValue "tr grapheme replacement" "./utr ${UGREP_OPTS} ${E_ACUTE_NFD} X ${E_ACUTE_NFD}${A_ACUTE_NFD} 2> /dev/null" "X${A_ACUTE_NFD}"
 
 exit $?
