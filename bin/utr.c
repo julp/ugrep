@@ -10,32 +10,20 @@
 #include <unicode/ubrk.h>
 
 #include "common.h"
-
-/**
- * TODO:
- * - consider cFlag (complemente/negate)
- **/
-
-#ifdef DEBUG
-/**
- * Voluntarily small for development/test
- * Unit: code unit/UChar, so minimum is 2 not 1! (don't take care of trailing \0)
- **/
-# define IN_BUFFER_SIZE 2
-#else
-# define IN_BUFFER_SIZE 1024
-#endif
-/**
- * 2*IN_BUFFER_SIZE because each char may be converted into a surrogate pair
- * (trailing \0 not counted)
- **/
-#define OUT_BUFFER_SIZE 2*IN_BUFFER_SIZE
+#include "struct/hashtable.h"
 
 enum {
     UTR_EXIT_SUCCESS = 0,
     UTR_EXIT_FAILURE,
     UTR_EXIT_USAGE
 };
+
+enum {
+    GRAPHEME_MODE,
+    CODE_POINT_MODE
+};
+
+#define DEFAULT_MODE GRAPHEME_MODE
 
 enum {
     NONE,
@@ -75,18 +63,6 @@ enum {
 | function | function | ok | ok => no sense ?
 +----------+----------+----+-------
 
-Note n°1:
-For u_strToTitle, as translation function, may be really difficult (impossible?) to apply while reading input by multiple blocks.
-Can we keep and reuse UBreakIterator state of the previous block?
-
-Note n°2:
-Don't forget that full case mapping can change the number of code points and/or code units of a string.
-An output buffer 4 times larger than input buffer may be more appropriate?
-
-Note n°3:
-U+03A3 (Lu) // U+03C3/U+03C3 (Ll) may not work, depending on how(where) read is splitted
-
-
 char: UChar32
 string: UChar32 *
 class: UChar *
@@ -107,10 +83,6 @@ typedef struct {
 } case_map_element_t;
 
 /* ========== global variables ========== */
-
-UString *ustr = NULL;
-UBreakIterator *ubrk = NULL;
-UBool possible_untermminated_word = FALSE;
 
 filter_func_decl_t filter_functions[] = {
     {"isupper",         u_isupper},
@@ -151,7 +123,7 @@ static const simple_translate_func_t simple_case_mapping[UCASE_COUNT] = {
 
 /* ========== getopt stuff ========== */
 
-static char optstr[] = "Ccdst";
+static char optstr[] = "Ccdstv";
 
 static struct option long_options[] =
 {
@@ -203,7 +175,8 @@ USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
     return uset;
 }
 
-USet *create_set_from_string32(const UChar32 *string32, int32_t string32_length, UBool negate, error_t **UNUSED(error)) {
+USet *create_set_from_string32(const UChar32 *string32, int32_t string32_length, UBool negate, error_t **UNUSED(error))
+{
     USet *uset;
     int i;
 
@@ -219,36 +192,299 @@ USet *create_set_from_string32(const UChar32 *string32, int32_t string32_length,
     return uset;
 }
 
+/* ========== X ========== */
+
+int32_t grapheme_count(UBreakIterator *ubrk, const UChar *ustring, int32_t ustring_len)
+{
+    int32_t i, count;
+    UErrorCode status;
+
+    count = 0;
+    status = U_ZERO_ERROR;
+    ubrk_setText(ubrk, ustring, ustring_len, &status);
+    if (U_FAILURE(status)) {
+        return -1;
+    }
+    for (i = ubrk_first(ubrk); UBRK_DONE != i; i = ubrk_next(ubrk)) {
+        ++count;
+    }
+    ubrk_setText(ubrk, NULL, 0, &status);
+    assert(U_SUCCESS(status));
+
+    return count;
+}
+
+/* ========== X ========== */
+
+#define POINTER_TO_UCHAR32(p) ((UChar32) (long) (p))
+#define TO_POINTER(c) ((void *) (long) (c))
+
+typedef struct {
+    UChar *ptr;
+    size_t len;
+} KVString;
+
+void *kvstring_dup(const void *v)
+{
+    KVString *s, *clone;
+
+    s = (KVString *) v;
+    clone = mem_new(*clone);
+    clone->ptr = s->ptr; // we don't need to dup it too
+    clone->len = s->len;
+
+    return clone;
+}
+
+#ifdef DEBUG
+static const UChar NULL_USTRING[] = { 0x28, 0x6E, 0x75, 0x6C, 0x6C, 0x29, 0 };
+
+static const KVString NULL_KVString = {
+    &NULL_USTRING,
+    6
+};
+
+void kvstring_debug(UString *output, const void *k, const void *v)
+{
+    const KVString *kk, *kv;
+
+    kk = (const KVString *) k;
+    kv = NULL == v ? &NULL_KVString : (const KVString *) v;
+    ustring_sprintf(output, "key = >%.*S< (%d), value = >%.*S< (%d)", kk->len, kk->ptr, kk->len, kv->len, kv->ptr, kv->len);
+}
+#endif /* DEBUG */
+
+int single_equal(const void *a, const void *b)
+{
+    const KVString *s1, *s2;
+
+    s1 = (const KVString *) a;
+    s2 = (const KVString *) b;
+
+    return 0 == u_strCompare(s1->ptr, s1->len, s2->ptr, s2->len, FALSE);
+}
+
+uint32_t single_hash(const void *k)
+{
+    size_t i;
+    uint32_t h;
+    const KVString *s;
+
+    h = 0;
+    s = (const KVString *) k;
+    for (i = 0; i < s->len; i++) {
+        h = h * 31 + s->ptr[i];
+    }
+
+    return h;
+}
+
+/*
+// not needed if based on UChar * instead of UChar32
+int cp_equal(const void *a, const void *b)
+{
+    return POINTER_TO_UCHAR32(a) == POINTER_TO_UCHAR32(b);
+}
+
+uint32_t cp_hash(const void *k)
+{
+    return k;
+}*/
+
+/* ========== X ========== */
+
+Hashtable *grapheme_hashtable_put(
+    UChar *from, int32_t from_length,
+    UChar *to, int32_t to_length, // NULL, 0 if -d
+    UBool delete, UBool complete
+) {
+    Hashtable *ht;
+    KVString k, v;
+    UErrorCode status;
+    int32_t l1, u1;
+    UBreakIterator *ubrk1, *ubrk2;
+
+    ht = hashtable_new(single_hash, single_equal, NULL, NULL, kvstring_dup, delete ? NULL : kvstring_dup);
+    status = U_ZERO_ERROR;
+    ubrk1 = ubrk_open(UBRK_CHARACTER, NULL, from, from_length, &status);
+    if (U_FAILURE(status)) {
+        // error
+        return NULL;
+    }
+    if (delete) {
+        if (UBRK_DONE != (l1 = ubrk_first(ubrk1))) {
+            while (UBRK_DONE != (u1 = ubrk_next(ubrk1))) {
+                k.ptr = from + l1;
+                k.len = u1 - l1;
+                hashtable_put(ht, &k, NULL);
+
+                l1 = u1;
+            }
+        }
+    } else {
+        int32_t l2, u2;
+
+        ubrk2 = ubrk_open(UBRK_CHARACTER, NULL, to, to_length, &status);
+        if (U_FAILURE(status)) {
+            // error
+            ubrk_close(ubrk1);
+            return NULL;
+        }
+        if (UBRK_DONE != (l1 = ubrk_first(ubrk1)) && UBRK_DONE != (l2 = ubrk_first(ubrk2))) {
+            while (UBRK_DONE != (u1 = ubrk_next(ubrk1)) && UBRK_DONE != (u2 = ubrk_next(ubrk2))) {
+                k.ptr = from + l1;
+                k.len = u1 - l1;
+                v.ptr = to + l2;
+                v.len = u2 - l2;
+                hashtable_put(ht, &k, &v);
+
+                l1 = u1;
+                l2 = u2;
+            }
+            if (UBRK_DONE != u1) { // "hack" (for now) for set2_type == CHARACTER
+                u2 = ubrk_last(ubrk2);
+                l2 = ubrk_previous(ubrk2);
+                do {
+                    k.ptr = from + l1;
+                    k.len = u1 - l1;
+                    v.ptr = to + l2;
+                    v.len = u2 - l2;
+                    hashtable_put(ht, &k, &v);
+
+                    l1 = u1;
+                } while (UBRK_DONE != (u1 = ubrk_next(ubrk1)));
+            }
+        }
+        ubrk_close(ubrk2);
+    }
+    ubrk_close(ubrk1);
+
+    return ht;
+}
+
+#if 0
+Hashtable *cp_hashtable_put(
+    UChar *from, int32_t from_length,
+    UChar *to, int32_t to_length,
+    UBool squeeze, UBool delete, UBool complete
+) {
+    Hashtable *ht;
+
+    ht = hashtable_new(...);
+    // ...
+
+    return ht;
+}
+#endif
+
 /* ========== replacement helpers ========== */
 
-// use an hashtable for performance ?
+static UBool ustring_endswith(UString *ustr, UChar *str, size_t length)
+{
+    return ustr->len >= length && 0 == u_memcmp(ustr->ptr + ustr->len - length, str, length);
+}
+
+void grapheme_process(
+    Hashtable *ht,
+    UBreakIterator *ubrk,
+    UString *in, UString *out,
+    UBool squeeze, UBool delete
+) {
+    int32_t l, u;
+    KVString k, *v;
+    UErrorCode status;
+
+    status = U_ZERO_ERROR;
+    ubrk_setText(ubrk, in->ptr, in->len, &status);
+    if (U_FAILURE(status)) {
+        // TODO
+        return;
+    }
+    if (UBRK_DONE != (l = ubrk_first(ubrk))) {
+        while (UBRK_DONE != (u = ubrk_next(ubrk))) {
+            k.ptr = in->ptr + l;
+            k.len = u - l;
+            if (delete) {
+                if (!hashtable_exists(ht, &k)) {
+                    if (!squeeze || !ustring_endswith(out, k.ptr, k.len)) {
+                        ustring_append_string_len(out, k.ptr, k.len);
+                    }
+                }
+            } else {
+                if (hashtable_get(ht, &k, (void **) &v)) {
+                    if (!squeeze || !ustring_endswith(out, v->ptr, v->len)) {
+                        ustring_append_string_len(out, v->ptr, v->len);
+                    }
+                } else {
+                    if (!squeeze || !ustring_endswith(out, k.ptr, k.len)) {
+                        ustring_append_string_len(out, k.ptr, k.len);
+                    }
+                }
+            }
+            l = u;
+        }
+    }
+    ubrk_setText(ubrk, NULL, 0, &status);
+    assert(U_SUCCESS(status));
+}
+
+#if 0
+void cp_process(
+    Hashtable *h,
+    UChar *in, int32_t in_length,
+    UBool squeeze, UBool delete
+) {
+    UChar32 last = U_SENTINEL;
+
+    //
+}
+
+void single_cp_tr(
+    UChar *from, int32_t from_length, // UTF-16 (binaire) ou UTF-32 (macros) based ?
+    UChar *to, int32_t to_length, // UTF-16 (binaire) ou UTF-32 (macros) based ?
+    UChar *in, int32_t in_length,
+    UBool squeeze
+) {
+    UChar32 last = U_SENTINEL; // un UBool suffit dans ce cas particulier ?
+
+    //
+}
+
+void single_cp_delete(
+    UChar *from, int32_t from_length, // UTF-16 (binaire) ou UTF-32 (macros) based ?
+    UChar *in, int32_t in_length,
+) {
+    //
+}
+#endif
+
 void trtr(
     UChar32 *from, int32_t from_length,
     UChar32 *to, int32_t to_length,
-    UChar *in, int32_t in_length,
-    UChar *out, int32_t *out_length, int32_t out_size
+    UString *in, UString *out
 ) {
-    int i, f;
+    size_t i;
+    int32_t f;
     UChar32 ci;
     UBool isError;
 
     isError = FALSE; // unused
-    for (i = 0; i < in_length; ) {
-        U16_NEXT(in, i, in_length, ci);
+    for (i = 0; i < in->len; ) {
+        U16_NEXT(in->ptr, i, in->len, ci);
         for (f = 0; f < from_length; f++) {
             if (from[f] == ci) {
                 if (NULL == to || 0 == *to || 0 == to_length) { // dFlag on
                     goto endinnerloop;
                 } else if (1 == to_length) { // dFlag off, to_length == 1 (to is a single code point)
-                    U16_APPEND(out, *out_length, out_size, to[0], isError);
+                    ustring_append_char32(out, to[0]);
                     goto endinnerloop;
                 } else { // dFlag off, to_length == from_length
-                    U16_APPEND(out, *out_length, out_size, to[f], isError);
+                    ustring_append_char32(out, to[f]);
                     goto endinnerloop;
                 }
             }
         }
-        U16_APPEND(out, *out_length, out_size, ci, isError);
+        ustring_append_char32(out, ci);
 
 endinnerloop:
         ;
@@ -256,40 +492,28 @@ endinnerloop:
 }
 
 void cptr(
-    UChar32 from,
-    UChar32 to,
-    UChar *in, int32_t in_length,
-    UChar *out, int32_t *out_length, int32_t out_size,
+    UChar32 from, UChar32 to,
+    UString *in, UString *out,
     UBool negate
 ) {
-    int i;
+    size_t i;
     UChar32 ci;
     UBool isError;
 
     isError = FALSE; // unused
-    for (i = 0; i < in_length; ) {
-        U16_NEXT(in, i, in_length, ci);
+    for (i = 0; i < in->len; ) {
+        U16_NEXT(in->ptr, i, in->len, ci);
         if (((from == ci) ^ negate)) {
             if (-1 != to) {
-                U16_APPEND(out, *out_length, out_size, to, isError);
+                ustring_append_char32(out, to);
             }
             continue;
         }
-        U16_APPEND(out, *out_length, out_size, ci, isError);
+        ustring_append_char32(out, ci);
     }
 }
 
 /* ========== main ========== */
-
-static void exit_cb(void)
-{
-    if (NULL != ustr) {
-        ustring_destroy(ustr);
-    }
-    if (NULL != ubrk) {
-        ubrk_close(ubrk);
-    }
-}
 
 int main(int argc, char **argv)
 {
@@ -297,24 +521,26 @@ int main(int argc, char **argv)
     USet *uset;
     UBool match;
     UChar32 i32;
+    Hashtable *ht;
     error_t *error;
     reader_t reader;
-    UChar *in;
     UChar *from, *to;
     UErrorCode status;
+    UString *in, *out;
+    UBool set2_expected;
+    UBreakIterator *ubrk;
     UChar32 *from32, *to32;
     filter_func_t filter_func;
     int set1_type, set2_type;
-    UBool set2_expected, dFlag, cFlag, isError;
-    UChar realin[IN_BUFFER_SIZE + 1 + 3]; // + 1 for \0, + 3 for fake characters
-    UChar out[OUT_BUFFER_SIZE + 1];
-    int32_t in_length, out_length;
     int32_t from_length, to_length;
+    UBool dFlag, cFlag, isError, sFlag;
     UCaseType set1_case_type, set2_case_type;
 
+    ht = NULL;
+    ubrk = NULL;
     uset = NULL;
     error = NULL;
-    in = realin + 1;
+    in = out = NULL;
     from = to = NULL;
     filter_func = NULL;
     from32 = to32 = NULL;
@@ -322,18 +548,7 @@ int main(int argc, char **argv)
     set1_type = set2_type = NONE;
     exit_failure_value = UTR_EXIT_FAILURE;
     set1_case_type = set2_case_type = UCASE_NONE;
-    isError = set2_expected = cFlag = dFlag = FALSE;
-
-    realin[0] = 0x0020;
-    // these following 'z', permit us to known if the word may be splitted or not
-    realin[IN_BUFFER_SIZE + 1] = 0x007A; // z (test this offset as boundary)
-    realin[IN_BUFFER_SIZE + 2] = 0x007A; // z (without it, boundary test were always true because we are at the end of the string)
-    realin[IN_BUFFER_SIZE + 3] = 0; // just in case and debugging
-
-    if (0 != atexit(exit_cb)) {
-        fputs("can't register atexit() callback", stderr);
-        return UTR_EXIT_FAILURE;
-    }
+    isError = set2_expected = cFlag = dFlag = sFlag = FALSE;
 
     reader_init(&reader, DEFAULT_READER_NAME);
 
@@ -347,13 +562,13 @@ int main(int argc, char **argv)
                 dFlag = TRUE;
                 break;
             case 's':
-                // TODO
+                sFlag = TRUE;
                 break;
             case 't':
                 // NOP, ignored, doesn't apply to Unicode
                 break;
             case 'v':
-                fprintf(stderr, "utr version %u.%u\n", UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
+                fprintf(stderr, "BSD utr version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
                 break;
             default:
@@ -505,28 +720,35 @@ int main(int argc, char **argv)
         }
     }
 
-    if (GLOBAL_FUNCTION == set1_type /*&& set2_type == NONE*/) {
-        ustr = ustring_new();
-        if (set1_case_type == UCASE_TITLE) {
-            ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
-            if (U_FAILURE(status)) {
-                icu_msg(FATAL, status, "ubrk_open");
-            }
+    in = ustring_new();
+    out = ustring_new();
+
+    if (STRING == set1_type) {
+        from = local_to_uchar(argv[0], &from_length, &error);
+        if (dFlag) {
+            to = NULL;
+            to_length = 0;
+        } else {
+            to = local_to_uchar(argv[1], &to_length, &error);
         }
+        ht = grapheme_hashtable_put(from, from_length, to, to_length, dFlag, FALSE);
+        //hashtable_debug(ht, kvstring_debug);
+        ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+        assert(U_SUCCESS(status));
     }
 
     while (!reader_eof(&reader)) {
-        out_length = 0;
-        if (-1 == (in_length = reader_readuchars(&reader, &error, in, IN_BUFFER_SIZE))) {
+        if (!reader_readline(&reader, &error, in)) {
             print_error(error);
         }
-// debug("in_length = %d", in_length);
-        // don't append a nul character: work with lengths (needed for correct titlecasing)
-        if (SET == set1_type || FILTER_FUNCTION == set1_type) {
-            int i;
+        ustring_chomp(in);
+        ustring_truncate(out);
 
-            for (i = 0; i < in_length; ) {
-                U16_NEXT(in, i, in_length, i32);
+        if (SET == set1_type || FILTER_FUNCTION == set1_type) {
+            size_t i;
+
+            for (i = 0; i < in->len; /* none: done by U16_NEXT */) {
+                U16_NEXT(in->ptr, i, in->len, i32);
                 if (SET == set1_type) {
                     match = uset_contains(uset, i32);
                 } else if (FILTER_FUNCTION == set1_type) {
@@ -540,53 +762,38 @@ int main(int argc, char **argv)
                     } else if (SIMPLE_FUNCTION == set2_type) {
                         i32 = simple_case_mapping[set2_case_type](i32);
                     }
-                    U16_APPEND(out, out_length, OUT_BUFFER_SIZE, i32, isError);
-                } else {
-                    U16_APPEND(out, out_length, OUT_BUFFER_SIZE, i32, isError);
                 }
+                ustring_append_char32(out, i32);
             }
         } else if (CHARACTER == set1_type && CHARACTER == set2_type) {
-            cptr(*from32, dFlag ? -1 : *to32, in, in_length, out, &out_length, OUT_BUFFER_SIZE, cFlag);
+            cptr(*from32, dFlag ? -1 : *to32, in, out, cFlag);
         } else if (SIMPLE_FUNCTION == set2_type) {
             if (CHARACTER == set1_type) {
+                // TODO: ???
                 to32 = mem_new(*to32); // we don't use \0 in fact
                 to32[0] = from32[0];
                 to_length = 1;
             } else if (STRING == set1_type) {
                 int i;
 
+                // TODO: ???
                 to32 = mem_new_n(*to32, from_length); // we don't use \0 in fact, so forget "+ 1"
                 to_length = from_length;
                 for (i = 0; i < from_length; i++) {
                     to32[i] = simple_case_mapping[set2_case_type](from32[i]);
                 }
             }
-            trtr(from32, from_length, to32, to_length, in, in_length, out, &out_length, OUT_BUFFER_SIZE);
+            trtr(from32, from_length, to32, to_length, in, out);
         } else if (GLOBAL_FUNCTION == set1_type /*&& set2_type == NONE*/) {
-            // out and out_length unused: static buffer unappropriate for this case
-            if (UCASE_TITLE == set1_case_type) {
-                if (possible_untermminated_word) {
-                    realin[0] = 0x0041; // prepend an uppercase letter (A): assume a splitted word doesn't become titlecased where it shouldn't
-                } else {
-                    realin[0] = 0x0020; // prepend a space: so we are not interfering in titlecasing
-                }
-                if (!ustring_fullcase(ustr, realin, in_length + 3, set1_case_type, ubrk, &error)) {
-                    print_error(error);
-                }
-                u_file_write(ustr->ptr + 1, ustr->len - 3, ustdout);
-                possible_untermminated_word = (in_length == IN_BUFFER_SIZE && !ubrk_isBoundary(ubrk, in_length + 1));
-            } else {
-                if (!ustring_fullcase(ustr, in, in_length, set1_case_type, ubrk, &error)) {
-                    print_error(error);
-                }
-                u_file_write(ustr->ptr, ustr->len, ustdout);
+            if (!ustring_fullcase(out, in->ptr, in->len, set1_case_type, &error)) {
+                print_error(error);
             }
-            continue;
         } else {
-            trtr(from32, from_length, to32, to_length, in, in_length, out, &out_length, OUT_BUFFER_SIZE);
+//             trtr(from32, from_length, to32, to_length, in, out);
+            grapheme_process(ht, ubrk, in, out, sFlag, dFlag);
         }
-        out[out_length] = 0;
-        u_file_write(out, out_length, ustdout);
+
+        u_file_write(out->ptr, out->len, ustdout);
     }
     reader_close(&reader);
 
@@ -597,13 +804,25 @@ int main(int argc, char **argv)
         free(to);
     }
     if (NULL != from32) {
-        free(from);
+        free(from32);
     }
     if (NULL != to32) {
-        free(to);
+        free(to32);
     }
     if (NULL != uset) {
         uset_close(uset);
+    }
+    if (NULL != ubrk) {
+        ubrk_close(ubrk);
+    }
+    if (NULL != ht) {
+        hashtable_destroy(ht);
+    }
+    if (NULL != in) {
+        ustring_destroy(in);
+    }
+    if (NULL != out) {
+        ustring_destroy(out);
     }
 
     return UTR_EXIT_SUCCESS;

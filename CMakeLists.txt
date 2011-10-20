@@ -78,8 +78,7 @@ endmacro(declare_ugrep_binary)
 
 declare_ugrep_binary(ugrep bin/ugrep.c struct/slist.c engines/fixed.c engines/re.c struct/intervals.c struct/fixed_circular_list.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
 declare_ugrep_binary(ucat bin/ucat.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
-declare_ugrep_binary(utr bin/utr.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
-#declare_ugrep_binary(utr bin/utr.c struct/hashtable.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
+declare_ugrep_binary(utr bin/utr.c struct/hashtable.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
 declare_ugrep_binary(usort bin/usort.c struct/rbtree.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
 declare_ugrep_binary(ucut bin/ucut.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
 
