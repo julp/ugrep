@@ -13,7 +13,7 @@ mark_as_advanced(CMAKE_C_FLAGS_MAINTAINER)
 set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES} Maintainer")
 
 set(UGREP_VERSION_MAJOR 0)
-set(UGREP_VERSION_MINOR 4)
+set(UGREP_VERSION_MINOR 5)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 
@@ -22,7 +22,9 @@ find_package(ICU 4.4 COMPONENTS i18n io REQUIRED)
 find_package(ZLIB QUIET)
 find_package(BZip2 QUIET)
 
-set(COMMON_BASE_SOURCES alloc.c ustring.c io/mmap.c io/stdio.c io/string.c error.c io/reader.c util.c env.c)
+set(COMMON_BASE_SOURCES io/mmap.c io/stdio.c io/string.c io/reader.c)
+file(GLOB MISC_SOURCES ${CMAKE_SOURCE_DIR}/misc/*.c)
+list(APPEND COMMON_BASE_SOURCES ${MISC_SOURCES})
 set(EXTRA_SOURCES "")
 set(EXTRA_LIBS "")
 
@@ -37,21 +39,21 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "BSD$")
 endif(${CMAKE_SYSTEM_NAME} MATCHES "BSD$")
 
 if(ZLIB_FOUND)
-    set(EXTRA_SOURCES ${EXTRA_SOURCES} io/zlib.c)
+    list(APPEND COMMON_BASE_SOURCES io/zlib.c)
     include_directories(${ZLIB_INCLUDE_DIR})
     set(EXTRA_LIBS ${EXTRA_LIBS} ${ZLIB_LIBRARIES})
     set(HAVE_ZLIB TRUE)
 endif(ZLIB_FOUND)
 
 if(BZIP2_FOUND)
-    set(EXTRA_SOURCES ${EXTRA_SOURCES} io/bzip2.c)
+    list(APPEND COMMON_BASE_SOURCES io/bzip2.c)
     include_directories(${BZIP2_INCLUDE_DIR})
     set(EXTRA_LIBS ${EXTRA_LIBS} ${BZIP2_LIBRARIES})
     set(HAVE_BZIP2 TRUE)
 endif(BZIP2_FOUND)
 
 if(MSVC)
-    file(GLOB EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/win32/*.c)
+    file(GLOB COMMON_BASE_SOURCES ${CMAKE_SOURCE_DIR}/win32/*.c)
     #set(EXTRA_SOURCES ${EXTRA_SOURCES} struct/hashtable.c)
     include_directories(${CMAKE_SOURCE_DIR}/win32)
 endif(MSVC)
@@ -68,7 +70,15 @@ message("==> ZLIB  : ${ZLIB_VERSION_STRING}")
 
 list(REMOVE_DUPLICATES EXTRA_SOURCES)
 
-include_directories(${ICU_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+include_directories(
+    ${ICU_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/misc/
+    ${CMAKE_SOURCE_DIR}/struct/
+    ${CMAKE_BINARY_DIR}
+)
 
 set(UgrepBinaries )
 macro(declare_ugrep_binary _KEY)
@@ -76,11 +86,11 @@ macro(declare_ugrep_binary _KEY)
     set("UgrepBinaries_${_KEY}" ${ARGN})
 endmacro(declare_ugrep_binary)
 
-declare_ugrep_binary(ugrep bin/ugrep.c struct/slist.c engines/fixed.c engines/re.c struct/intervals.c struct/fixed_circular_list.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
-declare_ugrep_binary(ucat bin/ucat.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
-declare_ugrep_binary(utr bin/utr.c struct/hashtable.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
-declare_ugrep_binary(usort bin/usort.c struct/rbtree.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
-declare_ugrep_binary(ucut bin/ucut.c ${EXTRA_SOURCES} ${COMMON_BASE_SOURCES})
+declare_ugrep_binary(ugrep bin/ugrep.c struct/slist.c engines/fixed.c engines/re.c struct/intervals.c struct/fixed_circular_list.c ${COMMON_BASE_SOURCES})
+declare_ugrep_binary(ucat bin/ucat.c ${COMMON_BASE_SOURCES})
+declare_ugrep_binary(utr bin/utr.c struct/hashtable.c ${COMMON_BASE_SOURCES})
+declare_ugrep_binary(usort bin/usort.c struct/rbtree.c ${COMMON_BASE_SOURCES})
+declare_ugrep_binary(ucut bin/ucut.c ${COMMON_BASE_SOURCES})
 
 foreach (UgrepBinary ${UgrepBinaries})
     #message(STATUS "UgrepBinary = ${UgrepBinary}")
