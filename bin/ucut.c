@@ -210,6 +210,7 @@ int main(int argc, char **argv)
 
     ret = 0;
     error = NULL;
+    env_init();
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = UCUT_EXIT_FAILURE;
 
@@ -253,7 +254,7 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    util_apply();
+    env_apply();
 
     if (cFlag && fFlag) {
         usage();

@@ -1097,11 +1097,10 @@ int main(int argc, char **argv)
         return UGREP_EXIT_FAILURE;
     }
 
+    env_init();
     reader_init(&reader, DEFAULT_READER_NAME);
     patterns = slist_new(pattern_destroy);
     exit_failure_value = UGREP_EXIT_FAILURE;
-
-    //ustdio_init();
 
     switch (__progname[1]) {
         case 'e':
@@ -1261,7 +1260,7 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    util_apply();
+    env_apply();
 
     reader_set_binary_behavior(&reader, binbehave);
 

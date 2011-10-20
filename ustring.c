@@ -56,7 +56,7 @@ UString *ustring_convert_argv_from_local(const char *cargv, error_t **error)
     int32_t cargv_length;
 
     status = U_ZERO_ERROR;
-    ucnv = ucnv_open(util_get_stdin_encoding(), &status);
+    ucnv = ucnv_open(env_get_stdin_encoding(), &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ucnv_open");
         return NULL;
@@ -355,6 +355,94 @@ UString *ustring_adopt_string(UChar *from) /* NONNULL() */
     require_else_return_null(NULL != from);
 
     return ustring_adopt_string_len(from, (size_t) u_strlen(from));
+}
+
+enum {
+    TRIM_LEFT  = 1,
+    TRIM_RIGHT = 2,
+    TRIM_BOTH  = 3
+};
+
+static int32_t _u_trim(
+    UChar *string, int32_t string_length,
+    UChar *what, int32_t what_length,
+    int mode
+) {
+    int32_t i, k;
+    UChar32 c = 0;
+    int32_t start = 0, end;
+    int32_t string_cu_length, what_cu_length;
+
+    if (string_length < 0) {
+        string_cu_length = u_strlen(string);
+    } else {
+        string_cu_length = string_length;
+    }
+    if (NULL != what) {
+        if (0 == *what) {
+            what = NULL;
+        } else if (what_length < 0) {
+            what_cu_length = u_strlen(what);
+        } else {
+            what_cu_length = what_length;
+        }
+    }
+    end = string_cu_length;
+    if (mode & TRIM_LEFT) {
+        for (i = k = 0 ; i < end ; ) {
+            U16_NEXT(string, k, end, c);
+            if (NULL != what) {
+                if (NULL == u_memchr32(what, c, what_cu_length)) {
+                    break;
+                }
+            } else {
+                if (FALSE == u_isWhitespace(c)) {
+                    break;
+                }
+            }
+            i = k;
+        }
+        start = i;
+    }
+    if (mode & TRIM_RIGHT) {
+        for (i = k = end ; i > start ; ) {
+            U16_PREV(string, 0, k, c);
+            if (NULL != what) {
+                if (NULL == u_memchr32(what, c, what_cu_length)) {
+                    break;
+                }
+            } else {
+                if (FALSE == u_isWhitespace(c)) {
+                    break;
+                }
+            }
+            i = k;
+        }
+        end = i;
+    }
+    if (start < string_cu_length) {
+        u_memmove(string, string + start, end - start);
+        *(string + end - start) = 0;
+    } else {
+        *string = 0;
+    }
+
+    return end - start;
+}
+
+static int32_t u_trim(UChar *s, int32_t s_length, UChar *what, int32_t what_length)
+{
+    return _u_trim(s, s_length, what, what_length, TRIM_BOTH);
+}
+
+static int32_t u_ltrim(UChar *s, int32_t s_length, UChar *what, int32_t what_length)
+{
+    return _u_trim(s, s_length, what, what_length, TRIM_LEFT);
+}
+
+static int32_t u_rtrim(UChar *s, int32_t s_length, UChar *what, int32_t what_length)
+{
+    return _u_trim(s, s_length, what, what_length, TRIM_RIGHT);
 }
 
 void ustring_trim(UString *ustr) /* NONNULL() */

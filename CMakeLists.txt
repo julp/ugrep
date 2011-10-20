@@ -22,7 +22,7 @@ find_package(ICU 4.4 COMPONENTS i18n io REQUIRED)
 find_package(ZLIB QUIET)
 find_package(BZip2 QUIET)
 
-set(COMMON_BASE_SOURCES alloc.c ustring.c io/mmap.c io/stdio.c io/string.c error.c io/reader.c util.c)
+set(COMMON_BASE_SOURCES alloc.c ustring.c io/mmap.c io/stdio.c io/string.c error.c io/reader.c util.c env.c)
 set(EXTRA_SOURCES "")
 set(EXTRA_LIBS "")
 

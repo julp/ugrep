@@ -97,10 +97,14 @@ static int procfile(reader_t *reader, const char *filename)
             u_fprintf(ustdout, "%s:\n", filename);
         }
         /* !fd->binary || (fd->binary && BIN_FILE_BIN != binbehave) */
+#if 1
         while (!reader_eof(reader)) {
             if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
             }
+#else
+        while (reader_readline(reader, &error, ustr)) {
+#endif
             ustring_chomp(ustr);
             if (bFlag || sFlag) {
                 UBool blank;
@@ -203,9 +207,9 @@ int main(int argc, char **argv)
     }
 
     ret = 0;
+    env_init();
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = UCAT_EXIT_FAILURE;
-    //ustdio_init();
 
 #if defined(HAVE_BZIP2) || defined(HAVE_ZLIB)
     switch (__progname[1]) {
@@ -306,7 +310,7 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    util_apply();
+    env_apply();
 
     reader_set_binary_behavior(&reader, binbehave);
 

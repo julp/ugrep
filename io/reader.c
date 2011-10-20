@@ -367,7 +367,7 @@ UBool reader_open_stdin(reader_t *this, error_t **error) /* NONNULL(1) */
     reader_init(this, "stdio");
 
     ret = reader_open(this, error, "-");
-    if (!reader_set_encoding(this, error, util_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
+    if (!reader_set_encoding(this, error, env_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
         return FALSE;
     }
 #ifdef DEBUG
@@ -389,7 +389,7 @@ UBool reader_open_string(reader_t *this, error_t **error, const char *string) /*
     if (NULL == (this->fp = string_open(string, -1))) {
         return FALSE;
     }
-    if (!reader_set_encoding(this, error, util_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
+    if (!reader_set_encoding(this, error, env_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
         return FALSE;
     }
 #ifdef DEBUG
@@ -416,7 +416,7 @@ void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
     this->fp = NULL;
     this->encoding = NULL;
     this->sourcename = NULL;
-    this->default_encoding = util_get_inputs_encoding();
+    this->default_encoding = env_get_inputs_encoding();
     if (NULL != name) {
         reader_set_imp_by_name(this, name);
     } else {
@@ -483,7 +483,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
 
     //this->ucnv = NULL;
     //encoding = NULL;
-    encoding = util_get_inputs_encoding();
+    encoding = env_get_inputs_encoding();
     status = U_ZERO_ERROR;
     this->lineno = 0;
     this->binary = FALSE;

@@ -176,9 +176,9 @@ int main(int argc, char **argv)
     ret = 0;
     wanted = ALL;
     error = NULL;
+    env_init();
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = USORT_EXIT_FAILURE;
-    //ustdio_init();
 
     status = U_ZERO_ERROR;
     ucol = ucol_open(NULL, &status);
@@ -230,6 +230,8 @@ Insensible aux accents et à la casse : Collator::STRENGTH à Collator::PRIMARY 
     }
     argc -= optind;
     argv += optind;
+
+    env_apply();
 
 //     if (ALL == wanted) {
         //tree = rbtree_new(usort_cmp_func[!!rFlag], (func_dtor_t) ustring_destroy, uFlag ? NULL : free);

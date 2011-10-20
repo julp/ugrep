@@ -186,5 +186,6 @@ typedef void (*func_dtor_t)(void *); /* Destructor callback */
 # include "ustring.h"
 # include "io/reader.h"
 # include "util.h"
+# include "env.h"
 
 #endif /* !COMMON_H */
