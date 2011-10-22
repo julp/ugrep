@@ -548,7 +548,7 @@ int main(int argc, char **argv)
     set1_type = set2_type = NONE;
     exit_failure_value = UTR_EXIT_FAILURE;
     set1_case_type = set2_case_type = UCASE_NONE;
-    isError = set2_expected = cFlag = dFlag = sFlag = FALSE;
+    match = isError = set2_expected = cFlag = dFlag = sFlag = FALSE;
 
     env_init();
     reader_init(&reader, DEFAULT_READER_NAME);
