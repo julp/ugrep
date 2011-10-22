@@ -373,6 +373,7 @@ static int32_t _u_trim(
     int32_t start = 0, end;
     int32_t string_cu_length, what_cu_length;
 
+    what_cu_length = 0;
     if (string_length < 0) {
         string_cu_length = u_strlen(string);
     } else {
