@@ -253,22 +253,21 @@ static UBool reader_rewind(reader_t *this, error_t **error)
 static UBool reader_rewind(reader_t *this, error_t **UNUSED(error))
 #endif /* !NO_PHYSICAL_REWIND */
 {
+    UBool ret;
+
     require_else_return_false(NULL != this);
 
     this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.ptr = this->utf16.buffer;
 #ifndef NO_PHYSICAL_REWIND
-    UBool ret;
-
     ret = this->imp->rewindTo(this->fp, error, this->signature_length);
-
-    return ret;
 #else
 //     ucnv_reset(this->ucnv);
 //     ucnv_resetToUnicode(this->ucnv);
+    ret = TRUE;
     this->byte.ptr = this->byte.buffer + this->signature_length;
-
-    return TRUE;
 #endif /* !NO_PHYSICAL_REWIND */
+
+    return ret;
 }
 
 /* ==================== public implementation getter/setter ==================== */
