@@ -17,7 +17,7 @@ static void *stdio_dopen(error_t **error, int fd, const char * const filename)
 
 static void stdio_close(void *fp)
 {
-    if (STDIN_FILENO != fileno(fp)) {
+    if (STDIN_FILENO != fileno((FILE *) fp)) {
         fclose((FILE *) fp);
     }
 }
