@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <ctype.h>
 
-#include "ugrep.h"
+#include "engine.h"
 #include "struct/fixed_circular_list.h"
 
 #define SEP_MATCH_UCHAR    0x003a

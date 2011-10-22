@@ -1,4 +1,5 @@
-#include "ugrep.h"
+#include "common.h"
+#include "slist.h"
 
 slist_t *slist_new(func_dtor_t dtor_func) /* WARN_UNUSED_RESULT */
 {
