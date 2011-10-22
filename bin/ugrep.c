@@ -763,6 +763,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
             FETCH_DATA(fixed_circular_list_fetch(lines), line, line_t);
 
             ustr = line->ustr;
+            ret = ENGINE_FAILURE;
             if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
                 return 1;

@@ -240,7 +240,7 @@ void *kvstring_dup(const void *v)
 static const UChar NULL_USTRING[] = { 0x28, 0x6E, 0x75, 0x6C, 0x6C, 0x29, 0 };
 
 static const KVString NULL_KVString = {
-    &NULL_USTRING,
+    (UChar *) &NULL_USTRING,
     6
 };
 

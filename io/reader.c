@@ -202,7 +202,8 @@ int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, int32_
 
     count = 0;
     while (count < maxLen) {
-        if ((this->utf16.externalEnd - this->utf16.ptr) < 2) {
+        available = this->utf16.externalEnd - this->utf16.ptr;
+        if (available < 2) {
             if ((available = fill_buffer(this, error)) < 1) {
                 if (-1 == available) {
                     count = -1;
