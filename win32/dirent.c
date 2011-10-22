@@ -4,10 +4,10 @@
 #include <errno.h>
 #include "unistd.h"
 #include "dirent.h"
-#include "hash.h"
+#include "hashtable.h"
 
-#define POINTER_TO_INT(p) ((int) (long) (p))
-#define INT_TO_POINTER(i) ((void *) (long) (i))
+#define POINTER_TO_UINT(p) ((uint32_t) (p))
+#define UINT_TO_POINTER(i) ((void *)   (i))
 
 #include <errno.h>
 
@@ -113,25 +113,26 @@ static int register_fd(void *x, int *fd, const char *path)
     if (NULL == _fullpath(full, path, _MAX_PATH)) {
         return 0;
     } else {
-        char *copy = strdup(full);
+        char *copy = _strdup(full);
         *fd = --FD_FROM_P(x);
-        return hashtable_put(HT_FROM_P(x), INT_TO_POINTER(*fd), copy);
+        hashtable_put(HT_FROM_P(x), UINT_TO_POINTER(*fd), copy);
+        return 1;
     }
 }
 
 static void unregister_fd(void *x, int fd)
 {
-    hashtable_delete(HT_FROM_P(x), INT_TO_POINTER(fd));
+    hashtable_remove(HT_FROM_P(x), UINT_TO_POINTER(fd));
 }
 
 static int fd_equal(const void *a, const void *b)
 {
-    return POINTER_TO_INT(a) == POINTER_TO_INT(b);
+    return POINTER_TO_UINT(a) == POINTER_TO_UINT(b);
 }
 
-static int32_t fd_hash(const void *p)
+static uint32_t fd_hash(const void *p)
 {
-    return POINTER_TO_INT(p);
+    return POINTER_TO_UINT(p);
 }
 
 void *dir_init()
@@ -139,7 +140,7 @@ void *dir_init()
     struct p *x;
 
     x = mem_new(*x);
-    x->ht = hashtable_new(fd_hash, fd_equal, NULL, free);
+    x->ht = hashtable_new(fd_hash, fd_equal, NULL, free, NULL, NULL);
     x->lastfd = -1;
 
     return (void *) x;
@@ -190,7 +191,7 @@ int win32_fstat(void *x, int fd, struct stat *buffer)
     } else {
         void *ptr;
 
-        if (hashtable_get(HT_FROM_P(x), INT_TO_POINTER(fd), &ptr)) {
+        if (hashtable_get(HT_FROM_P(x), UINT_TO_POINTER(fd), &ptr)) {
             if (NULL == ptr) {
                 errno = EBADF;
                 return -1;
@@ -217,9 +218,9 @@ int win32_close(void *x, int fd)
 DIR *opendir(void *x, const char *filename)
 {
     DIR *dp;
-    int index, fd;
     char *filespec;
     struct _stat buffer;
+    int index, fd, allocated;
 
     if (-1 == (fd = win32_open_ex(x, filename, _O_RDONLY, &buffer))) {
         return NULL;
@@ -229,13 +230,20 @@ DIR *opendir(void *x, const char *filename)
         return NULL;
     }
 
-    filespec = mem_new_n(*filename, strlen(filename) + 2 + 1);
-    strcpy(filespec, filename);
+    allocated = strlen(filename) + 2 + 1;
+    filespec = mem_new_n(*filename, allocated);
+    if (0 != strcpy_s(filespec, allocated, filename)) {
+        free(filespec);
+        return NULL;
+    }
     index = strlen(filespec) - 1;
     if (index >= 0 && (filespec[index] == '/' || (filespec[index] == '\\' && (index == 0 || !IsDBCSLeadByte(filespec[index-1]))))) {
         filespec[index] = '\0';
     }
-    strcat(filespec, "\\*");
+    if (0 != strncat_s(filespec, allocated, "\\*", sizeof("\\*") - 1)) {
+        free(filespec);
+        return NULL;
+    }
 
     dp = mem_new(*dp);
     dp->offset = 0;
@@ -253,7 +261,7 @@ DIR *opendir(void *x, const char *filename)
         }
     }
     dp->fd = fd;
-    dp->dir = strdup(filename);
+    dp->dir = _strdup(filename);
     free(filespec);
 
     return dp;

@@ -53,9 +53,9 @@ if(BZIP2_FOUND)
 endif(BZIP2_FOUND)
 
 if(MSVC)
-    file(GLOB COMMON_BASE_SOURCES ${CMAKE_SOURCE_DIR}/win32/*.c)
-    #set(EXTRA_SOURCES ${EXTRA_SOURCES} struct/hashtable.c)
-    include_directories(${CMAKE_SOURCE_DIR}/win32)
+    file(GLOB WIN32_SPECIFIC_SOURCES ${CMAKE_SOURCE_DIR}/win32/*.c)
+    list(APPEND COMMON_BASE_SOURCES ${WIN32_SPECIFIC_SOURCES} struct/hashtable.c)
+    include_directories(${CMAKE_SOURCE_DIR}/win32/)
 endif(MSVC)
 
 configure_file(
