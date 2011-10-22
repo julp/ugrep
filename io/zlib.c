@@ -16,7 +16,7 @@ static void *zlib_dopen(error_t **error, int fd, const char * const filename)
 
 static void zlib_close(void *fp)
 {
-    gzclose_r((gzFile *) fp);
+    gzclose((gzFile *) fp);
 }
 
 static UBool zlib_eof(void *fp)
