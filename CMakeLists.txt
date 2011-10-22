@@ -7,7 +7,7 @@ if(MSVC)
     # /GS /Wall
     set(CMAKE_C_FLAGS_MAINTAINER "/D REPLACE_GETOPT /D DEBUG /Od" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
 else(MSVC)
-    set(CMAKE_C_FLAGS_MAINTAINER "-g -DDEBUG -Wall -Wextra -std=gnu99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wuninitialized -Wunreachable-code -Wno-comment -Wnonnull" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
+    set(CMAKE_C_FLAGS_MAINTAINER "-g -DDEBUG -O -Wall -Wextra -std=gnu99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wuninitialized -Wunreachable-code -Wno-comment -Wnonnull" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
 endif(MSVC)
 mark_as_advanced(CMAKE_C_FLAGS_MAINTAINER)
 set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES} Maintainer")
