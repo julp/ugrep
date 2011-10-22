@@ -1,4 +1,5 @@
-#include "ugrep.h"
+#include "common.h"
+#include "fixed_circular_list.h"
 
 #ifdef OLD_RING
 fixed_circular_list_t *fixed_circular_list_new(size_t length, func_ctor_t ctor_func, func_dtor_t dtor_func, func_dtor_t clean_func) /* WARN_UNUSED_RESULT NONNULL(2) */

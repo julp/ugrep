@@ -2,12 +2,9 @@
 
 # define UGREP_H
 
-//# define OLD_INTERVAL 1
-
 # include "common.h"
 # include "struct/slist.h"
 # include "struct/intervals.h"
-# include "struct/fixed_circular_list.h"
 
 # define OPT_CASE_INSENSITIVE 0x00010000
 # define OPT_WORD_BOUND       0x00020000

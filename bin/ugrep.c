@@ -17,7 +17,7 @@
 #include <ctype.h>
 
 #include "ugrep.h"
-
+#include "struct/fixed_circular_list.h"
 
 #define SEP_MATCH_UCHAR    0x003a
 #define SEP_NO_MATCH_UCHAR 0x002d

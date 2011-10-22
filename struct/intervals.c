@@ -1,4 +1,6 @@
-#include "ugrep.h"
+#include "common.h"
+#include "struct/slist.h"
+#include "struct/intervals.h"
 
 #ifdef OLD_INTERVAL
 static interval_t *interval_new(int32_t, int32_t) WARN_UNUSED_RESULT;
