@@ -560,6 +560,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
                     if (NULL != ucm) {
                         if (U_FAILURE(status)) {
                             icu_error_set(error, WARN, status, "ucsdet_detect");
+                            ucsdet_close(csd);
                             goto failed;
                         }
                         confidence = ucsdet_getConfidence(ucm, &status);
