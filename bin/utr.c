@@ -23,7 +23,8 @@ enum {
     CODE_POINT_MODE
 };
 
-#define DEFAULT_MODE GRAPHEME_MODE
+// #define DEFAULT_MODE GRAPHEME_MODE
+#define DEFAULT_MODE CODE_POINT_MODE
 
 enum {
     NONE,
@@ -216,8 +217,8 @@ int32_t grapheme_count(UBreakIterator *ubrk, const UChar *ustring, int32_t ustri
 
 /* ========== X ========== */
 
-#define POINTER_TO_UCHAR32(p) ((UChar32) (long) (p))
-#define TO_POINTER(c) ((void *) (long) (c))
+#define POINTER_TO_UCHAR32(p) ((UChar32) (p))
+#define TO_POINTER(c)         ((void *) (c))
 
 typedef struct {
     UChar *ptr;
@@ -296,13 +297,13 @@ uint32_t cp_hash(const void *k)
 Hashtable *grapheme_hashtable_put(
     UChar *from, int32_t from_length,
     UChar *to, int32_t to_length, // NULL, 0 if -d
-    UBool delete, UBool complete
+    UBool delete, UBool UNUSED(complete)
 ) {
+    KVString k;
     Hashtable *ht;
-    KVString k, v;
-    UErrorCode status;
     int32_t l1, u1;
-    UBreakIterator *ubrk1, *ubrk2;
+    UErrorCode status;
+    UBreakIterator *ubrk1;
 
     ht = hashtable_new(single_hash, single_equal, NULL, NULL, kvstring_dup, delete ? NULL : kvstring_dup);
     status = U_ZERO_ERROR;
@@ -322,7 +323,9 @@ Hashtable *grapheme_hashtable_put(
             }
         }
     } else {
+        KVString v;
         int32_t l2, u2;
+        UBreakIterator *ubrk2;
 
         ubrk2 = ubrk_open(UBRK_CHARACTER, NULL, to, to_length, &status);
         if (U_FAILURE(status)) {
@@ -342,13 +345,9 @@ Hashtable *grapheme_hashtable_put(
                 l2 = u2;
             }
             if (UBRK_DONE != u1) { // "hack" (for now) for set2_type == CHARACTER
-                u2 = ubrk_last(ubrk2);
-                l2 = ubrk_previous(ubrk2);
-                do {
+                do { // for a while instead of do/while, inverse ubrk_next calls in the while above
                     k.ptr = from + l1;
                     k.len = u1 - l1;
-                    v.ptr = to + l2;
-                    v.len = u2 - l2;
                     hashtable_put(ht, &k, &v);
 
                     l1 = u1;
@@ -362,20 +361,60 @@ Hashtable *grapheme_hashtable_put(
     return ht;
 }
 
-#if 0
 Hashtable *cp_hashtable_put(
     UChar *from, int32_t from_length,
-    UChar *to, int32_t to_length,
-    UBool squeeze, UBool delete, UBool complete
+    UChar *to, int32_t to_length, // NULL, 0 if -d
+    UBool delete, UBool UNUSED(complete)
 ) {
+    UChar32 fc;
+    KVString k;
     Hashtable *ht;
+    int32_t fi, flast;
 
-    ht = hashtable_new(...);
-    // ...
+    ht = hashtable_new(single_hash, single_equal, NULL, NULL, kvstring_dup, delete ? NULL : kvstring_dup);
+    if (delete) {
+        flast = fi = 0;
+        while (fi < from_length) {
+            U16_NEXT(from, fi, from_length, fc);
+            k.ptr = from + flast;
+            k.len = fi - flast;
+            hashtable_put(ht, &k, NULL);
+            flast = fi;
+        }
+    } else {
+        UChar32 tc;
+        KVString v;
+        int32_t ti, tlast;
+
+        tlast = ti = flast = fi = 0;
+        while (fi < from_length && ti < to_length) {
+            U16_NEXT(from, fi, from_length, fc);
+            U16_NEXT(to, ti, to_length, tc);
+
+            k.ptr = from + flast;
+            k.len = fi - flast;
+            v.ptr = to + tlast;
+            v.len = ti - tlast;
+            hashtable_put(ht, &k, &v);
+
+            flast = fi;
+            tlast = ti;
+        }
+        if (fi < from_length) { // "hack" (for now) for set2_type == CHARACTER
+            while (fi < from_length) {
+                U16_NEXT(from, fi, from_length, fc);
+
+                k.ptr = from + flast;
+                k.len = fi - flast;
+                hashtable_put(ht, &k, &v);
+
+                flast = fi;
+            }
+        }
+    }
 
     return ht;
 }
-#endif
 
 /* ========== replacement helpers ========== */
 
@@ -428,17 +467,41 @@ void grapheme_process(
     assert(U_SUCCESS(status));
 }
 
-#if 0
 void cp_process(
-    Hashtable *h,
-    UChar *in, int32_t in_length,
+    Hashtable *ht,
+    UString *in, UString *out,
     UBool squeeze, UBool delete
 ) {
-    UChar32 last = U_SENTINEL;
+    size_t l, u;
+    KVString k, *v;
 
-    //
+    l = u = 0;
+    while (u < in->len) {
+        U16_FWD_1(in->ptr, u, in->len);
+        k.ptr = in->ptr + l;
+        k.len = u - l;
+        if (delete) {
+            if (!hashtable_exists(ht, &k)) {
+                if (!squeeze || !ustring_endswith(out, k.ptr, k.len)) {
+                    ustring_append_string_len(out, k.ptr, k.len);
+                }
+            }
+        } else {
+            if (hashtable_get(ht, &k, (void **) &v)) {
+                if (!squeeze || !ustring_endswith(out, v->ptr, v->len)) {
+                    ustring_append_string_len(out, v->ptr, v->len);
+                }
+            } else {
+                if (!squeeze || !ustring_endswith(out, k.ptr, k.len)) {
+                    ustring_append_string_len(out, k.ptr, k.len);
+                }
+            }
+        }
+        l = u;
+    }
 }
 
+#if 0
 void single_cp_tr(
     UChar *from, int32_t from_length, // UTF-16 (binaire) ou UTF-32 (macros) based ?
     UChar *to, int32_t to_length, // UTF-16 (binaire) ou UTF-32 (macros) based ?
@@ -732,10 +795,14 @@ int main(int argc, char **argv)
         } else {
             to = local_to_uchar(argv[1], &to_length, &error);
         }
-        ht = grapheme_hashtable_put(from, from_length, to, to_length, dFlag, FALSE);
+        if (GRAPHEME_MODE == DEFAULT_MODE) {
+            ht = grapheme_hashtable_put(from, from_length, to, to_length, dFlag, FALSE);
+            ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+            assert(U_SUCCESS(status));
+        } else {
+            ht = cp_hashtable_put(from, from_length, to, to_length, dFlag, FALSE);
+        }
         //hashtable_debug(ht, kvstring_debug);
-        ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
-        assert(U_SUCCESS(status));
     }
 
     while (!reader_eof(&reader)) {
@@ -748,7 +815,7 @@ int main(int argc, char **argv)
         if (SET == set1_type || FILTER_FUNCTION == set1_type) {
             size_t i;
 
-            for (i = 0; i < in->len; /* none: done by U16_NEXT */) {
+            for (i = 0; i < in->len; /* none: incrementation done by U16_NEXT */) {
                 U16_NEXT(in->ptr, i, in->len, i32);
                 if (SET == set1_type) {
                     match = uset_contains(uset, i32);
@@ -791,7 +858,11 @@ int main(int argc, char **argv)
             }
         } else {
 //             trtr(from32, from_length, to32, to_length, in, out);
-            grapheme_process(ht, ubrk, in, out, sFlag, dFlag);
+            if (GRAPHEME_MODE == DEFAULT_MODE) {
+                grapheme_process(ht, ubrk, in, out, sFlag, dFlag);
+            } else {
+                cp_process(ht, in, out, sFlag, dFlag);
+            }
         }
 
         u_file_write(out->ptr, out->len, ustdout);
