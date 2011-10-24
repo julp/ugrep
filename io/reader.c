@@ -47,15 +47,15 @@ static int32_t fill_buffer(reader_t *this, error_t **error)
     utf16Length = 0;
     status = U_ZERO_ERROR;
     utf16diff = this->utf16.ptr - this->utf16.buffer;
-    if (0 != utf16diff) {
+    if (utf16diff > 0) {
         u_memmove(this->utf16.buffer, this->utf16.ptr, this->utf16.internalEnd - this->utf16.ptr);
         this->utf16.internalEnd -= utf16diff;
         this->utf16.externalEnd -= utf16diff;
         this->utf16.ptr = this->utf16.buffer;
     }
     bytesdiff = this->byte.ptr - this->byte.buffer;
-    if (0 != bytesdiff) {
-        memmove(this->byte.buffer, this->byte.ptr, this->byte.ptr - this->byte.end);
+    if (bytesdiff > 0) {
+        memmove(this->byte.buffer, this->byte.ptr, this->byte.end - this->byte.ptr);
         this->byte.end -= bytesdiff;
         this->byte.ptr = this->byte.buffer;
     }
@@ -81,15 +81,17 @@ static int32_t fill_buffer(reader_t *this, error_t **error)
     utf16Length = utf16Ptr - this->utf16.ptr;
     this->utf16.internalEnd = this->utf16.externalEnd = utf16Ptr;
 
+#if 0
     if (this->utf16.externalEnd == this->utf16.limit) {
 //         UChar lastCU;
 
 //         lastCU = *(this->utf16.externalEnd - 1);
-        if (/*!U16_IS_SINGLE(X) &&*/ U16_IS_LEAD(*(this->utf16.externalEnd - 1))) {
+        if (/*!U16_IS_SINGLE(lastCU) &&*/ U16_IS_LEAD(*(this->utf16.externalEnd - 1))) {
             --this->utf16.externalEnd;
 debug("CP split detected. before : >%.*S< ; after : >%.*S<", this->utf16.internalEnd - this->utf16.ptr, this->utf16.ptr, this->utf16.externalEnd - this->utf16.ptr, this->utf16.ptr);
         }
     }
+#endif
 
     return utf16Length;
 }
@@ -200,10 +202,10 @@ int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, int32_
     require_else_return_val(NULL != buffer, -1);
     require_else_return_val(maxLen >= 2, -1);
 
-    count = 0;
-    while (count < maxLen) {
+    copyLen = count = 0;
+    do {
         available = this->utf16.externalEnd - this->utf16.ptr;
-        if (available < 2) {
+        if (available < 1) {
             if ((available = fill_buffer(this, error)) < 1) {
                 if (-1 == available) {
                     count = -1;
@@ -212,9 +214,19 @@ int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, int32_
             }
         }
         copyLen = MIN(maxLen - count, available);
+        if ((count + copyLen == maxLen) && U16_IS_LEAD(this->utf16.ptr[copyLen - 1])) {
+            --copyLen;
+            if (count + copyLen >= maxLen) {
+                u_memcpy(buffer + count, this->utf16.ptr, copyLen);
+                this->utf16.ptr += copyLen;
+                count += copyLen;
+                break;
+            }
+        }
         u_memcpy(buffer + count, this->utf16.ptr, copyLen);
         this->utf16.ptr += copyLen;
-    }
+        count += copyLen;
+    } while (copyLen > 0 && count < maxLen);
 
     return count;
 }
@@ -258,14 +270,14 @@ static UBool reader_rewind(reader_t *this, error_t **UNUSED(error))
 
     require_else_return_false(NULL != this);
 
+    this->byte.ptr = this->byte.buffer + this->signature_length;
     this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.ptr = this->utf16.buffer;
+//     ucnv_reset(this->ucnv);
+//     ucnv_resetToUnicode(this->ucnv);
 #ifndef NO_PHYSICAL_REWIND
     ret = this->imp->rewindTo(this->fp, error, this->signature_length);
 #else
-//     ucnv_reset(this->ucnv);
-//     ucnv_resetToUnicode(this->ucnv);
     ret = TRUE;
-    this->byte.ptr = this->byte.buffer + this->signature_length;
 #endif /* !NO_PHYSICAL_REWIND */
 
     return ret;

@@ -29,34 +29,13 @@ declare -r DATADIR="${TESTDIR}/data"
 #        rent locale.  If the current locale is C or POSIX, the dollar sign is ignored.  If the string is translated and replaced,
 #        the replacement is double-quoted.
 
-declare -r A=$'\xF0\x9D\x98\xBC' # 1D63C, Lu
-declare -r B=$'\xF0\x9D\x98\xBD'
-declare -r C=$'\xF0\x9D\x98\xBE'
-declare -r D=$'\xF0\x9D\x98\xBF'
-declare -r E=$'\xF0\x9D\x99\x80'
+. ${TESTDIR}/assert.sh.inc
+
 declare -r INPUT="a${A}b${B}c${C}d${D}e${E}"
-declare -r N1=$'\xF0\x9D\x9F\x8F' # 1D7CE, Nd
-declare -r N2=$'\xF0\x9D\x9F\x90'
-declare -r N3=$'\xF0\x9D\x9F\x91'
-declare -r N4=$'\xF0\x9D\x9F\x92'
-declare -r N5=$'\xF0\x9D\x9F\x93'
-
-declare -r DCLLI=$'\xF0\x90\x90\x80' # 10400, Lu
-declare -r DSLLI=$'\xF0\x90\x90\xA8' # 10428, Ll
-
-declare -r GRAVE=$'\xCC\x80'
-declare -r ACUTE=$'\xCC\x81'
-
-declare -r E_ACUTE_NFD="e${ACUTE}"
-declare -r E_GRAVE_NFD="e${GRAVE}"
-declare -r A_ACUTE_NFD="a${ACUTE}"
-declare -r A_GRAVE_NFD="a${GRAVE}"
 
 # Full case not "supported"
 # declare -r LSFI=$'\xEF\xAC\x81' # FB01, Ll
 # declare -r FI=$'\x66\x69' # F + I
-
-. ${TESTDIR}/assert.sh.inc
 
 assertOutputValue "tr 1 CU => 0" "./utr ${UGREP_OPTS} -d [abcde] ${INPUT} 2> /dev/null" "${A}${B}${C}${D}${E}"
 assertOutputValue "tr 2 CU => 0" "./utr ${UGREP_OPTS} -d [${A}${B}${C}${D}${E}] ${INPUT} 2> /dev/null" "abcde"

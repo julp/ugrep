@@ -3,6 +3,32 @@
 declare -ri TRUE=0
 declare -ri FALSE=1
 
+declare -r A=$'\xF0\x9D\x98\xBC' # 1D63C, Lu
+declare -r B=$'\xF0\x9D\x98\xBD'
+declare -r C=$'\xF0\x9D\x98\xBE'
+declare -r D=$'\xF0\x9D\x98\xBF'
+declare -r E=$'\xF0\x9D\x99\x80'
+declare -r F=$'\xF0\x9D\x99\x81'
+declare -r G=$'\xF0\x9D\x99\x82'
+declare -r H=$'\xF0\x9D\x99\x83'
+
+declare -r N1=$'\xF0\x9D\x9F\x8F' # 1D7CE, Nd
+declare -r N2=$'\xF0\x9D\x9F\x90'
+declare -r N3=$'\xF0\x9D\x9F\x91'
+declare -r N4=$'\xF0\x9D\x9F\x92'
+declare -r N5=$'\xF0\x9D\x9F\x93'
+
+declare -r DCLLI=$'\xF0\x90\x90\x80' # 10400, Lu
+declare -r DSLLI=$'\xF0\x90\x90\xA8' # 10428, Ll
+
+declare -r GRAVE=$'\xCC\x80'
+declare -r ACUTE=$'\xCC\x81'
+
+declare -r E_ACUTE_NFD="e${ACUTE}"
+declare -r E_GRAVE_NFD="e${GRAVE}"
+declare -r A_ACUTE_NFD="a${ACUTE}"
+declare -r A_GRAVE_NFD="a${GRAVE}"
+
 trap "rm -f /tmp/${PPID}.*" EXIT ERR SIGINT
 
 UGREP_OPTS="--input=UTF-8 --stdin=UTF-8"
