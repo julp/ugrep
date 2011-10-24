@@ -168,12 +168,39 @@ UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
     return available >= 0;
 }
 
+UChar32 reader_readuchar32(reader_t *this, error_t **error) /* NONNULL(1) */
+{
+    require_else_return_val(NULL != this, -1);
+
+    if ((this->utf16.externalEnd - this->utf16.ptr) < 2) {
+        fill_buffer(this, error);
+    }
+    if (this->utf16.ptr < this->utf16.externalEnd) {
+        UChar32 c;
+
+        c = *this->utf16.ptr++;
+        if (U16_IS_LEAD(c)) {
+            if (this->utf16.ptr < this->utf16.externalEnd) {
+                c = U16_GET_SUPPLEMENTARY(c, *this->utf16.ptr);
+                ++this->utf16.ptr;
+            } else {
+                c = U_EOF;
+            }
+        }
+
+        return c;
+    } else {
+        return U_EOF;
+    }
+}
+
 int32_t reader_readuchars32(reader_t *this, error_t **error, UChar32 *buffer, int32_t maxLen)
 {
     int32_t i, available;
 
     require_else_return_val(NULL != this, -1);
     require_else_return_val(NULL != buffer, -1);
+    require_else_return_val(maxLen >= 1, -1);
 
     for (i = 0; i < maxLen; i++) {
         if ((this->utf16.externalEnd - this->utf16.ptr) < 2) {
