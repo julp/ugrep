@@ -557,23 +557,25 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
                         goto failed;
                     }
                     ucm = ucsdet_detect(csd, &status);
-                    if (U_FAILURE(status)) {
-                        icu_error_set(error, WARN, status, "ucsdet_detect");
-                        goto failed;
-                    }
-                    confidence = ucsdet_getConfidence(ucm, &status);
-                    tmpencoding = ucsdet_getName(ucm, &status);
-                    if (U_FAILURE(status)) {
-                        icu_error_set(error, WARN, status, "ucsdet_getName");
-                        ucsdet_close(csd);
-                        goto failed;
-                    }
-                    if (confidence > MIN_CONFIDENCE) {
-                        encoding = tmpencoding;
-                        //debug("%s, confidence of " GREEN("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
-                    } else {
-                        //debug("%s, confidence of " RED("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
-                        //encoding = "US-ASCII";
+                    if (NULL != ucm) {
+                        if (U_FAILURE(status)) {
+                            icu_error_set(error, WARN, status, "ucsdet_detect");
+                            goto failed;
+                        }
+                        confidence = ucsdet_getConfidence(ucm, &status);
+                        tmpencoding = ucsdet_getName(ucm, &status);
+                        if (U_FAILURE(status)) {
+                            icu_error_set(error, WARN, status, "ucsdet_getName");
+                            ucsdet_close(csd);
+                            goto failed;
+                        }
+                        if (confidence > MIN_CONFIDENCE) {
+                            encoding = tmpencoding;
+                            //debug("%s, confidence of " GREEN("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
+                        } else {
+                            //debug("%s, confidence of " RED("%d%%") " for " YELLOW("%s"), filename, confidence, tmpencoding);
+                            //encoding = "US-ASCII";
+                        }
                     }
                     ucsdet_close(csd);
                 }
