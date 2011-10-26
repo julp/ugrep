@@ -20,23 +20,23 @@ const char *ubasename(const char *filename)
 
 error_t *error_win32_vnew(int type, const char *format, va_list args) /* WARN_UNUSED_RESULT */
 {
-    char *buf = NULL;
+    LPWSTR *buf = NULL;
     error_t *error = NULL;
     int32_t length, buf_len;
     UChar buffer[ERROR_MAX_LEN + 1];
 
-    FormatMessageA(
+    FormatMessageW(
        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-       NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &buf, 0, NULL
+       NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR) &buf, 0, NULL
     );
     if (NULL != buf) {
-        buf_len = strlen(buf);
+        buf_len = u_strlen(buf);
         error = mem_new(*error);
         length = u_vsnprintf(buffer, ERROR_MAX_LEN, format, args);
         error->type = type;
-        error->message = mem_new_n(*error->message, length + 1 + buf_len * U16_MAX_LENGTH);
+        error->message = mem_new_n(*error->message, length + buf_len + 1);
         u_strcpy(error->message, buffer);
-        u_uastrncpy(error->message + length, buf, buf_len);
+        u_strcpy(error->message + length, buf, buf_len);
         LocalFree(buf);
     }
 
