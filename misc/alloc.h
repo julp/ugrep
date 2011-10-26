@@ -2,7 +2,7 @@
 
 # define ALLOC_H
 
-# if GCC_VERSION >= 2096
+# if GCC_VERSION >= 2096 || __has_attribute(malloc)
 #  define MALLOC __attribute__((malloc))
 # else
 #  define MALLOC

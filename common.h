@@ -22,7 +22,11 @@
 #  define GCC_VERSION 0
 # endif /* __GNUC__ */
 
-# ifdef __GNUC__
+# ifndef __has_attribute
+#  define __has_attribute(x) 0
+# endif /* !__has_attribute */
+
+# if __GNUC__ || __has_attribute(unused)
 #  define UNUSED(x) UNUSED_ ## x __attribute__((unused))
 # else
 #  define UNUSED
@@ -36,19 +40,19 @@
 #  define UNEXPECTED(condition) (condition)
 # endif /* (UN)EXPECTED */
 
-# if GCC_VERSION >= 3004
+# if GCC_VERSION >= 3004 || __has_attribute(warn_unused_result)
 #  define WARN_UNUSED_RESULT __attribute__((warn_unused_result))
 # else
 #  define WARN_UNUSED_RESULT
 # endif /* WARN_UNUSED_RESULT */
 
-# if GCC_VERSION >= 3003 && !defined(DEBUG)
+# if (GCC_VERSION >= 3003 || __has_attribute(nonnull)) && !defined(DEBUG)
 #  define NONNULL(...) __attribute__((nonnull(__VA_ARGS__)))
 # else
 #  define NONNULL(...)
 # endif /* NONNULL */
 
-# if GCC_VERSION >= 2003
+# if GCC_VERSION >= 2003 || __has_attribute(format)
 #  define FORMAT(archetype, string_index, first_to_check) __attribute__((format(archetype, string_index, first_to_check)))
 #  define PRINTF(string_index, first_to_check) FORMAT(__printf__, string_index, first_to_check)
 # else
