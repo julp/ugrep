@@ -14,9 +14,13 @@ UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
 {
     switch (c) {
         case NFNONE_OPT:
+            env_set_normalization(UNORM_NONE);
+            return TRUE;
         case NFD_OPT:
+            env_set_normalization(UNORM_NFD);
+            return TRUE;
         case NFC_OPT:
-            // TODO
+            env_set_normalization(UNORM_NFC);
             return TRUE;
         case READER_OPT:
             if (!reader_set_imp_by_name(reader, optarg)) {

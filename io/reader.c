@@ -110,6 +110,11 @@ static void copy_buffer_until_into_ustring(reader_t *this, UString *ustr, UChar 
     this->utf16.ptr = ++includedLimit;
 }
 
+/**
+ * Return:
+ * - TRUE: read can continue (no error, no EOF)
+ * - FALSE: read should be stopped (error or EOF - check error == NULL if passed)
+ **/
 UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
 {
     UChar *p;
@@ -121,7 +126,8 @@ UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
     ustring_truncate(ustr);
     available = this->utf16.externalEnd - this->utf16.ptr;
     if (0 == available) {
-        if (-1 == (available = fill_buffer(this, error))) {
+        //if (-1 == (available = fill_buffer(this, error))) {
+        if ((available = fill_buffer(this, error)) < 1) {
             return FALSE;
         }
     }
@@ -140,8 +146,7 @@ UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
                             ustring_append_char(ustr, *p);
                             ++this->utf16.ptr;
                         }
-                        ++this->lineno;
-                        return TRUE;
+                        goto eol;
                     }
                     if (U_LF == *(p + 1)) {
                         ++p;
@@ -153,9 +158,8 @@ UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
                 case U_NL:
                 case U_LS:
                 case U_PS:
-                    ++this->lineno;
                     copy_buffer_until_into_ustring(this, ustr, p);
-                    return TRUE;
+                    goto eol;
                 default:
                     ++p;
             }
@@ -164,8 +168,15 @@ UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
         available = fill_buffer(this, error);
     }
 
+    if (FALSE) {
+eol:
+        available = 1;
+    }
     ++this->lineno;
-    return available >= 0;
+    ustring_normalize(ustr, env_get_normalization());
+
+    //return available >= 0;
+    return available > 0;
 }
 
 UChar32 reader_readuchar32(reader_t *this, error_t **error) /* NONNULL(1) */
@@ -298,12 +309,13 @@ static UBool reader_rewind(reader_t *this, error_t **UNUSED(error))
     require_else_return_false(NULL != this);
 
     this->byte.ptr = this->byte.buffer + this->signature_length;
-    this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.ptr = this->utf16.buffer;
 //     ucnv_reset(this->ucnv);
 //     ucnv_resetToUnicode(this->ucnv);
 #ifndef NO_PHYSICAL_REWIND
+    this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.ptr = this->utf16.buffer;
     ret = this->imp->rewindTo(this->fp, error, this->signature_length);
 #else
+    this->utf16.ptr = this->utf16.buffer;
     ret = TRUE;
 #endif /* !NO_PHYSICAL_REWIND */
 
@@ -593,6 +605,26 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
 #ifdef DEBUG
     debug("%s, file encoding = %s", this->sourcename, this->encoding);
 #endif /* DEBUG */
+#ifdef NO_PHYSICAL_REWIND
+    {
+        UChar *utf16Ptr;
+
+        utf16Ptr = this->utf16.buffer;
+        ucnv_toUnicode(
+            this->ucnv,
+            &utf16Ptr, this->utf16.limit,
+            (const char **) &this->byte.ptr, this->byte.end,
+            NULL,
+            this->imp->eof(this->fp),
+            &status
+        );
+        if (U_FAILURE(status)) {
+            icu_error_set(error, FATAL, status, "ucnv_toUnicode");
+            return FALSE;
+        }
+        this->utf16.internalEnd = this->utf16.externalEnd = utf16Ptr;
+    }
+#endif /* NO_PHYSICAL_REWIND */
     if (reader_is_seekable(this)) {
         if (!reader_rewind(this, error)) {
             goto failed;

@@ -48,7 +48,7 @@ UString *ustring_sized_new(size_t requested) /* WARN_UNUSED_RESULT */
     return ustr;
 }
 
-UString *ustring_convert_argv_from_local(const char *cargv, error_t **error)
+UString *ustring_convert_argv_from_local(const char *cargv, error_t **error/*, UBool unescape*/)
 {
     UString *ustr;
     UConverter *ucnv;
@@ -73,6 +73,11 @@ UString *ustring_convert_argv_from_local(const char *cargv, error_t **error)
         return NULL;
     }
     ustr->ptr[ustr->len] = 0;
+
+    // 1) unescape
+
+    // 2) normalize
+    ustring_normalize(ustr, env_get_normalization());
 
     return ustr;
 }
@@ -565,4 +570,42 @@ void ustring_sprintf(UString *ustr, const char *format, ...) /* NONNULL(1, 2) */
         va_end(args);
     }
     ustr->len = ret;
+}
+
+static UChar *u_strdup(UChar *src, int32_t len)
+{
+    UChar *cpy;
+
+    if (len < 0) {
+        len = u_strlen(src);
+    }
+    cpy = mem_new_n(*cpy, len + 1);
+    u_memcpy(cpy, src, len);
+    cpy[len] = 0;
+
+    return cpy;
+}
+
+UBool ustring_normalize(UString *ustr, UNormalizationMode mode)
+{
+    UErrorCode status;
+
+    require_else_return_false(NULL != ustr);
+
+    status = U_ZERO_ERROR;
+    if (UNORM_NONE != mode && ustr->len > 0) {
+        UChar *tmp;
+        int32_t res_len;
+
+        tmp = u_strdup(ustr->ptr, ustr->len);
+        res_len = unorm_normalize(tmp, ustr->len, mode, 0, NULL, 0, &status);
+        if (U_BUFFER_OVERFLOW_ERROR == status) {
+            status = U_ZERO_ERROR;
+            _ustring_maybe_expand_to(ustr, res_len);
+            ustr->len = unorm_normalize(tmp, ustr->len, mode, 0, ustr->ptr, ustr->allocated, &status);
+        }
+        free(tmp);
+    }
+
+    return U_SUCCESS(status);
 }

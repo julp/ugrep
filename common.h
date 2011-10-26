@@ -14,6 +14,7 @@
 # include <unicode/ucnv.h>
 # include <unicode/ustdio.h>
 # include <unicode/ustring.h>
+# include <unicode/unorm.h>
 
 
 # ifdef __GNUC__
@@ -189,7 +190,7 @@ typedef void (*func_dtor_t)(void *); /* Destructor callback */
 # include "error.h"
 # include "ustring.h"
 # include "io/reader.h"
-# include "util.h"
 # include "env.h"
+# include "util.h"
 
 #endif /* !COMMON_H */

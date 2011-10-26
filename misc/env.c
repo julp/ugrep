@@ -22,6 +22,7 @@ static const char *system_encoding = NULL;
 static const char *inputs_encoding = NULL;
 static const char *outputs_encoding = NULL;
 static const char *stdin_encoding = NULL;
+static UNormalizationMode normalization = UNORM_NFD;
 
 /**
  *                          SYSTEM
@@ -40,6 +41,28 @@ static const char *stdin_encoding = NULL;
  *                     \     /
  *                      stdin
  **/
+
+UNormalizationMode env_get_normalization(void)
+{
+    return normalization;
+}
+
+void env_set_normalization(UNormalizationMode mode)
+{
+    switch (mode) {
+        case UNORM_NONE:
+        case UNORM_NFD:
+        case UNORM_NFC:
+            normalization = mode;
+            break;
+        case UNORM_NFKD:
+        case UNORM_NFKC:
+            fprintf(stderr, "Compatibility (de)composition rejected (%d), skip\n", mode);
+            break;
+        default:
+            fprintf(stderr, "Unknown (de)composition (%d), skip\n", mode);
+    }
+}
 
 static UBool env_check_encoding(const char *encoding)
 {

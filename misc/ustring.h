@@ -35,6 +35,7 @@ UBool ustring_fullcase(UString *, UChar *, int32_t, UCaseType, error_t **) NONNU
 void ustring_insert_len(UString *, size_t, const UChar *, size_t) NONNULL();
 void ustring_ltrim(UString *) NONNULL();
 UString *ustring_new(void) WARN_UNUSED_RESULT;
+UBool ustring_normalize(UString *, UNormalizationMode);
 void ustring_prepend_char(UString *, UChar) NONNULL();
 void ustring_prepend_string(UString *, const UChar *) NONNULL();
 void ustring_prepend_string_len(UString *, const UChar *, int32_t) NONNULL();
