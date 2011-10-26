@@ -15,7 +15,7 @@ typedef struct {
     UStringSearch *usearch;
 } fixed_pattern_t;
 
-static void pattern_destroy(fixed_pattern_t *p)
+static void fixed_pattern_destroy(fixed_pattern_t *p)
 {
     if (NULL != p->usearch) {
         usearch_close(p->usearch);
@@ -45,7 +45,7 @@ static void *engine_fixed_compile(error_t **error, const UChar *upattern, int32_
             p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
         }
         if (U_FAILURE(status)) {
-            pattern_destroy(p);
+            fixed_pattern_destroy(p);
             icu_error_set(error, FATAL, status, "ubrk_open");
             return NULL;
         }
@@ -56,7 +56,7 @@ static void *engine_fixed_compile(error_t **error, const UChar *upattern, int32_
             if (NULL != p->ubrk) {
                 ubrk_close(p->ubrk);
             }
-            pattern_destroy(p);
+            fixed_pattern_destroy(p);
             icu_error_set(error, FATAL, status, "usearch_open");
             return NULL;
         }
@@ -84,7 +84,7 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
     p->usearch = NULL;
     status = U_ZERO_ERROR;
     if (NULL == (p->pattern = ustring_convert_argv_from_local(pattern, error))) {
-        pattern_destroy(p);
+        fixed_pattern_destroy(p);
         return NULL;
     }
     if (!IS_WHOLE_LINE(flags)) {
@@ -94,7 +94,7 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
             p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
         }
         if (U_FAILURE(status)) {
-            pattern_destroy(p);
+            fixed_pattern_destroy(p);
             icu_error_set(error, FATAL, status, "ubrk_open");
             return NULL;
         }
@@ -105,7 +105,7 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
             if (NULL != p->ubrk) {
                 ubrk_close(p->ubrk);
             }
-            pattern_destroy(p);
+            fixed_pattern_destroy(p);
             icu_error_set(error, FATAL, status, "usearch_open");
             return NULL;
         }
@@ -273,7 +273,7 @@ static void engine_fixed_destroy(void *data)
 {
     FETCH_DATA(data, p, fixed_pattern_t);
 
-    pattern_destroy(p);
+    fixed_pattern_destroy(p);
 }
 
 engine_t fixed_engine = {
