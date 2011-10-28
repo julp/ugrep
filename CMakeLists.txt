@@ -93,6 +93,7 @@ declare_ugrep_binary(usort bin/usort.c struct/rbtree.c ${COMMON_BASE_SOURCES})
 declare_ugrep_binary(ucut bin/ucut.c ${COMMON_BASE_SOURCES})
 if(CMAKE_BUILD_TYPE STREQUAL "Maintainer")
     declare_ugrep_binary(readuchars test/readuchars.c ${COMMON_BASE_SOURCES})
+    declare_ugrep_binary(unescape test/ustring_unescape.c ${COMMON_BASE_SOURCES})
 endif(CMAKE_BUILD_TYPE STREQUAL "Maintainer")
 
 foreach (UgrepBinary ${UgrepBinaries})

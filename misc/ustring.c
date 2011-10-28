@@ -16,6 +16,8 @@
 
 /* NOTE: /!\ all lengths are in code units not code point /!\ */
 
+/* ==================== private helpers for growing up ==================== */
+
 static inline size_t nearest_power(size_t requested_length)
 {
     if (requested_length > SIZE_MAX_2) {
@@ -28,58 +30,6 @@ static inline size_t nearest_power(size_t requested_length)
         }
         return (1UL << i);
     }
-}
-
-UString *ustring_new(void) /* WARN_UNUSED_RESULT */
-{
-    return ustring_sized_new(USTRING_INITIAL_LENGTH);
-}
-
-UString *ustring_sized_new(size_t requested) /* WARN_UNUSED_RESULT */
-{
-    UString *ustr;
-
-    ustr = mem_new(*ustr);
-    ustr->len = 0;
-    ustr->allocated = nearest_power(requested);
-    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
-    *ustr->ptr = 0;
-
-    return ustr;
-}
-
-UString *ustring_convert_argv_from_local(const char *cargv, error_t **error/*, UBool unescape*/)
-{
-    UString *ustr;
-    UConverter *ucnv;
-    UErrorCode status;
-    int32_t cargv_length;
-
-    status = U_ZERO_ERROR;
-    ucnv = ucnv_open(env_get_stdin_encoding(), &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ucnv_open");
-        return NULL;
-    }
-    cargv_length = strlen(cargv);
-    ustr = mem_new(*ustr);
-    ustr->allocated = nearest_power(cargv_length * ucnv_getMaxCharSize(ucnv));
-    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
-    ustr->len = ucnv_toUChars(ucnv, ustr->ptr, ustr->allocated, cargv, cargv_length, &status);
-    ucnv_close(ucnv);
-    if (U_FAILURE(status)) {
-        ustring_destroy(ustr);
-        icu_error_set(error, FATAL, status, "ucnv_toUChars");
-        return NULL;
-    }
-    ustr->ptr[ustr->len] = 0;
-
-    // 1) unescape
-
-    // 2) normalize
-    ustring_normalize(ustr, env_get_normalization());
-
-    return ustr;
 }
 
 static void _ustring_maybe_expand_of(UString *ustr, size_t additional_length) /* NONNULL() */
@@ -104,220 +54,24 @@ static void _ustring_maybe_expand_to(UString *ustr, size_t total_length) /* NONN
     }
 }
 
-void ustring_destroy(UString *ustr) /* NONNULL() */
-{
-    require_else_return(NULL != ustr);
+/* ==================== creation and cloning ==================== */
 
-    free(ustr->ptr);
-    free(ustr);
+UString *ustring_new(void) /* WARN_UNUSED_RESULT */
+{
+    return ustring_sized_new(USTRING_INITIAL_LENGTH);
 }
 
-void ustring_append_char32(UString *ustr, UChar32 c) /* NONNULL() */
+UString *ustring_sized_new(size_t requested) /* WARN_UNUSED_RESULT */
 {
-    _ustring_maybe_expand_of(ustr, 2);
+    UString *ustr;
 
-    U16_APPEND_UNSAFE(ustr->ptr, ustr->len, c);
-    ustr->ptr[ustr->len] = 0;
-}
-
-void ustring_append_char(UString *ustr, UChar c) /* NONNULL() */
-{
-    ustring_insert_len(ustr, ustr->len, &c, 1);
-}
-
-void ustring_append_string(UString *ustr, const UChar *str) /* NONNULL() */
-{
-    ustring_insert_len(ustr, ustr->len, str, u_strlen(str));
-}
-
-void ustring_append_string_len(UString *ustr, const UChar *str, int32_t len) /* NONNULL() */
-{
-    ustring_insert_len(ustr, ustr->len, str, len);
-}
-
-void ustring_prepend_char(UString *ustr, UChar c) /* NONNULL() */
-{
-    ustring_insert_len(ustr, 0, &c, 1);
-}
-
-void ustring_prepend_string(UString *ustr, const UChar *str) /* NONNULL() */
-{
-    ustring_insert_len(ustr, 0, str, u_strlen(str));
-}
-
-void ustring_prepend_string_len(UString *ustr, const UChar *str, int32_t len) /* NONNULL() */
-{
-    ustring_insert_len(ustr, 0, str, len);
-}
-
-void ustring_chomp(UString *ustr) /* NONNULL() */
-{
-    require_else_return(NULL != ustr);
-
-    if (ustr->len > 0) {
-        switch (ustr->ptr[ustr->len - 1]) {
-            case U_CR:
-            case U_VT:
-            case U_FF:
-            case U_NL:
-            case U_LS:
-            case U_PS:
-                ustr->ptr[--ustr->len] = 0;
-                break;
-            case U_LF:
-                ustr->ptr[--ustr->len] = 0;
-                if (ustr->len > 0 && U_CR == ustr->ptr[ustr->len - 1]) {
-                    ustr->ptr[--ustr->len] = 0;
-                }
-                break;
-        }
-    }
-}
-
-void ustring_sync(const UString *ref, UString *buffer, double ratio) /* NONNULL() */
-{
-    require_else_return(NULL != ref);
-    require_else_return(buffer != ref);
-    require_else_return(0 != ratio);
-
-    if (buffer->allocated <= ref->allocated * ratio) {
-        buffer->allocated = ref->allocated * ratio;
-        buffer->ptr = mem_renew(buffer->ptr, *buffer->ptr, buffer->allocated + 1);
-    }
-}
-
-UBool ustring_empty(const UString *ustr) /* NONNULL() */
-{
-    require_else_return_false(NULL != ustr);
-
-    return (ustr->len < 1);
-}
-
-void ustring_truncate(UString *ustr) /* NONNULL() */
-{
-    require_else_return(NULL != ustr);
-
-    *ustr->ptr = 0;
+    ustr = mem_new(*ustr);
     ustr->len = 0;
-}
+    ustr->allocated = nearest_power(requested);
+    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
+    *ustr->ptr = 0;
 
-void ustring_subreplace_len(UString *ustr, const UChar *replacement, size_t replacement_length, size_t position, size_t length) /* NONNULL() */
-{
-    require_else_return(NULL != ustr);
-    require_else_return(NULL != replacement);
-    require_else_return(position <= ustr->len);
-
-    if (position <= ustr->len) {
-        int32_t diff_len;
-
-        diff_len = replacement_length - length;
-        if (diff_len > 0) {
-            _ustring_maybe_expand_of(ustr, diff_len);
-        }
-        if (replacement >= ustr->ptr && replacement <= ustr->ptr + ustr->len) {
-            // TODO: overlap
-        } else {
-            if (replacement_length != length) {
-                memmove(ustr->ptr + position + length + diff_len, ustr->ptr + position + length, ustr->len - position);
-            }
-            memcpy(ustr->ptr + position, replacement, replacement_length);
-        }
-        ustr->len += diff_len;
-        ustr->ptr[ustr->len] = 0;
-    }
-}
-
-void ustring_dump(UString *ustr) /* NONNULL() */
-{
-    UChar *p;
-    UChar32 c;
-    size_t i, len;
-    const int replacement_len = 6;
-    const char replacement[] = "0x%04X";
-
-    require_else_return(NULL != ustr);
-
-    len = 0;
-    for (i = 0; i < ustr->len; ) {
-        U16_NEXT(ustr->ptr, i, ustr->len, c);
-        switch (c) {
-            case 0x09:
-            case 0x0D:
-                len++;
-                break;
-            default:
-                if (!u_isprint(c)) {
-                    len += replacement_len - U16_LENGTH(c);
-                }
-        }
-    }
-    if (len > 0) {
-        _ustring_maybe_expand_of(ustr, len);
-        ustr->len += len;
-        ustr->ptr[ustr->len] = 0;
-        p = ustr->ptr + ustr->len;
-        while (i > 0) {
-            U16_PREV(ustr->ptr, 0, i, c);
-            switch (c) {
-                case 0x09:
-                    *--p = 0x74;
-                    *--p = 0x5C;
-                    break;
-                case 0x0D:
-                    *--p = 0x72;
-                    *--p = 0x5C;
-                    break;
-                default:
-                    if (!u_isprint(c)) {
-                        p -= replacement_len;
-                        u_snprintf(p, replacement_len, replacement, c);
-                    } else {
-                        if (U_IS_BMP(c)) {
-                            *--p = c;
-                        } else {
-                            *--p = U16_LEAD(c);
-                            *--p = U16_TRAIL(c);
-                        }
-                    }
-            }
-        }
-    }
-}
-
-void ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t length) /* NONNULL() */
-{
-    require_else_return(c != NULL);
-    require_else_return(NULL != ustr);
-    require_else_return(position <= ustr->len);
-
-    _ustring_maybe_expand_of(ustr, length);
-    if (c >= ustr->ptr && c <= ustr->ptr + ustr->len) {
-        size_t offset = c - ustr->ptr;
-        size_t precount = 0;
-
-        c = ustr->ptr + offset;
-        if (position < ustr->len) {
-            u_memmove(ustr->ptr + position + length, ustr->ptr + position, ustr->len - position);
-        }
-        if (offset < position) {
-            precount = MIN(length, position - offset);
-            u_memcpy(ustr->ptr + position, c, precount);
-        }
-        if (length > precount) {
-            u_memcpy(ustr->ptr + position + precount, c + precount + length, length - precount);
-        }
-    } else {
-        if (position < ustr->len) {
-            u_memmove(ustr->ptr + position + length, ustr->ptr + position, ustr->len - position);
-        }
-        if (1 == length) {
-            ustr->ptr[position] = *c;
-        } else {
-            u_memcpy(ustr->ptr + position, c, length);
-        }
-    }
-    ustr->len += length;
-    ustr->ptr[ustr->len] = 0;
+    return ustr;
 }
 
 UString *ustring_dup_string_len(const UChar *from, size_t length) /* NONNULL() */
@@ -360,6 +114,318 @@ UString *ustring_adopt_string(UChar *from) /* NONNULL() */
     require_else_return_null(NULL != from);
 
     return ustring_adopt_string_len(from, (size_t) u_strlen(from));
+}
+
+/* ==================== handle argv ==================== */
+
+#define STRINGL(x) (sizeof(x) - 1)
+
+#define ustring_delete_range_p(/*UString **/ ustr, /*UChar **/ from, /*UChar **/ to) \
+    ustring_delete_len(ustr, from - ustr->ptr, to - from)
+
+#define ustring_subreplace_len_p(/*UString **/ ustr, /*UChar **/ from, /*UChar **/ to, /*UChar **/ what, /*size_t*/ len) \
+    ustring_subreplace_len(ustr, what, len, from - ustr->ptr, to - from)
+
+static int hexadecimal_digit(UChar c)
+{
+    if (c >= 0x30 && c <= 0x39) {
+        return (c - 0x30);
+    }
+    if (c >= 0x41 && c <= 0x46) {
+        return (c - (0x41 - 10));
+    }
+    if (c >= 0x61 && c <= 0x66) {
+        return (c - (0x61 - 10));
+    }
+
+    return -1;
+}
+
+void ustring_unescape(UString *ustr) /* NONNULL() */
+{
+    UChar lead;
+    int digits, diff;
+    const UChar *end;
+    UBool trail_expected;
+    UChar *p, *lead_offset;
+
+    lead = 0;
+    p = ustr->ptr;
+    lead_offset = NULL;
+    trail_expected = FALSE;
+    end = ustr->ptr + ustr->len;
+    while (p < end) {
+        if (*p != '\\') {
+            p++;
+        } else {
+            if ((end - p) < 1) { // assume \ is not the last character of the string
+                break;
+            }
+            switch (p[1]) {
+                case 'u':
+                    digits = 4;
+                    break;
+                case 'U':
+                    digits = 8;
+                    break;
+                default:
+                    digits = 0;
+                    p += STRINGL("\\X"); // p[0] is \ ; p[1] have been read
+            }
+            if (digits > 0) {
+                int n;
+                UChar *s;
+                UChar32 result;
+
+                s = p + STRINGL("\\X");
+                n = 0;
+                result = 0;
+                while (s < end && n < digits) {
+                    int digit;
+
+                    digit = hexadecimal_digit(*s);
+                    if (digit < 0) {
+                        break;
+                    }
+                    result = (result << 4) | digit;
+                    ++n;
+                    ++s;
+                }
+                if (n != digits) {
+                    goto failed;
+                }
+                if (result < 0 || result > UCHAR_MAX_VALUE || U_IS_UNICODE_NONCHAR(result)) {
+                    goto failed;
+                }
+                if (4 == digits) { // \uXXXX
+                    if (!U_IS_SURROGATE(result)) {
+                        if (trail_expected) {
+                            goto failed;
+                        } else {
+                            diff = ustring_subreplace_len_p(ustr, p, s, (UChar *) &result, 1);
+                            assert(diff == -5); // -(STRINGL("\\uXXXX") - 1 UChar)
+                            p += diff;
+                            end += diff;
+                        }
+                    } else if (U16_IS_SURROGATE_LEAD(result)) {
+                        trail_expected = TRUE;
+                        lead = result;
+                        lead_offset = p;
+                        //p += STRINGL("\\uXXXX");
+                        p = s;
+                    } else if (U16_IS_SURROGATE_TRAIL(result)) {
+                        if (trail_expected && ((2 * STRINGL("\\uXXXX")) == (s - lead_offset))) {
+                            UChar trail = result;
+                            trail_expected = FALSE;
+                            result = U16_GET_SUPPLEMENTARY(lead, result);
+                            if (!U_IS_UNICODE_CHAR(result)) {
+                                p = lead_offset; // we need to delete both CU
+                                goto failed;
+                            } else {
+                                UChar tmp[] = { lead, trail };
+                                diff = ustring_subreplace_len_p(ustr, lead_offset, s, tmp, 2);
+                                assert(diff == -10); // -(STRINGL("\\uXXXX\\uXXXX") - 2 UChar)
+                                p += diff;
+                                end += diff;
+                            }
+                        } else {
+                            goto failed;
+                        }
+                    }
+                } else if (8 == digits) { // \UXXXXXXXX
+                    if (!U_IS_UNICODE_CHAR(result)) {
+                        goto failed;
+                    } else {
+                        int32_t len;
+                        UChar tmp[U16_MAX_LENGTH];
+
+                        len = 0;
+                        U16_APPEND_UNSAFE(tmp, len, result);
+                        diff = ustring_subreplace_len_p(ustr, p, s, tmp, len);
+                        assert(diff == -((int) (STRINGL("\\Uxxxxxxxx") - U16_LENGTH(result))));
+                        p += diff;
+                        end += diff;
+                    }
+                }
+                if (FALSE) {
+failed:
+                    diff = ustring_delete_range_p(ustr, p, s);
+                    p += diff;
+                    end += diff;
+                }
+            }
+        }
+    }
+    if (trail_expected) {
+        ustring_delete_len(ustr, lead_offset - ustr->ptr, STRINGL("\\uXXXX")); // we already have assumed that sequence length is correct
+    }
+}
+
+UString *ustring_convert_argv_from_local(const char *cargv, error_t **error, UBool unescape)
+{
+    UString *ustr;
+    UConverter *ucnv;
+    UErrorCode status;
+    int32_t cargv_length;
+
+    status = U_ZERO_ERROR;
+    ucnv = ucnv_open(env_get_stdin_encoding(), &status);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "ucnv_open");
+        return NULL;
+    }
+    cargv_length = strlen(cargv);
+    ustr = mem_new(*ustr);
+    ustr->allocated = nearest_power(cargv_length * ucnv_getMaxCharSize(ucnv));
+    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
+    ustr->len = ucnv_toUChars(ucnv, ustr->ptr, ustr->allocated, cargv, cargv_length, &status);
+    ucnv_close(ucnv);
+    if (U_FAILURE(status)) {
+        ustring_destroy(ustr);
+        icu_error_set(error, FATAL, status, "ucnv_toUChars");
+        return NULL;
+    }
+    ustr->ptr[ustr->len] = 0;
+    if (unescape) {
+        ustring_unescape(ustr);
+    }
+    ustring_normalize(ustr, env_get_normalization());
+
+    return ustr;
+}
+
+/* ==================== destruction ==================== */
+
+void ustring_destroy(UString *ustr) /* NONNULL() */
+{
+    require_else_return(NULL != ustr);
+
+    free(ustr->ptr);
+    free(ustr);
+}
+
+UChar *ustring_orphan(UString *ustr) /* NONNULL() */
+{
+    UChar *ret;
+
+    ret = ustr->ptr;
+    free(ustr);
+
+    return ret;
+}
+
+/* ==================== basic operations (insert, append, replace, delete) ==================== */
+
+int32_t ustring_subreplace_len(UString *ustr, const UChar *replacement, size_t replacement_length, size_t position, size_t length) /* NONNULL(1) */
+{
+    int32_t diff_len;
+
+    require_else_return_zero(NULL != ustr);
+    require_else_return_zero(position <= ustr->len);
+
+    diff_len = replacement_length - length;
+    if (diff_len > 0) {
+        _ustring_maybe_expand_of(ustr, diff_len);
+    }
+    if (replacement_length != length) {
+        // TODO: assume ustr->len - position - length > 0?
+        u_memmove(ustr->ptr + position + length + diff_len, ustr->ptr + position + length, ustr->len - position - length);
+    }
+    if (replacement_length > 0) {
+        if (replacement >= ustr->ptr && replacement <= ustr->ptr + ustr->len) {
+            size_t offset = replacement - ustr->ptr;
+            size_t precount = 0;
+
+            replacement = ustr->ptr + offset;
+            if (offset < position) {
+                precount = MIN(replacement_length, position - offset);
+                u_memcpy(ustr->ptr + position, replacement, precount);
+            }
+            if (length > precount) {
+                u_memcpy(ustr->ptr + position + precount, replacement + precount + replacement_length, replacement_length - precount);
+            }
+        } else {
+            u_memcpy(ustr->ptr + position, replacement, replacement_length);
+        }
+    }
+    ustr->len += diff_len;
+    ustr->ptr[ustr->len] = 0;
+
+    return diff_len;
+}
+
+int32_t ustring_delete_len(UString *ustr, size_t position, size_t length) /* NONNULL(1) */
+{
+    return ustring_subreplace_len(ustr, NULL, 0, position, length);
+}
+
+int32_t ustring_insert_len(UString *ustr, size_t position, const UChar *c, size_t length) /* NONNULL(1) */
+{
+    return ustring_subreplace_len(ustr, c, length, position, 0);
+}
+
+void ustring_append_char32(UString *ustr, UChar32 c) /* NONNULL() */
+{
+    _ustring_maybe_expand_of(ustr, 2);
+
+    U16_APPEND_UNSAFE(ustr->ptr, ustr->len, c);
+    ustr->ptr[ustr->len] = 0;
+}
+
+void ustring_append_char(UString *ustr, UChar c) /* NONNULL() */
+{
+    ustring_insert_len(ustr, ustr->len, &c, 1);
+}
+
+void ustring_append_string(UString *ustr, const UChar *str) /* NONNULL() */
+{
+    ustring_insert_len(ustr, ustr->len, str, u_strlen(str));
+}
+
+void ustring_append_string_len(UString *ustr, const UChar *str, int32_t len) /* NONNULL() */
+{
+    ustring_insert_len(ustr, ustr->len, str, len);
+}
+
+void ustring_prepend_char(UString *ustr, UChar c) /* NONNULL() */
+{
+    ustring_insert_len(ustr, 0, &c, 1);
+}
+
+void ustring_prepend_string(UString *ustr, const UChar *str) /* NONNULL() */
+{
+    ustring_insert_len(ustr, 0, str, u_strlen(str));
+}
+
+void ustring_prepend_string_len(UString *ustr, const UChar *str, int32_t len) /* NONNULL() */
+{
+    ustring_insert_len(ustr, 0, str, len);
+}
+
+/* ==================== trimming (WS and/or EOL) ==================== */
+
+void ustring_chomp(UString *ustr) /* NONNULL() */
+{
+    require_else_return(NULL != ustr);
+
+    if (ustr->len > 0) {
+        switch (ustr->ptr[ustr->len - 1]) {
+            case U_CR:
+            case U_VT:
+            case U_FF:
+            case U_NL:
+            case U_LS:
+            case U_PS:
+                ustr->ptr[--ustr->len] = 0;
+                break;
+            case U_LF:
+                ustr->ptr[--ustr->len] = 0;
+                if (ustr->len > 0 && U_CR == ustr->ptr[ustr->len - 1]) {
+                    ustr->ptr[--ustr->len] = 0;
+                }
+                break;
+        }
+    }
 }
 
 enum {
@@ -472,6 +538,8 @@ void ustring_rtrim(UString *ustr) /* NONNULL() */
     ustr->len = u_rtrim(ustr->ptr, ustr->len, NULL, -1);
 }
 
+/* ==================== full case mapping ==================== */
+
 static UBool uloc_is_turkic(const char *locale)
 {
     if (NULL == locale) {
@@ -546,6 +614,92 @@ UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct,
     } else {
         ustr->ptr[ustr->len] = 0;
         return TRUE;
+    }
+}
+
+/* ==================== misc/others ==================== */
+
+void ustring_sync(const UString *ref, UString *buffer, double ratio) /* NONNULL() */
+{
+    require_else_return(NULL != ref);
+    require_else_return(buffer != ref);
+    require_else_return(0 != ratio);
+
+    if (buffer->allocated <= ref->allocated * ratio) {
+        buffer->allocated = ref->allocated * ratio;
+        buffer->ptr = mem_renew(buffer->ptr, *buffer->ptr, buffer->allocated + 1);
+    }
+}
+
+UBool ustring_empty(const UString *ustr) /* NONNULL() */
+{
+    require_else_return_false(NULL != ustr);
+
+    return (ustr->len < 1);
+}
+
+void ustring_truncate(UString *ustr) /* NONNULL() */
+{
+    require_else_return(NULL != ustr);
+
+    *ustr->ptr = 0;
+    ustr->len = 0;
+}
+
+void ustring_dump(UString *ustr) /* NONNULL() */
+{
+    UChar *p;
+    UChar32 c;
+    size_t i, len;
+    const int replacement_len = 6;
+    const char replacement[] = "0x%04X";
+
+    require_else_return(NULL != ustr);
+
+    len = 0;
+    for (i = 0; i < ustr->len; ) {
+        U16_NEXT(ustr->ptr, i, ustr->len, c);
+        switch (c) {
+            case 0x09:
+            case 0x0D:
+                len++;
+                break;
+            default:
+                if (!u_isprint(c)) {
+                    len += replacement_len - U16_LENGTH(c);
+                }
+        }
+    }
+    if (len > 0) {
+        _ustring_maybe_expand_of(ustr, len);
+        ustr->len += len;
+        ustr->ptr[ustr->len] = 0;
+        p = ustr->ptr + ustr->len;
+        while (i > 0) {
+            U16_PREV(ustr->ptr, 0, i, c);
+            switch (c) {
+                case 0x09:
+                    *--p = 0x74;
+                    *--p = 0x5C;
+                    break;
+                case 0x0D:
+                    *--p = 0x72;
+                    *--p = 0x5C;
+                    break;
+                default:
+                    if (!u_isprint(c)) {
+                        p -= replacement_len;
+                        u_snprintf(p, replacement_len, replacement, c);
+                    } else {
+                        if (U_IS_BMP(c)) {
+                            *--p = c;
+                        } else {
+                            *--p = U16_LEAD(c);
+                            *--p = U16_TRAIL(c);
+                        }
+                    }
+            }
+        }
     }
 }
 

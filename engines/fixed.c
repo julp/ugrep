@@ -83,7 +83,7 @@ static void *engine_fixed_compileC(error_t **error, const char *pattern, uint32_
     p->ubrk = NULL;
     p->usearch = NULL;
     status = U_ZERO_ERROR;
-    if (NULL == (p->pattern = ustring_convert_argv_from_local(pattern, error))) {
+    if (NULL == (p->pattern = ustring_convert_argv_from_local(pattern, error, TRUE))) {
         fixed_pattern_destroy(p);
         return NULL;
     }

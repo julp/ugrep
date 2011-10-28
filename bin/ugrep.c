@@ -246,6 +246,7 @@ static void usage(void)
         flags &= ~OPT_WORD_BOUND; \
     }
 
+// TODO: reject empty patterns
 UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t length, int pattern_type, uint32_t flags)
 {
     void *data;
@@ -266,15 +267,29 @@ UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t len
     return TRUE;
 }
 
+// TODO: convert C => UTF-16 here (not engine responsability) and don't add empty patterns to the list
 UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern_type, uint32_t flags)
 {
     void *data;
+#ifndef NOC
+    UString *ustr;
+#endif
     pattern_data_t *pdata;
 
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
+#ifndef NOC
+    if (NULL == (ustr = ustring_convert_argv_from_local(pattern, error, TRUE))) {
+        return FALSE;
+    }
+    if (ustring_empty(ustr)) {
+        return TRUE;
+    }
+    if (NULL == (data = engines[!!pattern_type]->compile(error, ustr->ptr, ustr->len, flags))) {
+#else
     if (NULL == (data = engines[!!pattern_type]->compileC(error, pattern, flags))) {
+#endif
         return FALSE;
     }
     pdata = mem_new(*pdata);
@@ -1286,6 +1301,7 @@ int main(int argc, char **argv)
                 print_error(error);
             }
             argc--;
+            // TODO: make sure pattern was not empty
         }
     }
 
