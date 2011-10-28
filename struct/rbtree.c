@@ -212,6 +212,9 @@ int rbtree_lookup_node(RBTree *tree, void *key, RBTreeNode **parent, int *side, 
         }
         if (0 == cmp) {
             *res = node->value;
+            if (NULL != tree->hash_func) {
+                free(hash);
+            }
             return 1;
         }
         *parent = node;
@@ -480,10 +483,16 @@ int rbtree_lookup(RBTree *tree, void *key, void **value) /* NONNULL(1) */
         key = tree->hash_func(key, tree->priv_data_hash);
     }
     if (NULL == (node = _rbtreenode_lookup(tree, key))) {
+        if (NULL != tree->hash_func) {
+            free(key);
+        }
         return 0;
     } else {
         if (NULL != value) {
             *value = node->value;
+        }
+        if (NULL != tree->hash_func) {
+            free(key);
         }
         return 1;
     }
@@ -499,16 +508,23 @@ int rbtree_replace(RBTree *tree, void *key, void *value, int call_dtor)
         key = tree->hash_func(key, tree->priv_data_hash);
     }
     if (NULL == (node = _rbtreenode_lookup(tree, key))) {
+        if (NULL != tree->hash_func) {
+            free(key);
+        }
         return 0;
     } else {
         if (call_dtor) {
             tree->value_dtor_func(node->value);
         }
         node->value = value;
+        if (NULL != tree->hash_func) {
+            free(key);
+        }
         return 1;
     }
 }
 
+// TODO: leak (missing dtor calls)
 int rbtree_remove(RBTree *tree, void *key) /* NONNULL(1) */
 {
     RBTreeNode *node;
