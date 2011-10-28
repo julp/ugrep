@@ -22,7 +22,7 @@ static const char *system_encoding = NULL;
 static const char *inputs_encoding = NULL;
 static const char *outputs_encoding = NULL;
 static const char *stdin_encoding = NULL;
-static UNormalizationMode normalization = UNORM_NFD;
+static UNormalizationMode normalization = UNORM_NFC;
 
 /**
  *                          SYSTEM
