@@ -247,15 +247,13 @@ static void usage(void)
     }
 
 // TODO: reject empty patterns
-UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t length, int pattern_type, uint32_t flags)
+UBool add_pattern(error_t **error, slist_t *l, UString *ustr, int pattern_type, uint32_t flags)
 {
     void *data;
-    UString *ustr;
     pattern_data_t *pdata;
 
-    ustr = ustring_adopt_string_len(pattern, length);
     if (PATTERN_AUTO == pattern_type) {
-        pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
+        pattern_type = is_pattern(ustr->ptr) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
     ustring_unescape(ustr);
     if (ustring_empty(ustr)) {
@@ -317,7 +315,7 @@ UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pat
             retval = FALSE;
         } else {
             ustring_chomp(ustr);
-            if (!add_pattern(error, l, ustr->ptr, ustr->len, pattern_type, flags)) {
+            if (!add_pattern(error, l, ustr, pattern_type, flags)) {
                 retval = FALSE;
             }
         }
