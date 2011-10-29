@@ -255,7 +255,9 @@ UBool add_pattern(error_t **error, slist_t *l, UString *ustr, int pattern_type, 
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_pattern(ustr->ptr) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    ustring_unescape(ustr);
+//     if (PATTERN_LITERAL == pattern_type) {
+        ustring_unescape(ustr);
+//     }
     if (ustring_empty(ustr)) {
         return TRUE;
     }
@@ -280,7 +282,7 @@ UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (ustr = ustring_convert_argv_from_local(pattern, error, TRUE))) {
+    if (NULL == (ustr = ustring_convert_argv_from_local(pattern, error, TRUE/*PATTERN_LITERAL == pattern_type*/))) {
         return FALSE;
     }
     if (ustring_empty(ustr)) {
