@@ -54,10 +54,12 @@ static int32_t fill_buffer(reader_t *this, error_t **error)
         this->utf16.ptr = this->utf16.buffer;
     }
     bytesdiff = this->byte.ptr - this->byte.buffer;
-    if (bytesdiff > 0) {
+    if (bytesdiff > 0 && this->byte.end > this->byte.ptr) {
         memmove(this->byte.buffer, this->byte.ptr, this->byte.end - this->byte.ptr);
         this->byte.end -= bytesdiff;
         this->byte.ptr = this->byte.buffer;
+    } else {
+        this->byte.end = this->byte.ptr = this->byte.buffer;
     }
     bytesAvailable = this->byte.limit - this->byte.end;
     maxBytesToRead = MIN(bytesAvailable / (2 * ucnv_getMinCharSize(this->ucnv)), CHAR_BUFFER_SIZE);
