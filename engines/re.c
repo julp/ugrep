@@ -3,8 +3,6 @@
 #include <unicode/ubrk.h>
 #include <unicode/uregex.h>
 
-// const UChar b[] = {0x005c, 0x0062, U_NUL};
-
 static const UChar _UREGEXP_FAKE_USTR[] = { 0 };
 #define UREGEXP_FAKE_USTR _UREGEXP_FAKE_USTR, 0
 
@@ -44,6 +42,16 @@ static void *engine_re_compile(error_t **error, UString *ustr, uint32_t flags)
     status = U_ZERO_ERROR;
     p = mem_new(*p);
     p->ubrk = NULL;
+    if (IS_WORD_BOUNDED(flags)) {
+        UChar bsb[] = { 0x005c, 0x0062, 0 }; /* \b */
+
+        if (!ustring_startswith(ustr, bsb, STR_LEN(bsb))) {
+            ustring_prepend_string_len(ustr, bsb, STR_LEN(bsb));
+        }
+        if (!ustring_endswith(ustr, bsb, STR_LEN(bsb))) {
+            ustring_append_string_len(ustr, bsb, STR_LEN(bsb));
+        }
+    }
     p->uregex = uregex_open(ustr->ptr, ustr->len, IS_CASE_INSENSITIVE(flags) ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
     ustring_destroy(ustr); // ICU dups the pattern, so we can free it
     if (U_FAILURE(status)) {
@@ -55,7 +63,11 @@ static void *engine_re_compile(error_t **error, UString *ustr, uint32_t flags)
         re_pattern_destroy(p);
         return NULL;
     }
-    p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+//     if (IS_WORD_BOUNDED(flags)) {
+//         p->ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
+//     } else {
+        p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+//     }
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ubrk_open");
         re_pattern_destroy(p);
