@@ -35,7 +35,7 @@ static void re_pattern_destroy(re_pattern_t *p)
     free(p);
 }
 
-static void *engine_re_compile(error_t **error, const UChar *upattern, int32_t length, uint32_t flags)
+static void *engine_re_compile(error_t **error, UString *ustr, uint32_t flags)
 {
     re_pattern_t *p;
     UErrorCode status;
@@ -44,48 +44,21 @@ static void *engine_re_compile(error_t **error, const UChar *upattern, int32_t l
     status = U_ZERO_ERROR;
     p = mem_new(*p);
     p->ubrk = NULL;
-    /* don't make a copy of upattern, ICU does this */
-    p->uregex = uregex_open(upattern, length, IS_CASE_INSENSITIVE(flags) ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
+    p->uregex = uregex_open(ustr->ptr, ustr->len, IS_CASE_INSENSITIVE(flags) ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
+    ustring_destroy(ustr); // ICU dups the pattern, so we can free it
     if (U_FAILURE(status)) {
         if (-1 != pe.line) {
-            error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%S\n\t%*c\n", pe.offset, upattern, pe.offset, '^');
+            error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%S\n\t%*c\n", pe.offset, ustr->ptr, pe.offset, '^');
         } else {
             icu_error_set(error, FATAL, status, "uregex_open");
         }
+        re_pattern_destroy(p);
         return NULL;
     }
     p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
     if (U_FAILURE(status)) {
-        re_pattern_destroy(p);
         icu_error_set(error, FATAL, status, "ubrk_open");
-        return NULL;
-    }
-
-    return p;
-}
-
-static void *engine_re_compileC(error_t **error, const char *pattern, uint32_t flags)
-{
-    re_pattern_t *p;
-    UErrorCode status;
-    UParseError pe = { -1, -1, {0}, {0} };
-
-    status = U_ZERO_ERROR;
-    p = mem_new(*p);
-    p->ubrk = NULL;
-    p->uregex = uregex_openC(pattern, IS_CASE_INSENSITIVE(flags) ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
-    if (U_FAILURE(status)) {
-        if (-1 != pe.line) {
-            error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%s\n\t%*c\n", pe.offset, pattern, pe.offset, '^');
-        } else {
-            icu_error_set(error, FATAL, status, "uregex_openC");
-        }
-        return NULL;
-    }
-    p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
-    if (U_FAILURE(status)) {
         re_pattern_destroy(p);
-        icu_error_set(error, FATAL, status, "ubrk_open");
         return NULL;
     }
 
@@ -214,7 +187,6 @@ static void engine_re_destroy(void *data)
 
 engine_t re_engine = {
     engine_re_compile,
-    engine_re_compileC,
     engine_re_match,
     engine_re_match_all,
     engine_re_whole_line_match,

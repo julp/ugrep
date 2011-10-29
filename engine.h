@@ -24,8 +24,7 @@ typedef enum {
 } engine_return_t;
 
 typedef struct {
-    void *(*compile)(error_t **, const UChar *, int32_t, uint32_t);
-    void *(*compileC)(error_t **, const char *, uint32_t);
+    void *(*compile)(error_t **, UString *, uint32_t);
     engine_return_t (*match)(error_t **, void *, const UString *);
 #ifdef OLD_INTERVAL
     engine_return_t (*match_all)(error_t **, void *, const UString *, slist_t *);

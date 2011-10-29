@@ -19,8 +19,8 @@ typedef enum {
 } UCaseType;
 
 UString *ustring_convert_argv_from_local(const char *, error_t **, UBool);
-UString *ustring_adopt_string(UChar *) NONNULL();
-UString *ustring_adopt_string_len(UChar *, size_t);
+UString *ustring_adopt_string(const UChar *) NONNULL();
+UString *ustring_adopt_string_len(const UChar *, size_t);
 void ustring_append_char(UString *, UChar) NONNULL();
 void ustring_append_char32(UString *, UChar32) NONNULL();
 void ustring_append_string(UString *, const UChar *) NONNULL();

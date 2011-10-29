@@ -250,12 +250,18 @@ static void usage(void)
 UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t length, int pattern_type, uint32_t flags)
 {
     void *data;
+    UString *ustr;
     pattern_data_t *pdata;
 
+    ustr = ustring_adopt_string_len(pattern, length);
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_pattern(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-    if (NULL == (data = engines[!!pattern_type]->compile(error, pattern, length, flags))) {
+    ustring_unescape(ustr);
+    if (ustring_empty(ustr)) {
+        return TRUE;
+    }
+    if (NULL == (data = engines[!!pattern_type]->compile(error, ustr, flags))) {
         return FALSE;
     }
     pdata = mem_new(*pdata);
@@ -267,29 +273,22 @@ UBool add_pattern(error_t **error, slist_t *l, const UChar *pattern, int32_t len
     return TRUE;
 }
 
-// TODO: convert C => UTF-16 here (not engine responsability) and don't add empty patterns to the list
 UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern_type, uint32_t flags)
 {
     void *data;
-#ifndef NOC
     UString *ustr;
-#endif
     pattern_data_t *pdata;
 
     if (PATTERN_AUTO == pattern_type) {
         pattern_type = is_patternC(pattern) ? PATTERN_REGEXP : PATTERN_LITERAL;
     }
-#ifndef NOC
     if (NULL == (ustr = ustring_convert_argv_from_local(pattern, error, TRUE))) {
         return FALSE;
     }
     if (ustring_empty(ustr)) {
         return TRUE;
     }
-    if (NULL == (data = engines[!!pattern_type]->compile(error, ustr->ptr, ustr->len, flags))) {
-#else
-    if (NULL == (data = engines[!!pattern_type]->compileC(error, pattern, flags))) {
-#endif
+    if (NULL == (data = engines[!!pattern_type]->compile(error, ustr, flags))) {
         return FALSE;
     }
     pdata = mem_new(*pdata);

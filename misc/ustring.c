@@ -97,19 +97,19 @@ UString *ustring_dup_string(const UChar *from) /* NONNULL() */
     return ustring_dup_string_len(from, (size_t) u_strlen(from));
 }
 
-UString *ustring_adopt_string_len(UChar *from, size_t len)
+UString *ustring_adopt_string_len(const UChar *from, size_t len)
 {
     UString *ustr;
 
     ustr = mem_new(*ustr);
     ustr->len = len;
     ustr->allocated = len + 1;
-    ustr->ptr = from;
+    ustr->ptr = (UChar *) from;
 
     return ustr;
 }
 
-UString *ustring_adopt_string(UChar *from) /* NONNULL() */
+UString *ustring_adopt_string(const UChar *from) /* NONNULL() */
 {
     require_else_return_null(NULL != from);
 
