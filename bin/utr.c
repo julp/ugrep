@@ -23,8 +23,8 @@ enum {
     CODE_POINT_MODE
 };
 
-// #define DEFAULT_MODE GRAPHEME_MODE
-#define DEFAULT_MODE CODE_POINT_MODE
+#define DEFAULT_MODE GRAPHEME_MODE
+// #define DEFAULT_MODE CODE_POINT_MODE
 
 enum {
     NONE,
@@ -193,7 +193,7 @@ USet *create_set_from_string32(const UChar32 *string32, int32_t string32_length,
     return uset;
 }
 
-/* ========== X ========== */
+/* ========== check lengths ========== */
 
 int32_t grapheme_count(UBreakIterator *ubrk, const UChar *ustring, int32_t ustring_len)
 {
@@ -215,7 +215,7 @@ int32_t grapheme_count(UBreakIterator *ubrk, const UChar *ustring, int32_t ustri
     return count;
 }
 
-/* ========== X ========== */
+/* ========== hashtable stuffs (hashing, keys equality, ...) ========== */
 
 #define POINTER_TO_UCHAR32(p) ((UChar32) (p))
 #define TO_POINTER(c)         ((void *) (c))
@@ -292,7 +292,7 @@ uint32_t cp_hash(const void *k)
     return k;
 }*/
 
-/* ========== X ========== */
+/* ========== hashtable building (parsing command arguments) ========== */
 
 Hashtable *grapheme_hashtable_put(
     UChar *from, int32_t from_length,
@@ -417,11 +417,6 @@ Hashtable *cp_hashtable_put(
 }
 
 /* ========== replacement helpers ========== */
-
-static UBool ustring_endswith(UString *ustr, UChar *str, size_t length)
-{
-    return ustr->len >= length && 0 == u_memcmp(ustr->ptr + ustr->len - length, str, length);
-}
 
 void grapheme_process(
     Hashtable *ht,

@@ -116,6 +116,18 @@ UString *ustring_adopt_string(UChar *from) /* NONNULL() */
     return ustring_adopt_string_len(from, (size_t) u_strlen(from));
 }
 
+/* ==================== prefix/suffix ==================== */
+
+UBool ustring_startswith(UString *ustr, UChar *str, size_t length) /* NONNULL() */
+{
+    return ustr->len >= length && 0 == u_memcmp(ustr->ptr, str, length);
+}
+
+UBool ustring_endswith(UString *ustr, UChar *str, size_t length) /* NONNULL() */
+{
+    return ustr->len >= length && 0 == u_memcmp(ustr->ptr + ustr->len - length, str, length);
+}
+
 /* ==================== handle argv ==================== */
 
 #define STRINGL(x) (sizeof(x) - 1)
