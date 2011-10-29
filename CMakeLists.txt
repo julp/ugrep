@@ -112,3 +112,8 @@ endforeach(UgrepBinary)
 #")
 
 add_custom_target(test COMMAND find ${CMAKE_SOURCE_DIR}/test -name '*.sh' -exec bash -i {} "\;")
+
+# include(CTest)
+# enable_testing()
+# add_test(unescape ${CMAKE_CURRENT_BINARY_DIR}/unescape)
+
