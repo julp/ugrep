@@ -504,7 +504,7 @@ static void parse_userpref(void)
             LPITEMIDLIST pidl = NULL;
 
             hr = SHGetSpecialFolderLocation(NULL, CSIDL_PROFILE, &pidl);
-            if (hr == S_OK) {
+            if (S_OK == hr) {
                 SHGetPathFromIDList(pidl, home);
                 CoTaskMemFree(pidl);
             }
