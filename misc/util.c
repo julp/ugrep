@@ -13,15 +13,18 @@ int exit_failure_value = 0;
 UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
 {
     switch (c) {
-        case NFNONE_OPT:
-            env_set_normalization(UNORM_NONE);
-            return TRUE;
-        case NFD_OPT:
-            env_set_normalization(UNORM_NFD);
-            return TRUE;
-        case NFC_OPT:
-            env_set_normalization(UNORM_NFC);
-            return TRUE;
+        case FORM_OPT:
+            if (!strcasecmp("none", optarg)) {
+                env_set_normalization(UNORM_NONE);
+                return TRUE;
+            } else if (!strcasecmp("c", optarg)) {
+                env_set_normalization(UNORM_NFC);
+                return TRUE;
+            } else if (!strcasecmp("d", optarg)) {
+                env_set_normalization(UNORM_NFD);
+                return TRUE;
+            }
+            return FALSE;
         case READER_OPT:
             if (!reader_set_imp_by_name(reader, optarg)) {
                 fprintf(stderr, "Unknown reader\n");
