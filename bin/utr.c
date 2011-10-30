@@ -23,9 +23,6 @@ enum {
     CODE_POINT_MODE
 };
 
-#define DEFAULT_MODE GRAPHEME_MODE
-// #define DEFAULT_MODE CODE_POINT_MODE
-
 enum {
     NONE,
     CHARACTER,       // a single code point, idea would be to optimize against STRING (more than one code point)
@@ -698,6 +695,7 @@ int main(int argc, char **argv)
                     return UTR_EXIT_USAGE;
                 }
             } else {
+                // TODO
                 if (NULL == (to32 = local_to_uchar32(argv[1], &to_length, &error))) {
                     print_error(error);
                     return UTR_EXIT_FAILURE;
@@ -746,6 +744,7 @@ int main(int argc, char **argv)
             print_error(error);
         }
     } else {
+        // TODO
         if (NULL == (from32 = local_to_uchar32(argv[0], &from_length, &error))) {
             print_error(error);
         }
@@ -753,6 +752,7 @@ int main(int argc, char **argv)
             set1_type = CHARACTER;
         } else {
             if (cFlag) { // readjust
+                // TODO?
                 if (NULL == (uset = create_set_from_string32(from32, from_length, cFlag, &error))) {
                     print_error(error);
                 }
@@ -790,12 +790,12 @@ int main(int argc, char **argv)
         } else {
             to = local_to_uchar(argv[1], &to_length, &error);
         }
-        if (GRAPHEME_MODE == DEFAULT_MODE) {
+        if (UNORM_NONE == env_get_normalization()) {
+            ht = cp_hashtable_put(from, from_length, to, to_length, dFlag, FALSE);
+        } else {
             ht = grapheme_hashtable_put(from, from_length, to, to_length, dFlag, FALSE);
             ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
             assert(U_SUCCESS(status));
-        } else {
-            ht = cp_hashtable_put(from, from_length, to, to_length, dFlag, FALSE);
         }
         //hashtable_debug(ht, kvstring_debug);
     }
@@ -853,10 +853,10 @@ int main(int argc, char **argv)
             }
         } else {
 //             trtr(from32, from_length, to32, to_length, in, out);
-            if (GRAPHEME_MODE == DEFAULT_MODE) {
-                grapheme_process(ht, ubrk, in, out, sFlag, dFlag);
-            } else {
+            if (UNORM_NONE == env_get_normalization()) {
                 cp_process(ht, in, out, sFlag, dFlag);
+            } else {
+                grapheme_process(ht, ubrk, in, out, sFlag, dFlag);
             }
         }
 
