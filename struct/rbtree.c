@@ -13,23 +13,6 @@ static int ucol_key_cmp_r(const void *k1, const void *k2)
     return strcmp((const char *) k2, (const char *) k1);
 }
 
-static void *ucol_compute_key(const void *value, const void *data)
-{
-    uint8_t *key;
-    int32_t key_len;
-    const UString *ustr;
-    const UCollator *ucol;
-
-    ustr = (const UString *) value;
-    ucol = (const UCollator *) data;
-    key_len = ucol_getSortKey(ucol, ustr->ptr, ustr->len, NULL, 0);
-    key = mem_new_n(*key, key_len + 1);
-    ensure(key_len == ucol_getSortKey(ucol, ustr->ptr, ustr->len, key, key_len));
-    key[key_len] = 0;
-
-    return key;
-}
-
 typedef enum {
     BLACK = 0,
     RED   = 1
@@ -121,7 +104,7 @@ RBTree *rbtree_collated_new(UCollator *ucol, func_dtor_t key_dtor_func, func_dto
 
     tree = rbtree_new(inversed ? ucol_key_cmp_r : ucol_key_cmp, key_dtor_func, value_dtor_func);
     tree->priv_data_hash = ucol;
-    tree->hash_func = ucol_compute_key;
+    tree->hash_func = ustring_to_collation_key;
 
     return tree;
 }

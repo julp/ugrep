@@ -47,6 +47,7 @@ void ustring_sprintf(UString *ustr, const char *format, ...) NONNULL(1, 2);
 UBool ustring_startswith(UString *, UChar *, size_t) NONNULL();
 int32_t ustring_subreplace_len(UString *, const UChar *, size_t, size_t, size_t) NONNULL(1);
 void ustring_sync(const UString *, UString *, double) NONNULL();
+void *ustring_to_collation_key(const void *, const void *) NONNULL();
 void ustring_trim(UString *) NONNULL();
 void ustring_truncate(UString *) NONNULL();
 void ustring_unescape(UString *) NONNULL();
