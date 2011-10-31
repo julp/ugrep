@@ -59,4 +59,10 @@ ARGS='--color=never zzz'
 assertOutputCommand "file with match (-l)" "./ugrep ${UGREP_OPTS} -l ${ARGS} ${FILE} 2>/dev/null" "grep -l ${ARGS} ${FILE}"
 assertOutputCommand "file without match (-L)" "./ugrep ${UGREP_OPTS} -L ${ARGS} ${FILE} 2>/dev/null" "grep -L ${ARGS} ${FILE}"
 
+FILE='engine.h' # Others are too "particular"
+ARGS="--color=never -nw ''"
+assertOutputValueEx "empty pattern" "./ugrep ${UGREP_OPTS} -E ${ARGS} ${FILE} 2>/dev/null" "grep ${ARGS} ${FILE}"
+assertOutputValueEx "empty pattern + word (-w)" "./ugrep ${UGREP_OPTS} -Ew ${ARGS} ${FILE} 2>/dev/null" "grep -w ${ARGS} ${FILE}"
+assertOutputValueEx "empty pattern + whole line (-x)" "./ugrep ${UGREP_OPTS} -Ex ${ARGS} ${FILE} 2>/dev/null" "grep -x ${ARGS} ${FILE}"
+
 exit $?
