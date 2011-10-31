@@ -38,33 +38,39 @@ static void *engine_fixed_compile(error_t **error, UString *ustr, uint32_t flags
     p->ubrk = NULL;
     p->usearch = NULL;
     status = U_ZERO_ERROR;
-    if (!IS_WHOLE_LINE(flags)) {
+    if (ustring_empty(ustr)) {
         if (IS_WORD_BOUNDED(flags)) {
             p->ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
-        } else {
-            p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
         }
-        if (U_FAILURE(status)) {
-            fixed_pattern_destroy(p);
-            icu_error_set(error, FATAL, status, "ubrk_open");
-            return NULL;
-        }
-    }
-    if (IS_WORD_BOUNDED(flags) || (IS_CASE_INSENSITIVE(flags) && !IS_WHOLE_LINE(flags))) {
-        p->usearch = usearch_open(ustr->ptr, ustr->len, USEARCH_FAKE_USTR, uloc_getDefault(), p->ubrk, &status);
-        if (U_FAILURE(status)) {
-            if (NULL != p->ubrk) {
-                ubrk_close(p->ubrk);
+    } else {
+        if (!IS_WHOLE_LINE(flags)) {
+            if (IS_WORD_BOUNDED(flags)) {
+                p->ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
+            } else {
+                p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
             }
-            fixed_pattern_destroy(p);
-            icu_error_set(error, FATAL, status, "usearch_open");
-            return NULL;
+            if (U_FAILURE(status)) {
+                fixed_pattern_destroy(p);
+                icu_error_set(error, FATAL, status, "ubrk_open");
+                return NULL;
+            }
         }
-        if (IS_CASE_INSENSITIVE(flags)) {
-            UCollator *ucol;
+        if (IS_WORD_BOUNDED(flags) || (IS_CASE_INSENSITIVE(flags) && !IS_WHOLE_LINE(flags))) {
+            p->usearch = usearch_open(ustr->ptr, ustr->len, USEARCH_FAKE_USTR, uloc_getDefault(), p->ubrk, &status);
+            if (U_FAILURE(status)) {
+                if (NULL != p->ubrk) {
+                    ubrk_close(p->ubrk);
+                }
+                fixed_pattern_destroy(p);
+                icu_error_set(error, FATAL, status, "usearch_open");
+                return NULL;
+            }
+            if (IS_CASE_INSENSITIVE(flags)) {
+                UCollator *ucol;
 
-            ucol = usearch_getCollator(p->usearch);
-            ucol_setStrength(ucol, (flags & ~OPT_MASK) > 1 ? UCOL_SECONDARY : UCOL_PRIMARY);
+                ucol = usearch_getCollator(p->usearch);
+                ucol_setStrength(ucol, (flags & ~OPT_MASK) > 1 ? UCOL_SECONDARY : UCOL_PRIMARY);
+            }
         }
     }
 
@@ -78,7 +84,35 @@ static engine_return_t engine_fixed_match(error_t **error, void *data, const USt
     FETCH_DATA(data, p, fixed_pattern_t);
 
     status = U_ZERO_ERROR;
-    if (NULL != p->usearch) {
+    if (ustring_empty(p->pattern)) {
+        if (IS_WORD_BOUNDED(p->flags)) {
+            if (ustring_empty(subject)) {
+                return ENGINE_MATCH_FOUND;
+            } else {
+                int32_t l, u, lastState, state;
+
+                ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+                if (U_FAILURE(status)) {
+                    icu_error_set(error, FATAL, status, "ubrk_setText");
+                    return ENGINE_FAILURE;
+                }
+                if (UBRK_DONE != (l = ubrk_first(p->ubrk))) {
+                    lastState = ubrk_getRuleStatus(p->ubrk);
+                    while (UBRK_DONE != (u = ubrk_next(p->ubrk))) {
+                        state = ubrk_getRuleStatus(p->ubrk);
+                        if (UBRK_WORD_NONE == lastState && lastState == state) {
+                            return ENGINE_MATCH_FOUND;
+                        }
+                        lastState = state;
+                        l = u;
+                    }
+                }
+                return ENGINE_NO_MATCH;
+            }
+        } else {
+            return ENGINE_MATCH_FOUND;
+        }
+    } else if (NULL != p->usearch) {
         if (subject->len > 0) {
             usearch_setText(p->usearch, subject->ptr, subject->len, &status);
             if (U_FAILURE(status)) {
@@ -134,7 +168,35 @@ static engine_return_t engine_fixed_match_all(error_t **error, void *data, const
 
     matches = 0;
     status = U_ZERO_ERROR;
-    if (NULL != p->usearch) {
+    if (ustring_empty(p->pattern)) {
+        if (IS_WORD_BOUNDED(p->flags)) {
+            if (ustring_empty(subject)) {
+                return ENGINE_MATCH_FOUND;
+            } else {
+                int32_t l, u, lastState, state;
+
+                ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+                if (U_FAILURE(status)) {
+                    icu_error_set(error, FATAL, status, "ubrk_setText");
+                    return ENGINE_FAILURE;
+                }
+                if (UBRK_DONE != (l = ubrk_first(p->ubrk))) {
+                    lastState = ubrk_getRuleStatus(p->ubrk);
+                    while (UBRK_DONE != (u = ubrk_next(p->ubrk))) {
+                        state = ubrk_getRuleStatus(p->ubrk);
+                        if (UBRK_WORD_NONE == lastState && lastState == state) {
+                            return ENGINE_MATCH_FOUND;
+                        }
+                        lastState = state;
+                        l = u;
+                    }
+                }
+                return ENGINE_NO_MATCH;
+            }
+        } else {
+            return ENGINE_MATCH_FOUND;
+        }
+    } else if (NULL != p->usearch) {
         int32_t l, u;
 
         if (subject->len > 0) {
@@ -192,7 +254,9 @@ static engine_return_t engine_fixed_whole_line_match(error_t **error, void *data
 {
     FETCH_DATA(data, p, fixed_pattern_t);
 
-    if (NULL != p->usearch) {
+    if (ustring_empty(p->pattern)) {
+        return ustring_empty(subject) ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH;
+    } else if (NULL != p->usearch) {
         int32_t ret;
         UErrorCode status;
 

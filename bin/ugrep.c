@@ -259,7 +259,7 @@ UBool add_pattern(error_t **error, slist_t *l, UString *ustr, int pattern_type, 
         ustring_unescape(ustr);
 //     }
     if (ustring_empty(ustr)) {
-        return TRUE;
+        pattern_type = PATTERN_LITERAL;
     }
     if (NULL == (data = engines[!!pattern_type]->compile(error, ustr, flags))) {
         return FALSE;
@@ -286,7 +286,7 @@ UBool add_patternC(error_t **error, slist_t *l, const char *pattern, int pattern
         return FALSE;
     }
     if (ustring_empty(ustr)) {
-        return TRUE;
+        pattern_type = PATTERN_LITERAL;
     }
     if (NULL == (data = engines[!!pattern_type]->compile(error, ustr, flags))) {
         return FALSE;
