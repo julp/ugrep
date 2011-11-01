@@ -32,7 +32,7 @@ enum {
 UBool cFlag = FALSE;
 UBool fFlag = FALSE;
 
-UChar32 delim = 0x09;
+UChar32 delim = 0x09; // UChar delim[U16_MAX_LENGTH] = { 0 };
 UString *ustr = NULL;
 
 /* ========== getopt stuff ========== */
@@ -225,19 +225,17 @@ int main(int argc, char **argv)
                 break;
             case 'd':
             {
-                UChar *uarg;
-                int32_t uarg_len;
+                UString *ustrarg;
 
-                if (NULL == (uarg = local_to_uchar(optarg, &uarg_len, &error))) {
+                if (NULL == (ustrarg = ustring_convert_argv_from_local(optarg, &error, TRUE))) {
                     print_error(error);
-                    return UCUT_EXIT_FAILURE;
                 }
-                if (1 != u_countChar32(uarg, uarg_len)) {
+                if (u_strHasMoreChar32Than(ustrarg->ptr, ustrarg->len, 1)) {
                     fprintf(stderr, "Delimiter is not a single character\n");
                     return UCUT_EXIT_FAILURE;
                 }
-                U16_GET_UNSAFE(uarg, 0, delim);
-                free(uarg);
+                U16_GET_UNSAFE(ustrarg->ptr, 0, delim);
+                ustring_destroy(ustrarg);
                 break;
             }
             case 'f':
