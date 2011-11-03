@@ -33,8 +33,5 @@ int rbtree_remove(RBTree *, void *) NONNULL(1);
 int rbtree_replace(RBTree *, void *, void *, int);
 void rbtree_traverse(RBTree *, traverse_mode_t, func_apply_t) NONNULL();
 // void rbtree_traverse_with_argument(RBTree *, traverse_mode_t, func_apply_arg_t, void *);
-# ifdef TEST
-INITIALIZER_DECL(rbtree_test);
-# endif /* TEST */
 
 #endif /* !RBTREE_H */
