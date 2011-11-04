@@ -114,7 +114,7 @@ static int parseInt(const char *s, char **endptr, int *ret)
 
 static int parseFields(const char *s/*, void *positions*/)
 {
-    char *p, *comma;
+    const char *p, *comma;
     char *endptr;
     int lower_limit;
     int upper_limit;
