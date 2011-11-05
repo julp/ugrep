@@ -68,28 +68,6 @@ static void usage(void)
     exit(USORT_EXIT_USAGE);
 }
 
-/*static int usort_cmp(const void *k1, const void *k2)
-{
-    UString *s1, *s2;
-
-    s1 = (UString *) k1;
-    s2 = (UString *) k2;
-
-    return ucol_strcoll(ucol, s1->ptr, s1->len, s2->ptr, s2->len);
-}
-
-static int usort_cmp_r(const void *k1, const void *k2)
-{
-    UString *s1, *s2;
-
-    s1 = (UString *) k1;
-    s2 = (UString *) k2;
-
-    return ucol_strcoll(ucol, s2->ptr, s2->len, s1->ptr, s1->len);
-}
-
-static const func_cmp_t usort_cmp_func[] = { usort_cmp, usort_cmp_r };*/
-
 static void usort_print(const void *k, void *v)
 {
     int i, count;
@@ -105,6 +83,21 @@ static void usort_print(const void *k, void *v)
         u_fputs(ustr->ptr, ustdout);
     }
 }
+
+#if 0
+static void usort_toustring(UString *ustr, const void *key, void *value)
+{
+    int count;
+    UString *kstr;
+
+    count = 1;
+    if (NULL != value) {
+        count =  *(int *) value;
+    }
+    kstr = (UString *) key;
+    ustring_sprintf(ustr, ">%.*S< (%d) => %d", kstr->len, kstr->ptr, kstr->len, count);
+}
+#endif
 
 // echo -en "1\n10\n12\n100\n101\n1" | ./usort
 static int procfile(reader_t *reader, const char *filename)
@@ -125,19 +118,13 @@ static int procfile(reader_t *reader, const char *filename)
                 ustring_ltrim(ustr);
             }
             if (uFlag) {
-                rbtree_insert(tree, ustr, NULL);
+                rbtree_insert(tree, ustr, NULL, 0, NULL);
             } else {
+                int v;
                 int *p;
-                int side;
-                void *res;
-                RBTreeNode *parent;
 
-                if (0 == rbtree_lookup_node(tree, ustr, &parent, &side, &res)) {
-                    p = mem_new(*p);
-                    *p = 1;
-                    rbtree_insert_node(tree, (RBTreeNode*) res, p, parent, side);
-                } else {
-                    p = (int *) res;
+                v = 1;
+                if (!rbtree_insert(tree, ustr, (void *) &v, RBTREE_INSERT_ON_DUP_KEY_FETCH, (void **) &p)) {
                     (*p)++;
                 }
             }
@@ -187,10 +174,6 @@ int main(int argc, char **argv)
         print_error(error);
     }
 
-/*
-Insensible aux accents, sensible à la casse : attribut Collator::STRENGTH à Collator::PRIMARY et Collator::CASE_LEVEL à Collator::ON
-Insensible aux accents et à la casse : Collator::STRENGTH à Collator::PRIMARY et Collator::CASE_LEVEL à Collator::OFF
-*/
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
             case 'b':
@@ -234,8 +217,7 @@ Insensible aux accents et à la casse : Collator::STRENGTH à Collator::PRIMARY 
     env_apply();
 
 //     if (ALL == wanted) {
-        //tree = rbtree_new(usort_cmp_func[!!rFlag], (func_dtor_t) ustring_destroy, uFlag ? NULL : free);
-        tree = rbtree_collated_new(ucol, (func_dtor_t) ustring_destroy, uFlag ? NULL : free, rFlag);
+        tree = rbtree_collated_new(ucol, rFlag, NODUP, uFlag ? NODUP : SIZE_TO_DUP_T(sizeof(int)), (func_dtor_t) ustring_destroy, uFlag ? NULL : free);
 //     }
 
     if (0 == argc) {

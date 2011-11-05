@@ -16,8 +16,8 @@ struct _Hashtable {
     func_equal_t key_equal_func;
     func_dtor_t key_dtor_func;
     func_dtor_t value_dtor_func;
-    func_dup_t key_dup_func;
-    func_dup_t value_dup_func;
+    dup_t key_duper;
+    dup_t value_duper;
 };
 
 #define BUCKET_DELETED 0x80000000
@@ -121,10 +121,17 @@ static void maybe_rehash(Hashtable *this)
     }
 }
 
+Hashtable *hashtable_standalone_dup_new(
+    func_hash_t hash_func, func_equal_t key_equal_func,
+    size_t key_size, size_t value_size
+) /* WARN_UNUSED_RESULT NONNULL(1, 2) */ {
+    return hashtable_new(hash_func, key_equal_func, free, free, SIZE_TO_DUP_T(key_size), SIZE_TO_DUP_T(value_size));
+}
+
 Hashtable *hashtable_new(
     func_hash_t hash_func, func_equal_t key_equal_func,
     func_dtor_t key_dtor_func, func_dtor_t value_dtor_func,
-    func_dup_t key_dup_func, func_dup_t value_dup_func
+    dup_t key_duper, dup_t value_duper
 ) /* WARN_UNUSED_RESULT NONNULL(1, 2) */ {
     size_t i;
     Hashtable *this;
@@ -136,10 +143,10 @@ Hashtable *hashtable_new(
     this->count = 0;
     this->hash_func = hash_func;
     this->key_equal_func = key_equal_func;
+    this->key_duper = key_duper;
     this->key_dtor_func = key_dtor_func;
+    this->value_duper = value_duper;
     this->value_dtor_func = value_dtor_func;
-    this->key_dup_func = key_dup_func;
-    this->value_dup_func = value_dup_func;
     this->primeIndex = DEFAULT_PRIMES_INDEX;
     this->size = PRIMES[this->primeIndex];
     this->buckets = mem_new_n(*this->buckets, this->size);
@@ -164,13 +171,9 @@ void hashtable_destroy(Hashtable *this) /* NONNULL() */
         if (!BUCKET_EMPTY_OR_DELETED(this->buckets[i])) {
             if (NULL != this->key_dtor_func) {
                 this->key_dtor_func(this->buckets[i].key);
-            } else if (NULL != this->key_dup_func) {
-                free(this->buckets[i].key);
             }
             if (NULL != this->value_dtor_func) {
                 this->value_dtor_func(this->buckets[i].value);
-            } else if (NULL != this->value_dup_func) {
-                free(this->buckets[i].value);
             }
         }
     }
@@ -188,24 +191,14 @@ void hashtable_put(Hashtable *this, void *key, void *value) /* NONNULL(1) */
     index = get_bucket_index(this, key, h, FALSE);
     if (BUCKET_EMPTY_OR_DELETED(this->buckets[index])) {
         this->buckets[index].hash = h;
-        if (NULL == this->key_dup_func) {
-            this->buckets[index].key = key;
-        } else {
-            this->buckets[index].key = this->key_dup_func(key);
-        }
+        this->buckets[index].key = clone(this->key_duper, key);
         ++this->count;
     } else {
         if (NULL != this->value_dtor_func) {
             this->value_dtor_func(this->buckets[index].value);
-        } else if (NULL != this->value_dup_func) {
-            free(this->buckets[index].value);
         }
     }
-    if (NULL == this->value_dup_func) {
-        this->buckets[index].value = value;
-    } else {
-        this->buckets[index].value = this->value_dup_func(value);
-    }
+    this->buckets[index].value = clone(this->value_duper, value);
 }
 
 UBool hashtable_get(Hashtable *this, void *key, void **value) /* NONNULL(1, 3) */
@@ -244,13 +237,9 @@ void hashtable_remove(Hashtable *this, void *key) /* NONNULL(1) */
         if (!BUCKET_EMPTY_OR_DELETED(*b)) {
             if (NULL != this->key_dtor_func) {
                 this->key_dtor_func(b->key);
-            } else if (NULL != this->key_dup_func) {
-                free(b->key);
             }
             if (NULL != this->value_dtor_func) {
                 this->value_dtor_func(b->value);
-            } else if (NULL != this->value_dup_func) {
-                free(b->value);
             }
             b->hash = BUCKET_DELETED;
 #ifdef DEBUG
@@ -295,7 +284,7 @@ UBool hashtable_empty(Hashtable *this) /* NONNULL() */
 }
 
 #ifdef DEBUG
-void hashtable_debug(Hashtable *this, void (*toUString)(UString *, const void *, const void *)) /* NONNULL() */
+void hashtable_debug(Hashtable *this, toUString toustring) /* NONNULL() */
 {
     size_t i;
     UString *ustr;
@@ -305,7 +294,7 @@ void hashtable_debug(Hashtable *this, void (*toUString)(UString *, const void *,
         if (BUCKET_EMPTY_OR_DELETED(this->buckets[i])) {
             fprintf(stderr, "[%2d] %s\n", i, IS_BUCKET_DELETED(this->buckets[i]) ? "deleted" : "empty");
         } else {
-            toUString(ustr, this->buckets[i].key, this->buckets[i].value);
+            toustring(ustr, this->buckets[i].key, this->buckets[i].value);
             u_fprintf(ustderr, "[%2d] H = %u, %S\n", i, this->buckets[i].hash, ustr->ptr);
         }
     }

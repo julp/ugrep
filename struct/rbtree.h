@@ -4,12 +4,14 @@
 
 # include <unicode/ucol.h>
 
-typedef int (*func_cmp_t)(const void *, const void *); /* Comparaison callback (like strcmp)*/
-typedef void (*func_apply_t)(const void *, void *); /* Foreach callback (value) */
-//typedef void (*func_apply_arg_t)(const void *, void *, void *); /* Foreach callback (value, arg) */
+# define RBTREE_INSERT_ON_DUP_KEY_PRESERVE  (0)
+# define RBTREE_INSERT_ON_DUP_KEY_FETCH     (1<<0)
+# define RBTREE_INSERT_ON_DUP_KEY_OVERWRITE (1<<1) /* no sense with FETCH */
+# define RBTREE_INSERT_ON_DUP_KEY_NO_DTOR   (1<<2) /* no sense with FETCH */
 
-typedef struct _RBTree RBTree;
-typedef struct _RBTreeNode RBTreeNode;
+typedef int (*func_cmp_t)(const void *, const void *); /* Comparaison callback (like strcmp) */
+typedef void (*func_apply_t)(const void *, void *);    /* Foreach callback (value) */
+typedef void *(*func_key_compute_t)(const void *, const void *);
 
 typedef enum
 {
@@ -18,20 +20,25 @@ typedef enum
     POST_ORDER /* Postfixed */
 } traverse_mode_t;
 
+typedef struct _RBTree RBTree;
+typedef struct _RBTreeNode RBTreeNode;
+
 void rbtree_clear(RBTree *) NONNULL();
-RBTree *rbtree_collated_new(UCollator *, func_dtor_t, func_dtor_t, int) NONNULL(1) WARN_UNUSED_RESULT;
+RBTree *rbtree_collated_new(UCollator *, int, dup_t, dup_t, func_dtor_t, func_dtor_t) NONNULL(1) WARN_UNUSED_RESULT;
+# ifdef DEBUG
+void rbtree_debug(RBTree *, toUString)  NONNULL();
+# endif /* DEBUG */
 void rbtree_destroy(RBTree *) NONNULL();
 int rbtree_empty(RBTree *) NONNULL();
-int rbtree_insert(RBTree *, void *, void *) NONNULL(1);
-int rbtree_insert_node(RBTree *, RBTreeNode *, void *, RBTreeNode *, int) NONNULL(1, 2);
-int rbtree_lookup(RBTree *, void *, void **) NONNULL(1);
-int rbtree_lookup_node(RBTree *, void *, RBTreeNode **, int *, void **) NONNULL(1, 3, 4, 5);
+int rbtree_exists(RBTree *, void *) NONNULL(1);
+int rbtree_get(RBTree *, void *, void **) NONNULL(1, 3);
+int rbtree_insert(RBTree *, void *, void *, uint32_t, void **) NONNULL(1);
+RBTreeNode *rbtree_lookup(RBTree *, void *) NONNULL(1);
 int rbtree_max(RBTree *, void **, void **) NONNULL(1);
 int rbtree_min(RBTree *, void **, void **) NONNULL(1);
-RBTree *rbtree_new(func_cmp_t, func_dtor_t, func_dtor_t) NONNULL(1) WARN_UNUSED_RESULT;
+RBTree *rbtree_new(func_cmp_t, dup_t, dup_t, func_dtor_t, func_dtor_t) NONNULL(1) WARN_UNUSED_RESULT;
 int rbtree_remove(RBTree *, void *) NONNULL(1);
-int rbtree_replace(RBTree *, void *, void *, int);
+int rbtree_replace(RBTree *, void *, void *) NONNULL(1);
 void rbtree_traverse(RBTree *, traverse_mode_t, func_apply_t) NONNULL();
-// void rbtree_traverse_with_argument(RBTree *, traverse_mode_t, func_apply_arg_t, void *);
 
 #endif /* !RBTREE_H */

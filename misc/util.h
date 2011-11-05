@@ -25,8 +25,6 @@ enum {
     READER_OPT
 };
 
-UChar *local_to_uchar(const char *, int32_t *, error_t **);
-UChar32 *local_to_uchar32(const char *, int32_t *, error_t **);
 void print_error(error_t *);
 void report(int, const char *, ...);
 UBool stdin_is_tty(void);

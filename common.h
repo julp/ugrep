@@ -147,8 +147,10 @@ extern char *__progname;
 #  define YELLOW(str) str
 # endif /* DEBUG && !_MSC_VER */
 
-typedef void *(*func_ctor_t)(void);  /* Constructor callback */
-typedef void (*func_dtor_t)(void *); /* Destructor callback */
+typedef void *(*func_ctor_t)(void);        /* Constructor callback */
+typedef void (*func_dtor_t)(void *);       /* Destructor callback */
+typedef void *(*func_dup_t)(const void *); /* Dup, clone, copy callback */
+typedef func_dup_t func_cpy_t;             /* Alias */
 
 # ifndef MAX
 #  define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -172,8 +174,41 @@ typedef void (*func_dtor_t)(void *); /* Destructor callback */
 # define COPYRIGHT "\nCopyright (C) 2010-2011, julp\n"
 
 # include "alloc.h"
+
+# if SIZEOF_LONG == SIZEOF_VOIDP
+typedef unsigned long dup_t;
+# elif SIZEOF_LONG_LONG == SIZEOF_VOIDP
+typedef unsigned long long dup_t;
+# else
+#  error (sizeof(void*) == sizeof(long) || sizeof(void*) == sizeof(long long)) required to be compiled
+# endif
+
+static const dup_t NODUP = 0;
+
+#define SIZE_TO_DUP_T(size) \
+    (((size) == 0) ? NODUP : (dup_t)(((long)(size)) << 1 | 1))
+
+static inline void *clone(dup_t duper, void *value) {
+    if (NODUP == duper) {
+        return value;
+    } else if (duper & 1) {
+        void *copy;
+        unsigned long size;
+
+        size = (duper >> 1) & LONG_MAX;
+        copy = malloc(size);
+        memcpy(copy, value, size);
+        return copy;
+    } else {
+        return ((func_dup_t) duper)(value);
+    }
+}
+
 # include "error.h"
 # include "ustring.h"
+# ifdef DEBUG
+typedef void (*toUString)(UString *, const void *, const void *);
+# endif /* DEBUG */
 # include "io/reader.h"
 # include "env.h"
 # include "util.h"

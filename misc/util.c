@@ -58,67 +58,6 @@ UBool stdin_is_tty(void)
     return (isatty(STDIN_FILENO));
 }
 
-UChar *local_to_uchar(const char *cargv, int32_t *uargv_length, error_t **error)
-{
-    UChar *uargv;
-    UConverter *ucnv;
-    UErrorCode status;
-    int32_t cargv_length;
-    int32_t _uargv_length;
-    int32_t allocated;
-
-    status = U_ZERO_ERROR;
-    ucnv = ucnv_open(env_get_stdin_encoding(), &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ucnv_open");
-        return NULL;
-    }
-    cargv_length = strlen(cargv);
-    allocated = cargv_length * ucnv_getMaxCharSize(ucnv);
-    uargv = mem_new_n(*uargv, allocated + 1);
-    _uargv_length = ucnv_toUChars(ucnv, uargv, allocated, cargv, cargv_length, &status);
-    ucnv_close(ucnv);
-    if (U_FAILURE(status)) {
-        free(uargv);
-        icu_error_set(error, FATAL, status, "ucnv_toUChars");
-        return NULL;
-    }
-    uargv[_uargv_length] = 0;
-    if (NULL != uargv_length) {
-        *uargv_length = _uargv_length;
-    }
-
-    return uargv;
-}
-
-UChar32 *local_to_uchar32(const char *cargv, int32_t *u32argv_length, error_t **error)
-{
-    UChar *u16argv;
-    UChar32 *u32argv;
-    UErrorCode status;
-    int32_t u16argv_length;
-    int32_t _u32argv_length;
-
-    if (NULL == (u16argv = local_to_uchar(cargv, &u16argv_length, error))) {
-        return NULL;
-    } else {
-        status = U_ZERO_ERROR;
-        _u32argv_length = u_countChar32(u16argv, u16argv_length);
-        u32argv = mem_new_n(*u32argv, _u32argv_length + 1);
-        u_strToUTF32(u32argv, _u32argv_length, NULL, u16argv, u16argv_length, &status);
-        if (U_FAILURE(status)) {
-            free(u16argv);
-            free(u32argv);
-        }
-        //u32argv[_u32argv_length] = 0;
-        free(u16argv);
-        if (NULL != u32argv_length) {
-            *u32argv_length = _u32argv_length;
-        }
-        return u32argv;
-    }
-}
-
 void print_error(error_t *error)
 {
     if (NULL != error && error->type >= verbosity) {

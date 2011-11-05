@@ -25,6 +25,8 @@ enum {
 
 enum {
     NONE,
+    // SINGLE_CODE_POINT,
+    // SINGLE_GRAPHEME,
     CHARACTER,       // a single code point, idea would be to optimize against STRING (more than one code point)
     STRING,
     SET,
@@ -147,24 +149,24 @@ static void usage(void)
 
 /* ========== set helpers ========== */
 
+// cpattern is expected to be a class (= surrounded by square brackets)
 USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
 {
     USet *uset;
-    UChar *upattern;
+    UString *ustr;
     UErrorCode status;
-    int32_t upattern_length;
 
     status = U_ZERO_ERROR;
-    if (NULL == (upattern = local_to_uchar(cpattern, &upattern_length, error))) {
+    if (NULL == (ustr = ustring_convert_argv_from_local(cpattern, error, TRUE))) {
         return NULL;
     }
-    uset = uset_openPattern(upattern, upattern_length, &status);
+    uset = uset_openPattern(ustr->ptr, ustr->len, &status);
     if (U_FAILURE(status)) {
-        free(upattern);
+        ustring_destroy(ustr);
         icu_error_set(error, FATAL, status, "uset_openPattern");
         return NULL;
     }
-    free(upattern);
+    ustring_destroy(ustr);
     if (negate) {
         uset_complement(uset);
     }
@@ -173,15 +175,13 @@ USet *create_set_from_argv(const char *cpattern, UBool negate, error_t **error)
     return uset;
 }
 
-USet *create_set_from_string32(const UChar32 *string32, int32_t string32_length, UBool negate, error_t **UNUSED(error))
+// pattern (ustr) is not expected to be a class here (no square brackets here)
+USet *create_set_from_ustring(UString *ustr, UBool negate, error_t **UNUSED(error))
 {
     USet *uset;
-    int i;
 
     uset = uset_openEmpty();
-    for (i = 0; i < string32_length; i++) {
-        uset_add(uset, string32[i]);
-    }
+    uset_addAllCodePoints(uset, ustr->ptr, ustr->len);
     if (negate) {
         uset_complement(uset);
     }
@@ -192,14 +192,14 @@ USet *create_set_from_string32(const UChar32 *string32, int32_t string32_length,
 
 /* ========== check lengths ========== */
 
-int32_t grapheme_count(UBreakIterator *ubrk, const UChar *ustring, int32_t ustring_len)
+int32_t grapheme_count(UBreakIterator *ubrk, const UString *ustr)
 {
     int32_t i, count;
     UErrorCode status;
 
     count = 0;
     status = U_ZERO_ERROR;
-    ubrk_setText(ubrk, ustring, ustring_len, &status);
+    ubrk_setText(ubrk, ustr->ptr, ustr->len, &status);
     if (U_FAILURE(status)) {
         return -1;
     }
@@ -214,31 +214,16 @@ int32_t grapheme_count(UBreakIterator *ubrk, const UChar *ustring, int32_t ustri
 
 /* ========== hashtable stuffs (hashing, keys equality, ...) ========== */
 
-#define POINTER_TO_UCHAR32(p) ((UChar32) (p))
-#define TO_POINTER(c)         ((void *) (c))
-
 typedef struct {
     UChar *ptr;
     size_t len;
 } KVString;
 
-void *kvstring_dup(const void *v)
-{
-    KVString *s, *clone;
-
-    s = (KVString *) v;
-    clone = mem_new(*clone);
-    clone->ptr = s->ptr; // we don't need to dup it too
-    clone->len = s->len;
-
-    return clone;
-}
-
 #ifdef DEBUG
-static const UChar NULL_USTRING[] = { 0x28, 0x6E, 0x75, 0x6C, 0x6C, 0x29, 0 };
+static const UChar NULL_UCHAR[] = { 0x28, 0x6E, 0x75, 0x6C, 0x6C, 0x29, 0 };
 
 static const KVString NULL_KVString = {
-    (UChar *) &NULL_USTRING,
+    (UChar *) &NULL_UCHAR,
     6
 };
 
@@ -277,42 +262,26 @@ uint32_t single_hash(const void *k)
     return h;
 }
 
-/*
-// not needed if based on UChar * instead of UChar32
-int cp_equal(const void *a, const void *b)
-{
-    return POINTER_TO_UCHAR32(a) == POINTER_TO_UCHAR32(b);
-}
-
-uint32_t cp_hash(const void *k)
-{
-    return k;
-}*/
-
 /* ========== hashtable building (parsing command arguments) ========== */
 
-Hashtable *grapheme_hashtable_put(
-    UChar *from, int32_t from_length,
-    UChar *to, int32_t to_length, // NULL, 0 if -d
-    UBool delete, UBool UNUSED(complete)
-) {
+UBool grapheme_hashtable_put(Hashtable *ht, UString *from, UString *to, UBool delete, UBool UNUSED(complete))
+{
     KVString k;
-    Hashtable *ht;
     int32_t l1, u1;
     UErrorCode status;
     UBreakIterator *ubrk1;
 
-    ht = hashtable_new(single_hash, single_equal, NULL, NULL, kvstring_dup, delete ? NULL : kvstring_dup);
+    ht = hashtable_standalone_dup_new(single_hash, single_equal, sizeof(KVString), delete ? 0 : sizeof(KVString));
     status = U_ZERO_ERROR;
-    ubrk1 = ubrk_open(UBRK_CHARACTER, NULL, from, from_length, &status);
+    ubrk1 = ubrk_open(UBRK_CHARACTER, NULL, from->ptr, from->len, &status);
     if (U_FAILURE(status)) {
-        // error
-        return NULL;
+        // TODO: error
+        return FALSE;
     }
     if (delete) {
         if (UBRK_DONE != (l1 = ubrk_first(ubrk1))) {
             while (UBRK_DONE != (u1 = ubrk_next(ubrk1))) {
-                k.ptr = from + l1;
+                k.ptr = from->ptr + l1;
                 k.len = u1 - l1;
                 hashtable_put(ht, &k, NULL);
 
@@ -324,17 +293,17 @@ Hashtable *grapheme_hashtable_put(
         int32_t l2, u2;
         UBreakIterator *ubrk2;
 
-        ubrk2 = ubrk_open(UBRK_CHARACTER, NULL, to, to_length, &status);
+        ubrk2 = ubrk_open(UBRK_CHARACTER, NULL, to->ptr, to->len, &status);
         if (U_FAILURE(status)) {
-            // error
+            // TODO: error
             ubrk_close(ubrk1);
-            return NULL;
+            return FALSE;
         }
         if (UBRK_DONE != (l1 = ubrk_first(ubrk1)) && UBRK_DONE != (l2 = ubrk_first(ubrk2))) {
             while (UBRK_DONE != (u1 = ubrk_next(ubrk1)) && UBRK_DONE != (u2 = ubrk_next(ubrk2))) {
-                k.ptr = from + l1;
+                k.ptr = from->ptr + l1;
                 k.len = u1 - l1;
-                v.ptr = to + l2;
+                v.ptr = to->ptr + l2;
                 v.len = u2 - l2;
                 hashtable_put(ht, &k, &v);
 
@@ -343,7 +312,7 @@ Hashtable *grapheme_hashtable_put(
             }
             if (UBRK_DONE != u1) { // "hack" (for now) for set2_type == CHARACTER
                 do { // for a while instead of do/while, inverse ubrk_next calls in the while above
-                    k.ptr = from + l1;
+                    k.ptr = from->ptr + l1;
                     k.len = u1 - l1;
                     hashtable_put(ht, &k, &v);
 
@@ -355,25 +324,20 @@ Hashtable *grapheme_hashtable_put(
     }
     ubrk_close(ubrk1);
 
-    return ht;
+    return TRUE;
 }
 
-Hashtable *cp_hashtable_put(
-    UChar *from, int32_t from_length,
-    UChar *to, int32_t to_length, // NULL, 0 if -d
-    UBool delete, UBool UNUSED(complete)
-) {
+void cp_hashtable_put(Hashtable *ht, UString *from, UString *to, UBool delete, UBool UNUSED(complete))
+{
     UChar32 fc;
     KVString k;
-    Hashtable *ht;
-    int32_t fi, flast;
+    size_t fi, flast;
 
-    ht = hashtable_new(single_hash, single_equal, NULL, NULL, kvstring_dup, delete ? NULL : kvstring_dup);
     if (delete) {
         flast = fi = 0;
-        while (fi < from_length) {
-            U16_NEXT(from, fi, from_length, fc);
-            k.ptr = from + flast;
+        while (fi < from->len) {
+            U16_NEXT(from->ptr, fi, from->len, fc);
+            k.ptr = from->ptr + flast;
             k.len = fi - flast;
             hashtable_put(ht, &k, NULL);
             flast = fi;
@@ -381,27 +345,27 @@ Hashtable *cp_hashtable_put(
     } else {
         UChar32 tc;
         KVString v;
-        int32_t ti, tlast;
+        size_t ti, tlast;
 
         tlast = ti = flast = fi = 0;
-        while (fi < from_length && ti < to_length) {
-            U16_NEXT(from, fi, from_length, fc);
-            U16_NEXT(to, ti, to_length, tc);
+        while (fi < from->len && ti < to->len) {
+            U16_NEXT(from->ptr, fi, from->len, fc);
+            U16_NEXT(to->ptr, ti, to->len, tc);
 
-            k.ptr = from + flast;
+            k.ptr = from->ptr + flast;
             k.len = fi - flast;
-            v.ptr = to + tlast;
+            v.ptr = to->ptr + tlast;
             v.len = ti - tlast;
             hashtable_put(ht, &k, &v);
 
             flast = fi;
             tlast = ti;
         }
-        if (fi < from_length) { // "hack" (for now) for set2_type == CHARACTER
-            while (fi < from_length) {
-                U16_NEXT(from, fi, from_length, fc);
+        if (fi < from->len) { // "hack" (for now) for set2_type == CHARACTER
+            while (fi < from->len) {
+                U16_NEXT(from->ptr, fi, from->len, fc);
 
-                k.ptr = from + flast;
+                k.ptr = from->ptr + flast;
                 k.len = fi - flast;
                 hashtable_put(ht, &k, &v);
 
@@ -409,8 +373,6 @@ Hashtable *cp_hashtable_put(
             }
         }
     }
-
-    return ht;
 }
 
 /* ========== replacement helpers ========== */
@@ -428,7 +390,7 @@ void grapheme_process(
     status = U_ZERO_ERROR;
     ubrk_setText(ubrk, in->ptr, in->len, &status);
     if (U_FAILURE(status)) {
-        // TODO
+        // TODO: error
         return;
     }
     if (UBRK_DONE != (l = ubrk_first(ubrk))) {
@@ -493,82 +455,19 @@ void cp_process(
     }
 }
 
-#if 0
-void single_cp_tr(
-    UChar *from, int32_t from_length, // UTF-16 (binaire) ou UTF-32 (macros) based ?
-    UChar *to, int32_t to_length, // UTF-16 (binaire) ou UTF-32 (macros) based ?
-    UChar *in, int32_t in_length,
-    UBool squeeze
-) {
-    UChar32 last = U_SENTINEL; // un UBool suffit dans ce cas particulier ?
-
-    //
-}
-
-void single_cp_delete(
-    UChar *from, int32_t from_length, // UTF-16 (binaire) ou UTF-32 (macros) based ?
-    UChar *in, int32_t in_length,
-) {
-    //
-}
-#endif
-
-void trtr(
-    UChar32 *from, int32_t from_length,
-    UChar32 *to, int32_t to_length,
-    UString *in, UString *out
-) {
-    size_t i;
-    int32_t f;
-    UChar32 ci;
-    UBool isError;
-
-    isError = FALSE; // unused
-    for (i = 0; i < in->len; ) {
-        U16_NEXT(in->ptr, i, in->len, ci);
-        for (f = 0; f < from_length; f++) {
-            if (from[f] == ci) {
-                if (NULL == to || 0 == *to || 0 == to_length) { // dFlag on
-                    goto endinnerloop;
-                } else if (1 == to_length) { // dFlag off, to_length == 1 (to is a single code point)
-                    ustring_append_char32(out, to[0]);
-                    goto endinnerloop;
-                } else { // dFlag off, to_length == from_length
-                    ustring_append_char32(out, to[f]);
-                    goto endinnerloop;
-                }
-            }
-        }
-        ustring_append_char32(out, ci);
-
-endinnerloop:
-        ;
-    }
-}
-
-void cptr(
-    UChar32 from, UChar32 to,
-    UString *in, UString *out,
-    UBool negate
-) {
-    size_t i;
-    UChar32 ci;
-    UBool isError;
-
-    isError = FALSE; // unused
-    for (i = 0; i < in->len; ) {
-        U16_NEXT(in->ptr, i, in->len, ci);
-        if (((from == ci) ^ negate)) {
-            if (-1 != to) {
-                ustring_append_char32(out, to);
-            }
-            continue;
-        }
-        ustring_append_char32(out, ci);
-    }
-}
-
 /* ========== main ========== */
+
+#define CP_TO_KVString(c, kvs) \
+    do { \
+        (kvs).len = U16_LENGTH(c); \
+        (kvs).ptr = mem_new_n(*(kvs).ptr, (kvs).len); \
+        if (((uint32_t) (c)) <= 0xffff) { \
+            ((kvs).ptr)[0] = (UChar) (c); \
+        } else { \
+            ((kvs).ptr)[0] = (UChar) (((c) >> 10) + 0xd7c0); \
+            ((kvs).ptr)[1] = (UChar) (((c) & 0x3ff) | 0xdc00); \
+        } \
+    } while (0);
 
 int main(int argc, char **argv)
 {
@@ -579,15 +478,12 @@ int main(int argc, char **argv)
     Hashtable *ht;
     error_t *error;
     reader_t reader;
-    UChar *from, *to;
     UErrorCode status;
-    UString *in, *out;
     UBool set2_expected;
     UBreakIterator *ubrk;
-    UChar32 *from32, *to32;
     filter_func_t filter_func;
     int set1_type, set2_type;
-    int32_t from_length, to_length;
+    UString *in, *out, *set1, *set2;
     UBool dFlag, cFlag, isError, sFlag;
     UCaseType set1_case_type, set2_case_type;
 
@@ -595,12 +491,10 @@ int main(int argc, char **argv)
     ubrk = NULL;
     uset = NULL;
     error = NULL;
-    in = out = NULL;
-    from = to = NULL;
     filter_func = NULL;
-    from32 = to32 = NULL;
     status = U_ZERO_ERROR;
     set1_type = set2_type = NONE;
+    set2 = set1 = in = out = NULL;
     exit_failure_value = UTR_EXIT_FAILURE;
     set1_case_type = set2_case_type = UCASE_NONE;
     match = isError = set2_expected = cFlag = dFlag = sFlag = FALSE;
@@ -695,15 +589,13 @@ int main(int argc, char **argv)
                     return UTR_EXIT_USAGE;
                 }
             } else {
-                // TODO
-                if (NULL == (to32 = local_to_uchar32(argv[1], &to_length, &error))) {
+                if (NULL == (set2 = ustring_convert_argv_from_local(argv[1], &error, TRUE))) {
                     print_error(error);
-                    return UTR_EXIT_FAILURE;
                 }
-                if (1 == to_length) {
-                    set2_type = CHARACTER;
-                } else {
+                if (u_strHasMoreChar32Than(set2->ptr, set2->len, 1)) {
                     set2_type = STRING;
+                } else {
+                    set2_type = CHARACTER;
                 }
             }
         }
@@ -744,22 +636,24 @@ int main(int argc, char **argv)
             print_error(error);
         }
     } else {
-        // TODO
-        if (NULL == (from32 = local_to_uchar32(argv[0], &from_length, &error))) {
+        if (NULL == (set1 = ustring_convert_argv_from_local(argv[0], &error, TRUE))) {
             print_error(error);
         }
-        if (1 == from_length) {
-            set1_type = CHARACTER;
-        } else {
+        if (u_strHasMoreChar32Than(set1->ptr, set1->len, 1)) {
             if (cFlag) { // readjust
-                // TODO?
-                if (NULL == (uset = create_set_from_string32(from32, from_length, cFlag, &error))) {
+                if (NULL == (uset = create_set_from_ustring(set1, cFlag, &error))) {
                     print_error(error);
                 }
                 set1_type = SET;
             } else {
                 set1_type = STRING;
             }
+        } else {
+            set1_type = CHARACTER;
+        }
+        if ((CHARACTER == set1_type || STRING == set1_type) && UNORM_NONE != env_get_normalization()) {
+            ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+            assert(U_SUCCESS(status));
         }
     }
 
@@ -772,8 +666,11 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Complement option cannot be applied when the both sets are defined as strings\n");
                 return UTR_EXIT_FAILURE;
             }
-            if (from_length != to_length) {
+            if (UNORM_NONE == env_get_normalization() && u_countChar32(set2->ptr, set2->len) != u_countChar32(set1->ptr, set1->len)) {
                 fprintf(stderr, "Number of code points differs between sets\n");
+                return UTR_EXIT_FAILURE;
+            } else if (UNORM_NONE != env_get_normalization() && grapheme_count(ubrk, set2) != grapheme_count(ubrk, set1)) {
+                fprintf(stderr, "Number of graphemes differs between sets\n");
                 return UTR_EXIT_FAILURE;
             }
         }
@@ -783,23 +680,43 @@ int main(int argc, char **argv)
     out = ustring_new();
 
     if (STRING == set1_type) {
-        from = local_to_uchar(argv[0], &from_length, &error);
-        if (dFlag) {
-            to = NULL;
-            to_length = 0;
-        } else {
-            to = local_to_uchar(argv[1], &to_length, &error);
-        }
-        if (UNORM_NONE == env_get_normalization()) {
-            ht = cp_hashtable_put(from, from_length, to, to_length, dFlag, FALSE);
-        } else {
-            ht = grapheme_hashtable_put(from, from_length, to, to_length, dFlag, FALSE);
-            ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
-            assert(U_SUCCESS(status));
-        }
-        //hashtable_debug(ht, kvstring_debug);
-    }
+        ht = hashtable_standalone_dup_new(single_hash, single_equal, sizeof(KVString), dFlag ? 0 : sizeof(KVString));
+        if (SIMPLE_FUNCTION == set2_type) {
+            UChar32 c;
+            KVString k, v;
+            size_t i, last;
 
+            last = i = 0;
+            while (i < set1->len) {
+                U16_NEXT(set1->ptr, i, set1->len, c);
+                k.ptr = set1->ptr + last;
+                k.len = i - last;
+                c = simple_case_mapping[set2_case_type](c);
+                CP_TO_KVString(c, v);
+                hashtable_put(ht, &k, &v);
+                last = i;
+            }
+        } else if (UNORM_NONE == env_get_normalization()) {
+            cp_hashtable_put(ht, set1, set2, dFlag, FALSE);
+        } else {
+            grapheme_hashtable_put(ht, set1, set2, dFlag, FALSE);
+        }
+    }
+#ifdef DEBUG
+    {
+        const char *typemap[] = {
+            "none",
+            "single code point",
+            "string",
+            "set",
+            "filter function",
+            "simple translation function",
+            "global translation function"
+        };
+
+        debug("mode = %s, set1 = %s, set2 = %s", UNORM_NONE == env_get_normalization() ? "CP/as is" : "graphemes", typemap[set1_type], typemap[set2_type]);
+    }
+#endif /* DEBUG */
     while (!reader_eof(&reader)) {
         if (!reader_readline(&reader, &error, in)) {
             print_error(error);
@@ -821,7 +738,7 @@ int main(int argc, char **argv)
                     if (dFlag) {
                         continue;
                     } else if (CHARACTER == set2_type) {
-                        i32 = *to32;
+                        U16_GET_UNSAFE(set2->ptr, 0, i32); // TODO: compute it once, *before* loop
                     } else if (SIMPLE_FUNCTION == set2_type) {
                         i32 = simple_case_mapping[set2_case_type](i32);
                     }
@@ -829,30 +746,14 @@ int main(int argc, char **argv)
                 ustring_append_char32(out, i32);
             }
         } else if (CHARACTER == set1_type && CHARACTER == set2_type) {
-            cptr(*from32, dFlag ? -1 : *to32, in, out, cFlag);
+            // TODO: ?
         } else if (SIMPLE_FUNCTION == set2_type) {
-            if (CHARACTER == set1_type) {
-                // TODO: ???
-                to32 = mem_new(*to32); // we don't use \0 in fact
-                to32[0] = from32[0];
-                to_length = 1;
-            } else if (STRING == set1_type) {
-                int i;
-
-                // TODO: ???
-                to32 = mem_new_n(*to32, from_length); // we don't use \0 in fact, so forget "+ 1"
-                to_length = from_length;
-                for (i = 0; i < from_length; i++) {
-                    to32[i] = simple_case_mapping[set2_case_type](from32[i]);
-                }
-            }
-            trtr(from32, from_length, to32, to_length, in, out);
+            cp_process(ht, in, out, sFlag, FALSE);
         } else if (GLOBAL_FUNCTION == set1_type /*&& set2_type == NONE*/) {
             if (!ustring_fullcase(out, in->ptr, in->len, set1_case_type, &error)) {
                 print_error(error);
             }
         } else {
-//             trtr(from32, from_length, to32, to_length, in, out);
             if (UNORM_NONE == env_get_normalization()) {
                 cp_process(ht, in, out, sFlag, dFlag);
             } else {
@@ -864,26 +765,20 @@ int main(int argc, char **argv)
     }
     reader_close(&reader);
 
-    if (NULL != from) {
-        free(from);
-    }
-    if (NULL != to) {
-        free(to);
-    }
-    if (NULL != from32) {
-        free(from32);
-    }
-    if (NULL != to32) {
-        free(to32);
+    if (NULL != ubrk) {
+        ubrk_close(ubrk);
     }
     if (NULL != uset) {
         uset_close(uset);
     }
-    if (NULL != ubrk) {
-        ubrk_close(ubrk);
-    }
     if (NULL != ht) {
         hashtable_destroy(ht);
+    }
+    if (NULL != set1) {
+        ustring_destroy(set1);
+    }
+    if (NULL != set2) {
+        ustring_destroy(set2);
     }
     if (NULL != in) {
         ustring_destroy(in);
