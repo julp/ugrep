@@ -84,7 +84,7 @@ UString *ustring_dup_string_len(const UChar *from, size_t length) /* NONNULL() *
     ustr = mem_new(*ustr);
     ustr->len = length;
     ustr->allocated = nearest_power(ustr->len);
-    ustr->ptr = mem_new_n(UChar, ustr->allocated + 1);
+    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
     u_memcpy(ustr->ptr, from, ustr->len);
     ustr->ptr[ustr->len] = 0;
 
