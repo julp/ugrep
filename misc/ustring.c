@@ -131,8 +131,6 @@ UBool ustring_endswith(UString *ustr, UChar *str, size_t length) /* NONNULL() */
 
 /* ==================== handle argv ==================== */
 
-#define STRINGL(x) (sizeof(x) - 1)
-
 #define ustring_delete_range_p(/*UString **/ ustr, /*UChar **/ from, /*UChar **/ to) \
     ustring_delete_len(ustr, from - ustr->ptr, to - from)
 
@@ -141,13 +139,13 @@ UBool ustring_endswith(UString *ustr, UChar *str, size_t length) /* NONNULL() */
 
 static int hexadecimal_digit(UChar c)
 {
-    if (c >= 0x30 && c <= 0x39) {
+    if (c >= 0x30 && c <= 0x39) { // '0' .. '9'
         return (c - 0x30);
     }
-    if (c >= 0x41 && c <= 0x46) {
+    if (c >= 0x41 && c <= 0x46) { // 'A' .. 'F'
         return (c - (0x41 - 10));
     }
-    if (c >= 0x61 && c <= 0x66) {
+    if (c >= 0x61 && c <= 0x66) { // 'a' .. 'f'
         return (c - (0x61 - 10));
     }
 
@@ -183,14 +181,14 @@ void ustring_unescape(UString *ustr) /* NONNULL() */
                     break;
                 default:
                     digits = 0;
-                    p += STRINGL("\\X"); // p[0] is \ ; p[1] have been read
+                    p += STR_LEN("\\X"); // p[0] is \ ; p[1] have been read
             }
             if (digits > 0) {
                 int n;
                 UChar *s;
                 UChar32 result;
 
-                s = p + STRINGL("\\X");
+                s = p + STR_LEN("\\X");
                 n = 0;
                 result = 0;
                 while (s < end && n < digits) {
@@ -216,7 +214,7 @@ void ustring_unescape(UString *ustr) /* NONNULL() */
                             goto failed;
                         } else {
                             diff = ustring_subreplace_len_p(ustr, p, s, (UChar *) &result, 1);
-                            assert(diff == -5); // -(STRINGL("\\uXXXX") - 1 UChar)
+                            assert(diff == -5); // -(STR_LEN("\\uXXXX") - 1 UChar)
                             p += diff;
                             end += diff;
                         }
@@ -224,10 +222,10 @@ void ustring_unescape(UString *ustr) /* NONNULL() */
                         trail_expected = TRUE;
                         lead = result;
                         lead_offset = p;
-                        //p += STRINGL("\\uXXXX");
+                        //p += STR_LEN("\\uXXXX");
                         p = s;
                     } else if (U16_IS_SURROGATE_TRAIL(result)) {
-                        if (trail_expected && ((2 * STRINGL("\\uXXXX")) == (s - lead_offset))) {
+                        if (trail_expected && ((2 * STR_LEN("\\uXXXX")) == (s - lead_offset))) {
                             UChar trail = result;
                             trail_expected = FALSE;
                             result = U16_GET_SUPPLEMENTARY(lead, result);
@@ -237,7 +235,7 @@ void ustring_unescape(UString *ustr) /* NONNULL() */
                             } else {
                                 UChar tmp[] = { lead, trail };
                                 diff = ustring_subreplace_len_p(ustr, lead_offset, s, tmp, 2);
-                                assert(diff == -10); // -(STRINGL("\\uXXXX\\uXXXX") - 2 UChar)
+                                assert(diff == -10); // -(STR_LEN("\\uXXXX\\uXXXX") - 2 UChar)
                                 p += diff;
                                 end += diff;
                             }
@@ -255,7 +253,7 @@ void ustring_unescape(UString *ustr) /* NONNULL() */
                         len = 0;
                         U16_APPEND_UNSAFE(tmp, len, result);
                         diff = ustring_subreplace_len_p(ustr, p, s, tmp, len);
-                        assert(diff == -((int) (STRINGL("\\Uxxxxxxxx") - U16_LENGTH(result))));
+                        assert(diff == -((int) (STR_LEN("\\Uxxxxxxxx") - U16_LENGTH(result))));
                         p += diff;
                         end += diff;
                     }
@@ -270,7 +268,7 @@ failed:
         }
     }
     if (trail_expected) {
-        ustring_delete_len(ustr, lead_offset - ustr->ptr, STRINGL("\\uXXXX")); // we already have assumed that sequence length is correct
+        ustring_delete_len(ustr, lead_offset - ustr->ptr, STR_LEN("\\uXXXX")); // we already have assumed that sequence length is correct
     }
 }
 
