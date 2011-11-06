@@ -12,6 +12,16 @@
 #include "common.h"
 #include "engine.h"
 
+#ifdef OLD_INTERVAL
+typedef slist_t intervals_list_t;
+# define intervals_clean(x) slist_clean(x)
+# define intervals_destroy(x) slist_destroy(x)
+#else
+typedef slist_pool_t intervals_list_t;
+# define intervals_clean(x) slist_pool_clean(x)
+# define intervals_destroy(x) slist_pool_destroy(x)
+#endif /* OLD_INTERVAL */
+
 enum {
     UCUT_EXIT_SUCCESS = 0,
     UCUT_EXIT_FAILURE,
@@ -36,6 +46,7 @@ const UChar DEFAULT_DELIM[] = { 0x09, 0 };
 
 UString *ustr = NULL;
 UString *delim = NULL;
+intervals_list_t *intervals = NULL;
 
 DPtrArray *pieces = NULL;
 pattern_data_t *pattern = NULL;
@@ -88,6 +99,20 @@ static int /*pieces_length*/ split_on_length(void/*?*/ *positions, void/*?*/ *pi
 }
 #endif
 
+static int32_t split_at_indices(UBreakIterator *ubrk, DPtrArray *pieces, intervals_list_t *intervals)
+{
+    int32_t count;
+
+    count = 0;
+    if (NULL == ubrk) {
+        //
+    } else {
+        //
+    }
+
+    return count;
+}
+
 /* ========== main ========== */
 
 #ifndef HAVE_STRCHRNUL
@@ -101,7 +126,27 @@ static char *strchrnul(const char *s, int c)
 }
 #endif /* HAVE_STRCHRNUL */
 
-static int parseInt(const char *s, char **endptr, int *ret)
+// Int (in parseIntError) for interval not integer
+static const char *parseIntError(int code)
+{
+    switch (code) {
+        case FIELD_NO_ERR:
+            return "no error";
+        case FIELD_ERR_NUMBER_EXPECTED:
+            return "number expected";
+        case FIELD_ERR_OUT_OF_RANGE:
+            return "number is out of the range [0;INT_MAX[";
+        case FIELD_ERR_NON_DIGIT_FOUND:
+            return "non digit character found";
+        case FIELD_ERR_INVALID_RANGE:
+            return "invalid range: upper limit should be greater or equal than lower limit";
+        default:
+            return "bogus error code";
+    }
+}
+
+// Int (in parseInt) for interval not integer
+static int parseInt(const char *s, char **endptr, /*int min, int max,*/ int *ret)
 {
     long val;
 
@@ -118,7 +163,13 @@ static int parseInt(const char *s, char **endptr, int *ret)
     return FIELD_NO_ERR;
 }
 
-static int parseFields(const char *s/*, void *positions*/)
+/**
+ * The elements in list can be repeated, can overlap, and can be specified in any order,
+ * but the bytes, characters, or fields selected shall be written in the order of the
+ * input data. If an element appears in the selection list more than once, it shall be
+ * written exactly once.
+ **/
+static int parseFields(const char *s, intervals_list_t *intervals) // TODO: add an error_t ** to arguments
 {
     const char *p, *comma;
     char *endptr;
@@ -163,7 +214,7 @@ static int parseFields(const char *s/*, void *positions*/)
                 return 0;
             }
         }
-        debug("Interval is [%d;%d]", lower_limit, upper_limit);
+        interval_add(intervals, INT_MAX, lower_limit, upper_limit);
         if ('\0' == *comma) {
             break;
         }
@@ -216,6 +267,9 @@ static void exit_cb(void)
     if (NULL != pattern) {
         fixed_engine.destroy(pattern);
     }
+    if (NULL != intervals) {
+        intervals_destroy(intervals);
+    }
 }
 
 int main(int argc, char **argv)
@@ -232,6 +286,7 @@ int main(int argc, char **argv)
 
     ret = 0;
     error = NULL;
+    intervals = intervals_new();
     env_init();
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = UCUT_EXIT_FAILURE;
@@ -239,14 +294,20 @@ int main(int argc, char **argv)
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
             case 'b':
-                debug("parseFields = %d", parseFields(optarg));
+                if (!parseFields(optarg, intervals)) {
+                    // TODO: error
+                }
                 break;
             case 'c':
                 cFlag = TRUE;
-                debug("parseFields = %d", parseFields(optarg));
+                if (!parseFields(optarg, intervals)) {
+                    // TODO: error
+                }
                 break;
             case 'd':
             {
+                // TODO: ustring_convert_argv_from_local should be called *after* parsing arguments (any --form= option should be considered *before*)
+
                 /*UString *ustrarg;
 
                 if (NULL == (ustrarg = ustring_convert_argv_from_local(optarg, &error, TRUE))) {
@@ -265,7 +326,9 @@ int main(int argc, char **argv)
             }
             case 'f':
                 fFlag = TRUE;
-                debug("parseFields = %d", parseFields(optarg));
+                if (!parseFields(optarg, intervals)) {
+                    // TODO: error
+                }
                 break;
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
@@ -285,6 +348,17 @@ int main(int argc, char **argv)
     }
     if (!cFlag && !fFlag) {
         usage();
+    }
+#endif
+#ifdef DEBUG
+    {
+        slist_element_t *el;
+
+        for (el = intervals->head; NULL != el; el = el->next) {
+            FETCH_DATA(el->data, i, interval_t);
+
+            debug("[%d;%d]", i->lower_limit, i->upper_limit);
+        }
     }
 #endif
 
