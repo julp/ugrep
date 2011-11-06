@@ -202,5 +202,6 @@ engine_t re_engine = {
     engine_re_match,
     engine_re_match_all,
     engine_re_whole_line_match,
+    NULL,
     engine_re_destroy
 };

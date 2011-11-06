@@ -137,6 +137,13 @@ extern char *__progname;
 # define U_LS 0x2028 /* Line Separator */
 # define U_PS 0x2029 /* Paragraph Separator */
 
+# ifdef _MSC_VER
+static const UChar EOL[] = {U_CR, U_LF, 0};
+# else
+static const UChar EOL[] = {U_LF, 0};
+# endif /* _MSC_VER */
+static const size_t EOL_LEN = ARRAY_SIZE(EOL) - 1;
+
 # if defined(DEBUG) && !defined(_MSC_VER)
 #  define RED(str)    "\33[1;31m" str "\33[0m"
 #  define GREEN(str)  "\33[1;32m" str "\33[0m"

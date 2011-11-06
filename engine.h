@@ -5,6 +5,7 @@
 # include "common.h"
 # include "struct/slist.h"
 # include "struct/intervals.h"
+# include "struct/dptrarray.h"
 
 # define OPT_CASE_INSENSITIVE 0x00010000
 # define OPT_WORD_BOUND       0x00020000
@@ -24,7 +25,22 @@ typedef enum {
 } engine_return_t;
 
 typedef struct {
-    void *(*compile)(error_t **, UString *, uint32_t);
+    UChar *ptr;
+    size_t len;
+} match_t;
+
+static inline void add_match(DPtrArray *array, const UString *subject, int32_t l, int32_t u)
+{
+    match_t *m;
+
+    m = mem_new(*m);
+    m->ptr = subject->ptr + l;
+    m->len = u - l;
+    dptrarray_push(array, m);
+}
+
+typedef struct {
+    void *(*compile)(error_t **, UString *, uint32_t); /* /!\ The UString will be owned by the engine: it can be freed at any time depending on the internal behavior of the engine /!\ */
     engine_return_t (*match)(error_t **, void *, const UString *);
 #ifdef OLD_INTERVAL
     engine_return_t (*match_all)(error_t **, void *, const UString *, slist_t *);
@@ -32,6 +48,7 @@ typedef struct {
     engine_return_t (*match_all)(error_t **, void *, const UString *, slist_pool_t *);
 #endif /* OLD_INTERVAL */
     engine_return_t (*whole_line_match)(error_t **, void *, const UString *);
+    int32_t (*split)(error_t **, void *, const UString *, DPtrArray *);
     void (*destroy)(void *);
 } engine_t;
 

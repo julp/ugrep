@@ -10,7 +10,7 @@
 #include <errno.h>
 
 #include "common.h"
-
+#include "engine.h"
 
 enum {
     UCUT_EXIT_SUCCESS = 0,
@@ -32,8 +32,21 @@ enum {
 UBool cFlag = FALSE;
 UBool fFlag = FALSE;
 
-UChar32 delim = 0x09; // UChar delim[U16_MAX_LENGTH] = { 0 };
+const UChar DEFAULT_DELIM[] = { 0x09, 0 };
+
 UString *ustr = NULL;
+UString *delim = NULL;
+
+DPtrArray *pieces = NULL;
+pattern_data_t *pattern = NULL;
+
+extern engine_t fixed_engine;
+extern engine_t re_engine;
+
+engine_t *engines[] = {
+    &fixed_engine,
+    &re_engine
+};
 
 /* ========== getopt stuff ========== */
 
@@ -67,13 +80,6 @@ static void usage(void)
 /* ========== cutter ========== */
 
 #if 0
-static int /*pieces_length*/ engine_fixed_split(void *data, void/*?*/ *positions, void/*?*/ *pieces)
-{
-    // ustring_sync_copy with a ratio of 2 ?
-    // dynamic array of UChar * ?
-    // list (slist_t) ?
-}
-
 static int /*pieces_length*/ split_on_length(void/*?*/ *positions, void/*?*/ *pieces)
 {
     // ustring_sync_copy with a ratio of 2 ?
@@ -102,14 +108,14 @@ static int parseInt(const char *s, char **endptr, int *ret)
     errno = 0;
     val = strtol(s, endptr, 10);
     if (0 != errno || *endptr == s) {
-        return 0;
+        return FIELD_ERR_NUMBER_EXPECTED;
     }
     if (val <= 0/* || val < INT_MIN*/ || val > INT_MAX) {
-        return 0;
+        return FIELD_ERR_OUT_OF_RANGE;
     }
     *ret = (int) val;
 
-    return 1;
+    return FIELD_NO_ERR;
 }
 
 static int parseFields(const char *s/*, void *positions*/)
@@ -126,26 +132,26 @@ static int parseFields(const char *s/*, void *positions*/)
         comma = strchrnul(p, ',');
         if ('-' == *p) {
             /* -Y */
-            if (!parseInt(p + 1, &endptr, &upper_limit) || ('\0' != *endptr && ',' != *endptr)) {
+            if (parseInt(p + 1, &endptr, &upper_limit) || ('\0' != *endptr && ',' != *endptr)) {
                 return 0;
             }
         } else {
             if (NULL == memchr(p, '-', comma - p)) {
                 /* X */
-                if (!parseInt(p, &endptr, &lower_limit) || ('\0' != *endptr && ',' != *endptr)) {
+                if (parseInt(p, &endptr, &lower_limit) || ('\0' != *endptr && ',' != *endptr)) {
                     return 0;
                 }
                 upper_limit = lower_limit;
             } else {
                 /* X- or X-Y */
-                if (!parseInt(p, &endptr, &lower_limit)) {
+                if (parseInt(p, &endptr, &lower_limit)) {
                     return 0;
                 }
                 if ('-' == *endptr) {
                     if ('\0' == *(endptr + 1)) {
                         // NOP (lower_limit = 0)
                     } else {
-                        if (!parseInt(endptr + 1, &endptr, &upper_limit) || ('\0' != *endptr && ',' != *endptr)) {
+                        if (parseInt(endptr + 1, &endptr, &upper_limit) || ('\0' != *endptr && ',' != *endptr)) {
                             return 0;
                         }
                     }
@@ -169,16 +175,26 @@ static int parseFields(const char *s/*, void *positions*/)
 
 static int procfile(reader_t *reader, const char *filename)
 {
+    int32_t i, count;
     error_t *error;
 
     error = NULL;
+    dptrarray_clear(pieces);
     if (reader_open(reader, &error, filename)) {
         while (!reader_eof(reader)) {
             if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
             }
             ustring_chomp(ustr);
-            // TODO
+            count = fixed_engine.split(&error, pattern, ustr, pieces);
+            for (i = 0; i < count; i++) {
+                match_t *m;
+
+                m = dptrarray_at(pieces, i);
+                //u_file_write(m->ptr, m->len, ustdout);
+                u_fprintf(ustdout, "%d: %.*S (%d)\n", i + 1, m->len, m->ptr, m->len);
+            }
+            u_file_write(EOL, EOL_LEN, ustdout);
         }
         reader_close(reader);
     } else {
@@ -193,6 +209,12 @@ static void exit_cb(void)
 {
     if (NULL != ustr) {
         ustring_destroy(ustr);
+    }
+    if (NULL != pieces) {
+        dptrarray_destroy(pieces);
+    }
+    if (NULL != pattern) {
+        fixed_engine.destroy(pattern);
     }
 }
 
@@ -225,7 +247,7 @@ int main(int argc, char **argv)
                 break;
             case 'd':
             {
-                UString *ustrarg;
+                /*UString *ustrarg;
 
                 if (NULL == (ustrarg = ustring_convert_argv_from_local(optarg, &error, TRUE))) {
                     print_error(error);
@@ -235,7 +257,10 @@ int main(int argc, char **argv)
                     return UCUT_EXIT_FAILURE;
                 }
                 U16_GET_UNSAFE(ustrarg->ptr, 0, delim);
-                ustring_destroy(ustrarg);
+                ustring_destroy(ustrarg);*/
+                if (NULL == (delim = ustring_convert_argv_from_local(optarg, &error, TRUE))) {
+                    print_error(error);
+                }
                 break;
             }
             case 'f':
@@ -254,14 +279,23 @@ int main(int argc, char **argv)
 
     env_apply();
 
+#if 0
     if (cFlag && fFlag) {
         usage();
     }
     if (!cFlag && !fFlag) {
         usage();
     }
+#endif
 
+    if (NULL == delim) {
+        delim = ustring_dup_string_len(DEFAULT_DELIM, STR_LEN(DEFAULT_DELIM));
+    }
+    if (NULL == (pattern = fixed_engine.compile(&error, delim, 0))) {
+        print_error(error);
+    }
     ustr = ustring_new();
+    pieces = dptrarray_new(free);
 
     if (0 == argc) {
         ret |= procfile(&reader, "-");

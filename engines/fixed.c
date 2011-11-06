@@ -284,6 +284,61 @@ static engine_return_t engine_fixed_whole_line_match(error_t **error, void *data
     }
 }
 
+static int32_t engine_fixed_split(error_t **error, void *data, const UString *subject, DPtrArray *array)
+{
+    UErrorCode status;
+    int32_t l, u, pieces;
+    FETCH_DATA(data, p, fixed_pattern_t);
+
+    l = u = pieces = 0;
+    status = U_ZERO_ERROR;
+    if (NULL != p->usearch) {
+        usearch_setText(p->usearch, subject->ptr, subject->len, &status);
+        if (U_FAILURE(status)) {
+            icu_error_set(error, FATAL, status, "usearch_setText");
+            return ENGINE_FAILURE;
+        }
+        for (l = usearch_first(p->usearch, &status); U_SUCCESS(status) && USEARCH_DONE != l; l = usearch_next(p->usearch, &status)) {
+            ++pieces;
+            add_match(array, subject, l, u);
+            u = l + usearch_getMatchedLength(p->usearch);
+        }
+        if (U_FAILURE(status)) {
+            icu_error_set(error, FATAL, status, "usearch_[first|next]");
+            return ENGINE_FAILURE;
+        }
+        usearch_setText(p->usearch, USEARCH_FAKE_USTR, &status);
+        assert(U_SUCCESS(status));
+    } else {
+        UChar *m;
+
+        ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+        if (U_FAILURE(status)) {
+            icu_error_set(error, FATAL, status, "ubrk_setText");
+            return ENGINE_FAILURE;
+        }
+        while (NULL != (m = u_strFindFirst(subject->ptr + u, subject->len - u, p->pattern->ptr, p->pattern->len))) {
+            u = m - subject->ptr;
+            if (ubrk_isBoundary(p->ubrk, u) && ubrk_isBoundary(p->ubrk, u + p->pattern->len)) {
+                ++pieces;
+                add_match(array, subject, l, u);
+            }
+            l = u = u + p->pattern->len;
+        }
+        ubrk_setText(p->ubrk, NULL, 0, &status);
+        assert(U_SUCCESS(status));
+    }
+    if (!pieces) {
+        add_match(array, subject, 0, subject->len);
+        ++pieces;
+    } else if ((size_t) u < subject->len) {
+        add_match(array, subject, u, subject->len);
+        ++pieces;
+    }
+
+    return pieces;
+}
+
 static void engine_fixed_destroy(void *data)
 {
     FETCH_DATA(data, p, fixed_pattern_t);
@@ -296,5 +351,6 @@ engine_t fixed_engine = {
     engine_fixed_match,
     engine_fixed_match_all,
     engine_fixed_whole_line_match,
+    engine_fixed_split,
     engine_fixed_destroy
 };

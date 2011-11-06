@@ -22,13 +22,6 @@
 #define SEP_MATCH_UCHAR    0x003a
 #define SEP_NO_MATCH_UCHAR 0x002d
 
-#ifdef _MSC_VER
-const UChar EOL[] = {U_CR, U_LF, 0};
-#else
-const UChar EOL[] = {U_LF, 0};
-#endif /* _MSC_VER */
-const size_t EOL_LEN = ARRAY_SIZE(EOL) - 1;
-
 
 enum {
     UGREP_EXIT_MATCH    = 0,
