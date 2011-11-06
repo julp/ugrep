@@ -203,8 +203,10 @@ int32_t grapheme_count(UBreakIterator *ubrk, const UString *ustr)
     if (U_FAILURE(status)) {
         return -1;
     }
-    for (i = ubrk_first(ubrk); UBRK_DONE != i; i = ubrk_next(ubrk)) {
-        ++count;
+    if (UBRK_DONE != (i = ubrk_first(ubrk))) {
+        while (UBRK_DONE != (i = ubrk_next(ubrk))) {
+            ++count;
+        }
     }
     ubrk_setText(ubrk, NULL, 0, &status);
     assert(U_SUCCESS(status));
@@ -377,6 +379,7 @@ void cp_hashtable_put(Hashtable *ht, UString *from, UString *to, UBool delete, U
 
 /* ========== replacement helpers ========== */
 
+// TODO: merge grapheme_process and cp_process? It would avoid checking in main function
 void grapheme_process(
     Hashtable *ht,
     UBreakIterator *ubrk,
@@ -452,6 +455,67 @@ void cp_process(
             }
         }
         l = u;
+    }
+}
+
+void single_process(
+    UBreakIterator *ubrk, // ubrk = NULL if not in grapheme mode
+    UString *from, UString *to, // to = NULL if in delete mode
+    UString *in, UString *out,
+    UBool squeeze, UBool delete
+) {
+    debug("UBRK %s", NULL == ubrk ? "none (cp)" : "based (grapheme)");
+    if (NULL != ubrk) {
+        int32_t l, u;
+        UErrorCode status;
+
+        status = U_ZERO_ERROR;
+        ubrk_setText(ubrk, in->ptr, in->len, &status);
+        if (U_FAILURE(status)) {
+            // TODO: error
+            return;
+        }
+        if (UBRK_DONE != (l = ubrk_first(ubrk))) {
+            while (UBRK_DONE != (u = ubrk_next(ubrk))) {
+                if (0 == u_strCompare(in->ptr + l, u - l, from->ptr, from->len, FALSE)) {
+                    if (delete) {
+                        /* NOP */
+                    } else {
+                        if (!squeeze || !ustring_endswith(out, to->ptr, to->len)) {
+                            ustring_append_string_len(out, to->ptr, to->len);
+                        }
+                    }
+                } else {
+                    if (!squeeze || !ustring_endswith(out, in->ptr + l, u - l)) {
+                        ustring_append_string_len(out, in->ptr + l, u - l);
+                    }
+                }
+                l = u;
+            }
+        }
+        ubrk_setText(ubrk, NULL, 0, &status);
+        assert(U_SUCCESS(status));
+    } else {
+        size_t l, u;
+
+        l = u = 0;
+        while (u < in->len) {
+            U16_FWD_1(in->ptr, u, in->len);
+            if (0 == u_strCompare(in->ptr + l, u - l, from->ptr, from->len, FALSE)) {
+                if (delete) {
+                    /* NOP */
+                } else {
+                    if (!squeeze || !ustring_endswith(out, to->ptr, to->len)) {
+                        ustring_append_string_len(out, to->ptr, to->len);
+                    }
+                }
+            } else {
+                if (!squeeze || !ustring_endswith(out, in->ptr + l, u - l)) {
+                    ustring_append_string_len(out, in->ptr + l, u - l);
+                }
+            }
+            l = u;
+        }
     }
 }
 
@@ -592,11 +656,15 @@ int main(int argc, char **argv)
                 if (NULL == (set2 = ustring_convert_argv_from_local(argv[1], &error, TRUE))) {
                     print_error(error);
                 }
+#if 1
                 if (u_strHasMoreChar32Than(set2->ptr, set2->len, 1)) {
                     set2_type = STRING;
                 } else {
                     set2_type = CHARACTER;
                 }
+#else
+                set2_type = STRING;
+#endif
             }
         }
     }
@@ -639,7 +707,11 @@ int main(int argc, char **argv)
         if (NULL == (set1 = ustring_convert_argv_from_local(argv[0], &error, TRUE))) {
             print_error(error);
         }
-        if (u_strHasMoreChar32Than(set1->ptr, set1->len, 1)) {
+        if (!cFlag && UNORM_NONE != env_get_normalization()) {
+            ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+            assert(U_SUCCESS(status));
+        }
+        if ((UNORM_NONE == env_get_normalization() && u_strHasMoreChar32Than(set1->ptr, set1->len, 1)) || (UNORM_NONE != env_get_normalization() && grapheme_count(ubrk, set1) > 1)) {
             if (cFlag) { // readjust
                 if (NULL == (uset = create_set_from_ustring(set1, cFlag, &error))) {
                     print_error(error);
@@ -650,10 +722,6 @@ int main(int argc, char **argv)
             }
         } else {
             set1_type = CHARACTER;
-        }
-        if ((CHARACTER == set1_type || STRING == set1_type) && UNORM_NONE != env_get_normalization()) {
-            ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
-            assert(U_SUCCESS(status));
         }
     }
 
@@ -745,8 +813,8 @@ int main(int argc, char **argv)
                 }
                 ustring_append_char32(out, i32);
             }
-        } else if (CHARACTER == set1_type && CHARACTER == set2_type) {
-            // TODO: ?
+        } else if (CHARACTER == set1_type/* && CHARACTER == set2_type*/) {
+            single_process(ubrk, set1, set2, in, out, sFlag, dFlag);
         } else if (SIMPLE_FUNCTION == set2_type) {
             cp_process(ht, in, out, sFlag, FALSE);
         } else if (GLOBAL_FUNCTION == set1_type /*&& set2_type == NONE*/) {
