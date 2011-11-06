@@ -813,11 +813,11 @@ int main(int argc, char **argv)
                 }
                 ustring_append_char32(out, i32);
             }
-        } else if (CHARACTER == set1_type/* && CHARACTER == set2_type*/) {
-            single_process(ubrk, set1, set2, in, out, sFlag, dFlag);
         } else if (SIMPLE_FUNCTION == set2_type) {
             cp_process(ht, in, out, sFlag, FALSE);
-        } else if (GLOBAL_FUNCTION == set1_type /*&& set2_type == NONE*/) {
+        } else if (CHARACTER == set1_type/* && CHARACTER == set2_type*/) {
+            single_process(ubrk, set1, set2, in, out, sFlag, dFlag);
+        } else if (GLOBAL_FUNCTION == set1_type/* && set2_type == NONE*/) {
             if (!ustring_fullcase(out, in->ptr, in->len, set1_case_type, &error)) {
                 print_error(error);
             }
