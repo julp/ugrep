@@ -23,6 +23,13 @@ static void interval_append(slist_t *intervals, int32_t lower_limit, int32_t upp
 
     slist_append(intervals, interval_new(lower_limit, upper_limit));
 }
+
+static void interval_prepend(slist_t *intervals, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
+{
+    require_else_return(NULL != intervals);
+
+    slist_prepend(intervals, interval_new(lower_limit, upper_limit));
+}
 #else
 static slist_element_t *slist_pool_element_new(slist_pool_t *, const void *) WARN_UNUSED_RESULT NONNULL();
 static void slist_pool_garbage_element(slist_pool_t *, slist_element_t *, slist_element_t *) NONNULL();
@@ -138,6 +145,22 @@ void slist_pool_append(slist_pool_t *l, const void *src) /* NONNULL() */
     }
 }
 
+void slist_pool_prepend(slist_pool_t *l, const void *src) /* NONNULL() */
+{
+    slist_element_t *el;
+
+    require_else_return(NULL != l);
+    require_else_return(NULL != src);
+
+    el = slist_pool_element_new(l, src);
+    if (NULL == l->tail) {
+        l->head = l->tail = el;
+    } else {
+        el->next = l->head;
+        l->head = el;
+    }
+}
+
 static void slist_pool_garbage_element(slist_pool_t *l, slist_element_t *target, slist_element_t *previous) /* NONNULL() */
 {
     require_else_return(NULL != l);
@@ -159,16 +182,19 @@ static void slist_pool_garbage_element(slist_pool_t *l, slist_element_t *target,
 #define IN(value, interval) \
     (((value) >= (interval)->lower_limit) && ((value) <= (interval)->upper_limit))
 
+/* Intervals are half-open: [lower_limit;upper_limit[ */
 #ifdef OLD_INTERVAL
 UBool interval_add(slist_t *intervals, int32_t max_upper_limit, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
 #else
 UBool interval_add(slist_pool_t *intervals, int32_t max_upper_limit, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
 #endif /* OLD_INTERVAL */
 {
+    int overlap;
     slist_element_t *prev, *from, *to;
 
     require_else_return_false(NULL != intervals);
 
+    overlap = 0;
     if (lower_limit == 0 && upper_limit == max_upper_limit) {
         return TRUE;
     }
@@ -188,9 +214,11 @@ UBool interval_add(slist_pool_t *intervals, int32_t max_upper_limit, int32_t low
             FETCH_DATA(from->data, i, interval_t);
 
             if (IN(lower_limit, i) || IN(upper_limit, i)) {
+                overlap = 1;
                 break;
             }
             if (lower_limit < i->lower_limit) {
+                overlap = 0;
                 break;
             }
             prev = from;
@@ -254,10 +282,20 @@ UBool interval_add(slist_pool_t *intervals, int32_t max_upper_limit, int32_t low
                 }
             } else {
                 FETCH_DATA(from->data, i, interval_t);
-                i->lower_limit = MIN(i->lower_limit, lower_limit);
-                i->upper_limit = MAX(i->upper_limit, upper_limit);
-                if (i->lower_limit == 0 && i->upper_limit == max_upper_limit) {
-                    return TRUE;
+
+                if (!overlap/*!IN(lower_limit, i) && !IN(upper_limit, i)*/) {
+#ifdef OLD_INTERVAL
+                    interval_prepend(intervals, lower_limit, upper_limit);
+#else
+                    interval_t new = {lower_limit, upper_limit};
+                    slist_pool_prepend(intervals, &new);
+#endif /* OLD_INTERVAL */
+                } else {
+                    i->lower_limit = MIN(i->lower_limit, lower_limit);
+                    i->upper_limit = MAX(i->upper_limit, upper_limit);
+                    if (i->lower_limit == 0 && i->upper_limit == max_upper_limit) {
+                        return TRUE;
+                    }
                 }
             }
         }

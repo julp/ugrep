@@ -27,6 +27,23 @@ UBool slist_empty(slist_t *l) /* NONNULL() */
     return (NULL == l->head);
 }
 
+void slist_prepend(slist_t *l, void *data) /* NONNULL(1) */
+{
+    slist_element_t *n;
+
+    require_else_return(NULL != l);
+
+    n = mem_new(*n);
+    n->next = NULL;
+    n->data = data;
+    if (NULL == l->tail) {
+        l->head = l->tail = n;
+    } else {
+        n->next = l->head;
+        l->head = n;
+    }
+}
+
 void slist_append(slist_t *l, void *data) /* NONNULL(1) */
 {
     slist_element_t *n;

@@ -20,5 +20,6 @@ void slist_destroy(slist_t *) NONNULL();
 UBool slist_empty(slist_t *) NONNULL();
 size_t slist_length(slist_t *) NONNULL();
 slist_t *slist_new(func_dtor_t) WARN_UNUSED_RESULT;
+void slist_prepend(slist_t *, void *) NONNULL(1);
 
 #endif /* !SLIST_H */

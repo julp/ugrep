@@ -115,19 +115,7 @@ static int32_t split_at_indices(UBreakIterator *ubrk, DPtrArray *pieces, interva
 
 /* ========== main ========== */
 
-#ifndef HAVE_STRCHRNUL
-static char *strchrnul(const char *s, int c)
-{
-    while (('\0' != *s) && (*s != c)) {
-        s++;
-    }
-
-    return (char *) s;
-}
-#endif /* HAVE_STRCHRNUL */
-
-// Int (in parseIntError) for interval not integer
-static const char *parseIntError(int code)
+static const char *intervalParsingErrorName(int code)
 {
     switch (code) {
         case FIELD_NO_ERR:
@@ -145,20 +133,69 @@ static const char *parseIntError(int code)
     }
 }
 
-// Int (in parseInt) for interval not integer
-static int parseInt(const char *s, char **endptr, /*int min, int max,*/ int *ret)
+#ifndef HAVE_STRCHRNUL
+static char *strchrnul(const char *s, int c)
 {
-    long val;
-
-    errno = 0;
-    val = strtol(s, endptr, 10);
-    if (0 != errno || *endptr == s) {
-        return FIELD_ERR_NUMBER_EXPECTED;
+    while (('\0' != *s) && (*s != c)) {
+        s++;
     }
-    if (val <= 0/* || val < INT_MIN*/ || val > INT_MAX) {
+
+    return (char *) s;
+}
+#endif /* HAVE_STRCHRNUL */
+
+static int parseIntervalBoundary(const char *nptr, char **endptr, int32_t min, int32_t max, int32_t *ret)
+{
+    char c;
+    const char *s;
+    UBool negative;
+    int any, cutlim;
+    uint32_t cutoff, acc;
+
+    s = nptr;
+    acc = any = 0;
+    if ('-' == (c = *s++)) {
+        negative = TRUE;
+        c = *s++;
+    } else {
+        negative = FALSE;
+        if ('+' == *s) {
+            c = *s++;
+        }
+    }
+    cutoff = negative ? (uint32_t) - (INT32_MIN + INT32_MAX) + INT32_MAX : INT32_MAX;
+    cutlim = cutoff % 10;
+    cutoff /= 10;
+    do {
+        if (c >= '0' && c <= '9') {
+            c -= '0';
+        } else {
+            break;
+        }
+        if (any < 0 || acc > cutoff || (acc == cutoff && c > cutlim)) {
+            any = -1;
+        } else {
+            any = 1;
+            acc *= 10;
+            acc += c;
+        }
+    } while ('\0' != (c = *s++));
+    if (NULL != endptr) {
+        *endptr = (char *) (any ? s - 1 : nptr);
+    }
+    if (any < 0) {
+        *ret = negative ? INT32_MIN : INT32_MAX;
+        return FIELD_ERR_OUT_OF_RANGE;
+    } else if (!any) {
+        return FIELD_ERR_NUMBER_EXPECTED;
+    } else if (negative) {
+        *ret = -acc;
+    } else {
+        *ret = acc;
+    }
+    if (*ret < min || *ret > max) {
         return FIELD_ERR_OUT_OF_RANGE;
     }
-    *ret = (int) val;
 
     return FIELD_NO_ERR;
 }
@@ -169,12 +206,12 @@ static int parseInt(const char *s, char **endptr, /*int min, int max,*/ int *ret
  * input data. If an element appears in the selection list more than once, it shall be
  * written exactly once.
  **/
-static int parseFields(const char *s, intervals_list_t *intervals) // TODO: add an error_t ** to arguments
+static UBool parseIntervals(error_t **error, const char *s, intervals_list_t *intervals) // TODO: add an error_t ** to arguments
 {
-    const char *p, *comma;
+    int ret;
     char *endptr;
-    int lower_limit;
-    int upper_limit;
+    const char *p, *comma;
+    int32_t lower_limit, upper_limit;
 
     p = s;
     while ('\0' != *p) {
@@ -183,51 +220,59 @@ static int parseFields(const char *s, intervals_list_t *intervals) // TODO: add 
         comma = strchrnul(p, ',');
         if ('-' == *p) {
             /* -Y */
-            if (parseInt(p + 1, &endptr, &upper_limit) || ('\0' != *endptr && ',' != *endptr)) {
-                return 0;
+            if (0 != (ret = parseIntervalBoundary(p + 1, &endptr, 0, INT32_MAX, &upper_limit)) || ('\0' != *endptr && ',' != *endptr)) {
+                error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
+                return FALSE;
             }
         } else {
             if (NULL == memchr(p, '-', comma - p)) {
                 /* X */
-                if (parseInt(p, &endptr, &lower_limit) || ('\0' != *endptr && ',' != *endptr)) {
-                    return 0;
+                if (0 != (ret = parseIntervalBoundary(p, &endptr, 0, INT32_MAX, &lower_limit)) || ('\0' != *endptr && ',' != *endptr)) {
+                    error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
+                    return FALSE;
                 }
                 upper_limit = lower_limit;
             } else {
                 /* X- or X-Y */
-                if (parseInt(p, &endptr, &lower_limit)) {
-                    return 0;
+                if (0 != (ret = parseIntervalBoundary(p, &endptr, 0, INT32_MAX, &lower_limit))) {
+                    error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
+                    return FALSE;
                 }
                 if ('-' == *endptr) {
                     if ('\0' == *(endptr + 1)) {
                         // NOP (lower_limit = 0)
                     } else {
-                        if (parseInt(endptr + 1, &endptr, &upper_limit) || ('\0' != *endptr && ',' != *endptr)) {
-                            return 0;
+                        if (0 != (ret = parseIntervalBoundary(endptr + 1, &endptr, 0, INT32_MAX, &upper_limit)) || ('\0' != *endptr && ',' != *endptr)) {
+                            error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
+                            return FALSE;
                         }
                     }
                 } else {
-                    return 0;
+                    error_set(error, FATAL, "'-' expected, get '%c' (%d):\n%*c", *endptr, *endptr, endptr - s + 1, '^');
+                    return FALSE;
                 }
             }
-            if (lower_limit >/*=*/ upper_limit) {
-                return 0;
+            if (lower_limit > upper_limit) {
+                error_set(error, FATAL, "invalid interval: lower limit greater then upper one");
+                return FALSE;
             }
         }
-        interval_add(intervals, INT_MAX, lower_limit, upper_limit);
+        debug("add [%d;%d[", lower_limit - 1, upper_limit);
+        interval_add(intervals, INT32_MAX, lower_limit - 1, upper_limit); // - 1 because first index is 0 not 1
         if ('\0' == *comma) {
             break;
         }
         p = comma + 1;
     }
 
-    return 1;
+    return TRUE;
 }
 
 static int procfile(reader_t *reader, const char *filename)
 {
-    int32_t i, count;
+    int32_t j, count;
     error_t *error;
+    slist_element_t *el;
 
     error = NULL;
     dptrarray_clear(pieces);
@@ -238,12 +283,17 @@ static int procfile(reader_t *reader, const char *filename)
             }
             ustring_chomp(ustr);
             count = fixed_engine.split(&error, pattern, ustr, pieces);
-            for (i = 0; i < count; i++) {
-                match_t *m;
+            for (el = intervals->head; NULL != el; el = el->next) {
+                FETCH_DATA(el->data, i, interval_t);
 
-                m = dptrarray_at(pieces, i);
-                //u_file_write(m->ptr, m->len, ustdout);
-                u_fprintf(ustdout, "%d: %.*S (%d)\n", i + 1, m->len, m->ptr, m->len);
+                for (j = i->lower_limit; j < MIN(count, i->upper_limit); j++) {
+                    match_t *m;
+
+                    m = dptrarray_at(pieces, j);
+                    u_file_write(m->ptr, m->len, ustdout);
+                    u_file_write(delim->ptr, delim->len, ustdout);
+                    //u_fprintf(ustdout, "%d: %.*S (%d)\n", j + 1, m->len, m->ptr, m->len);
+                }
             }
             u_file_write(EOL, EOL_LEN, ustdout);
         }
@@ -278,6 +328,7 @@ int main(int argc, char **argv)
     int ret;
     error_t *error;
     reader_t reader;
+    const char *intervals_arg, *delim_arg;
 
     if (0 != atexit(exit_cb)) {
         fputs("can't register atexit() callback", stderr);
@@ -287,6 +338,7 @@ int main(int argc, char **argv)
     ret = 0;
     error = NULL;
     intervals = intervals_new();
+    intervals_arg = delim_arg = NULL;
     env_init();
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = UCUT_EXIT_FAILURE;
@@ -294,41 +346,20 @@ int main(int argc, char **argv)
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
             case 'b':
-                if (!parseFields(optarg, intervals)) {
-                    // TODO: error
-                }
+                intervals_arg = optarg;
                 break;
             case 'c':
                 cFlag = TRUE;
-                if (!parseFields(optarg, intervals)) {
-                    // TODO: error
-                }
+                intervals_arg = optarg;
                 break;
             case 'd':
             {
-                // TODO: ustring_convert_argv_from_local should be called *after* parsing arguments (any --form= option should be considered *before*)
-
-                /*UString *ustrarg;
-
-                if (NULL == (ustrarg = ustring_convert_argv_from_local(optarg, &error, TRUE))) {
-                    print_error(error);
-                }
-                if (u_strHasMoreChar32Than(ustrarg->ptr, ustrarg->len, 1)) {
-                    fprintf(stderr, "Delimiter is not a single character\n");
-                    return UCUT_EXIT_FAILURE;
-                }
-                U16_GET_UNSAFE(ustrarg->ptr, 0, delim);
-                ustring_destroy(ustrarg);*/
-                if (NULL == (delim = ustring_convert_argv_from_local(optarg, &error, TRUE))) {
-                    print_error(error);
-                }
+                delim_arg = optarg;
                 break;
             }
             case 'f':
                 fFlag = TRUE;
-                if (!parseFields(optarg, intervals)) {
-                    // TODO: error
-                }
+                intervals_arg = optarg;
                 break;
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
@@ -350,6 +381,9 @@ int main(int argc, char **argv)
         usage();
     }
 #endif
+    if (!parseIntervals(&error, intervals_arg, intervals)) {
+        print_error(error);
+    }
 #ifdef DEBUG
     {
         slist_element_t *el;
@@ -357,13 +391,16 @@ int main(int argc, char **argv)
         for (el = intervals->head; NULL != el; el = el->next) {
             FETCH_DATA(el->data, i, interval_t);
 
-            debug("[%d;%d]", i->lower_limit, i->upper_limit);
+            debug("[%d;%d[", i->lower_limit, i->upper_limit);
         }
     }
 #endif
-
-    if (NULL == delim) {
+    if (NULL == delim_arg) {
         delim = ustring_dup_string_len(DEFAULT_DELIM, STR_LEN(DEFAULT_DELIM));
+    } else {
+        if (NULL == (delim = ustring_convert_argv_from_local(delim_arg, &error, TRUE))) {
+            print_error(error);
+        }
     }
     if (NULL == (pattern = fixed_engine.compile(&error, delim, 0))) {
         print_error(error);
