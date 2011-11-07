@@ -656,15 +656,11 @@ int main(int argc, char **argv)
                 if (NULL == (set2 = ustring_convert_argv_from_local(argv[1], &error, TRUE))) {
                     print_error(error);
                 }
-#if 1
                 if (u_strHasMoreChar32Than(set2->ptr, set2->len, 1)) {
                     set2_type = STRING;
                 } else {
                     set2_type = CHARACTER;
                 }
-#else
-                set2_type = STRING;
-#endif
             }
         }
     }
@@ -774,7 +770,7 @@ int main(int argc, char **argv)
     {
         const char *typemap[] = {
             "none",
-            "single code point",
+            "single code point or grapheme",
             "string",
             "set",
             "filter function",
