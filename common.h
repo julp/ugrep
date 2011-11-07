@@ -129,10 +129,19 @@ extern char *__progname;
 # define STR_SIZE(str)     (ARRAY_SIZE(str))
 
 # define U_BS 0x0008 /* Backspace */
+# define U_HT 0x0009 /* Horizontal Tabulation - \t */
 # define U_CR 0x000D /* Carriage Return - \r */
 # define U_LF 0x000A /* Line Feed - \n */
 # define U_VT 0x000B /* Vertical Tabulation */
 # define U_FF 0x000C /* Form Feed */
+# define U_0  0x0030 /* 0 */
+# define U_9  0x0039 /* 9 */
+# define U_A  0x0041 /* A */
+# define U_F  0x0046 /* F */
+# define U_U  0x0055 /* U */
+# define U_a  0x0061 /* a */
+# define U_f  0x0066 /* f */
+# define U_u  0x0075 /* u */
 # define U_NL 0x0085 /* Next Line */
 # define U_LS 0x2028 /* Line Separator */
 # define U_PS 0x2029 /* Paragraph Separator */

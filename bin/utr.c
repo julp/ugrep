@@ -826,6 +826,7 @@ int main(int argc, char **argv)
         }
 
         u_file_write(out->ptr, out->len, ustdout);
+        u_file_write(EOL, EOL_LEN, ustdout);
     }
     reader_close(&reader);
 

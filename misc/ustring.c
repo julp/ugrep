@@ -139,14 +139,14 @@ UBool ustring_endswith(UString *ustr, UChar *str, size_t length) /* NONNULL() */
 
 static int hexadecimal_digit(UChar c)
 {
-    if (c >= 0x30 && c <= 0x39) { // '0' .. '9'
-        return (c - 0x30);
+    if (c >= U_0 && c <= U_9) { // '0' .. '9'
+        return (c - U_0);
     }
-    if (c >= 0x41 && c <= 0x46) { // 'A' .. 'F'
-        return (c - (0x41 - 10));
+    if (c >= U_A && c <= U_F) { // 'A' .. 'F'
+        return (c - (U_A - 10));
     }
-    if (c >= 0x61 && c <= 0x66) { // 'a' .. 'f'
-        return (c - (0x61 - 10));
+    if (c >= U_a && c <= U_f) { // 'a' .. 'f'
+        return (c - (U_a - 10));
     }
 
     return -1;
@@ -173,12 +173,33 @@ void ustring_unescape(UString *ustr) /* NONNULL() */
                 break;
             }
             switch (p[1]) {
-                case 'u':
+                case U_u: // u
                     digits = 4;
                     break;
-                case 'U':
+                case U_U: // U
                     digits = 8;
                     break;
+#if 0
+                //case 0x61: // a, BEL, 0x07
+                case 0x62: // b
+                case 0x65: // e
+                case 0x66: // f
+                case 0x6E: // n
+                case 0x72: // r
+                case 0x74: // t
+                case 0x76: // v
+                    if (TRUE) {
+                        static const UChar map[] = {
+                            0, U_BS, 0, 0, 0x1B, U_FF, 0, 0, 0, 0, 0, 0, 0, U_LF, 0, 0, 0, U_CR, 0, U_HT, 0, U_VT, 0, 0, 0, 0
+                        };
+
+                        digits = 0;
+//                         if (0 != map[p[1] - U_a]) {
+                            ustring_subreplace_len_p(ustr, p, p + 1, &map[p[1] - U_a], 1);
+//                         }
+                        break;
+                    }
+#endif
                 default:
                     digits = 0;
                     p += STR_LEN("\\X"); // p[0] is \ ; p[1] have been read
@@ -630,6 +651,37 @@ UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct,
 
 /* ==================== misc/others ==================== */
 
+#if 0
+enum {
+    LT, // <
+    LE, // <=
+    EQ, // ==
+    NE, // !=
+    GE, // >=
+    GT  // >
+};
+
+UBool ustring_char32_len_cmp(const UString *ustr, int operator, int32_t length)
+{
+    switch (operator) {
+        case LT:
+            --length;
+        case LE:
+            return !u_strHasMoreChar32Than(ustr->ptr, ustr->len, length);
+        case EQ:
+            return u_countChar32(ustr->ptr, ustr->len) == length;
+        case NE:
+            return u_countChar32(ustr->ptr, ustr->len) != length;
+        case GE:
+            ++length;
+        case GT:
+            return u_strHasMoreChar32Than(ustr->ptr, ustr->len, length);
+    }
+
+    return FALSE;
+}
+#endif
+
 void ustring_sync(const UString *ref, UString *buffer, double ratio) /* NONNULL() */
 {
     require_else_return(NULL != ref);
@@ -671,8 +723,8 @@ void ustring_dump(UString *ustr) /* NONNULL() */
     for (i = 0; i < ustr->len; ) {
         U16_NEXT(ustr->ptr, i, ustr->len, c);
         switch (c) {
-            case 0x09:
-            case 0x0D:
+            case U_HT:
+            case U_CR:
                 len++;
                 break;
             default:
@@ -689,11 +741,11 @@ void ustring_dump(UString *ustr) /* NONNULL() */
         while (i > 0) {
             U16_PREV(ustr->ptr, 0, i, c);
             switch (c) {
-                case 0x09:
+                case U_HT:
                     *--p = 0x74;
                     *--p = 0x5C;
                     break;
-                case 0x0D:
+                case U_CR:
                     *--p = 0x72;
                     *--p = 0x5C;
                     break;
