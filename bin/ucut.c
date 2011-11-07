@@ -123,7 +123,7 @@ static const char *intervalParsingErrorName(int code)
         case FIELD_ERR_NUMBER_EXPECTED:
             return "number expected";
         case FIELD_ERR_OUT_OF_RANGE:
-            return "number is out of the range [0;INT_MAX[";
+            return "number is out of the range [1;INT32_MAX[";
         case FIELD_ERR_NON_DIGIT_FOUND:
             return "non digit character found";
         case FIELD_ERR_INVALID_RANGE:
@@ -215,26 +215,26 @@ static UBool parseIntervals(error_t **error, const char *s, intervals_list_t *in
 
     p = s;
     while ('\0' != *p) {
-        lower_limit = 0;
-        upper_limit = INT_MAX;
+        lower_limit = 1;
+        upper_limit = INT32_MAX;
         comma = strchrnul(p, ',');
         if ('-' == *p) {
             /* -Y */
-            if (0 != (ret = parseIntervalBoundary(p + 1, &endptr, 0, INT32_MAX, &upper_limit)) || ('\0' != *endptr && ',' != *endptr)) {
+            if (0 != (ret = parseIntervalBoundary(p + 1, &endptr, 1, INT32_MAX, &upper_limit)) || ('\0' != *endptr && ',' != *endptr)) {
                 error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
                 return FALSE;
             }
         } else {
             if (NULL == memchr(p, '-', comma - p)) {
                 /* X */
-                if (0 != (ret = parseIntervalBoundary(p, &endptr, 0, INT32_MAX, &lower_limit)) || ('\0' != *endptr && ',' != *endptr)) {
+                if (0 != (ret = parseIntervalBoundary(p, &endptr, 1, INT32_MAX, &lower_limit)) || ('\0' != *endptr && ',' != *endptr)) {
                     error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
                     return FALSE;
                 }
                 upper_limit = lower_limit;
             } else {
                 /* X- or X-Y */
-                if (0 != (ret = parseIntervalBoundary(p, &endptr, 0, INT32_MAX, &lower_limit))) {
+                if (0 != (ret = parseIntervalBoundary(p, &endptr, 1, INT32_MAX, &lower_limit))) {
                     error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
                     return FALSE;
                 }
@@ -242,7 +242,7 @@ static UBool parseIntervals(error_t **error, const char *s, intervals_list_t *in
                     if ('\0' == *(endptr + 1)) {
                         // NOP (lower_limit = 0)
                     } else {
-                        if (0 != (ret = parseIntervalBoundary(endptr + 1, &endptr, 0, INT32_MAX, &upper_limit)) || ('\0' != *endptr && ',' != *endptr)) {
+                        if (0 != (ret = parseIntervalBoundary(endptr + 1, &endptr, 1, INT32_MAX, &upper_limit)) || ('\0' != *endptr && ',' != *endptr)) {
                             error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
                             return FALSE;
                         }
