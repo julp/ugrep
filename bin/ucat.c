@@ -48,10 +48,10 @@ static char optstr[] = "AEHTVbehnqstuv";
 static struct option long_options[] =
 {
     GETOPT_COMMON_OPTIONS,
-    {"binary-files",        required_argument, NULL, BINARY_OPT}, // grep
-    {"show-all",            no_argument,       NULL, 'A'},
-    {"show-ends",           no_argument,       NULL, 'E'},
-    {"with-filename",       no_argument,       NULL, 'H'}, // grep
+    {"binary-files",     required_argument, NULL, BINARY_OPT}, // grep
+    {"show-all",         no_argument,       NULL, 'A'},
+    {"show-ends",        no_argument,       NULL, 'E'},
+    {"with-filename",    no_argument,       NULL, 'H'}, // grep
 #ifndef WITHOUT_FTS
     {"recursive",        no_argument,       NULL, 'R'}, // grep
 #endif /* !WITHOUT_FTS */
