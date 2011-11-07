@@ -190,6 +190,56 @@ static engine_return_t engine_re_whole_line_match(error_t **error, void *data, c
     return (ret ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
 }
 
+static int32_t engine_re_split(error_t **error, void *data, const UString *subject, DPtrArray *array)
+{
+    UErrorCode status;
+    int32_t last, l, u, pieces;
+    FETCH_DATA(data, p, re_pattern_t);
+
+    last = l = u = pieces = 0;
+    status = U_ZERO_ERROR;
+    uregex_setText(p->uregex, subject->ptr, subject->len, &status);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "uregex_setText");
+        return ENGINE_FAILURE;
+    }
+    ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "ubrk_setText");
+        return ENGINE_FAILURE;
+    }
+    while (uregex_findNext(p->uregex, &status)) {
+        l = uregex_start(p->uregex, 0, &status);
+        if (U_FAILURE(status)) {
+            icu_error_set(error, FATAL, status, "uregex_start");
+            return ENGINE_FAILURE;
+        }
+        u = uregex_end(p->uregex, 0, &status);
+        if (U_FAILURE(status)) {
+            icu_error_set(error, FATAL, status, "uregex_end");
+            return ENGINE_FAILURE;
+        }
+        if (ubrk_isBoundary(p->ubrk, l) && ubrk_isBoundary(p->ubrk, u)) {
+            add_match(array, subject, last, l);
+            ++pieces;
+        }
+        last = u;
+    }
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "uregex_findNext");
+        return ENGINE_FAILURE;
+    }
+    if (!pieces) {
+        // NOP
+    } else if ((size_t) last < subject->len) {
+        add_match(array, subject, last, subject->len);
+        ++pieces;
+    }
+    re_pattern_reset(p);
+
+    return pieces;
+}
+
 static void engine_re_destroy(void *data)
 {
     FETCH_DATA(data, p, re_pattern_t);
@@ -202,6 +252,6 @@ engine_t re_engine = {
     engine_re_match,
     engine_re_match_all,
     engine_re_whole_line_match,
-    NULL,
+    engine_re_split,
     engine_re_destroy
 };

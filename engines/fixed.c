@@ -329,8 +329,8 @@ static int32_t engine_fixed_split(error_t **error, void *data, const UString *su
         assert(U_SUCCESS(status));
     }
     if (!pieces) {
-        add_match(array, subject, 0, subject->len);
-        ++pieces;
+//         add_match(array, subject, 0, subject->len);
+//         ++pieces;
     } else if ((size_t) u < subject->len) {
         add_match(array, subject, u, subject->len);
         ++pieces;

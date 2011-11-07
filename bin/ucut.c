@@ -16,10 +16,12 @@
 typedef slist_t intervals_list_t;
 # define intervals_clean(x) slist_clean(x)
 # define intervals_destroy(x) slist_destroy(x)
+# define intervals_empty(x) slist_empty(x)
 #else
 typedef slist_pool_t intervals_list_t;
 # define intervals_clean(x) slist_pool_clean(x)
 # define intervals_destroy(x) slist_pool_destroy(x)
+# define intervals_empty(x) slist_pool_empty(x)
 #endif /* OLD_INTERVAL */
 
 enum {
@@ -31,7 +33,7 @@ enum {
 enum {
     FIELD_NO_ERR = 0,
     FIELD_ERR_NUMBER_EXPECTED, // s == *endptr
-    FIELD_ERR_OUT_OF_RANGE,    // number <= 0 or number > INT_MAX
+    FIELD_ERR_OUT_OF_RANGE,    // number not in [min;max] ([1;INT_MAX] here)
     FIELD_ERR_NON_DIGIT_FOUND, // *endptr not in ('\0', ',')
     FIELD_ERR_INVALID_RANGE,   // lower_limit > upper_limit
     FIELD_ERR__COUNT
@@ -39,8 +41,12 @@ enum {
 
 /* ========== global variables ========== */
 
+extern engine_t fixed_engine;
+extern engine_t re_engine;
+
 UBool cFlag = FALSE;
 UBool fFlag = FALSE;
+UBool sFlag = FALSE;
 
 const UChar DEFAULT_DELIM[] = { 0x09, 0 };
 
@@ -49,15 +55,7 @@ UString *delim = NULL;
 intervals_list_t *intervals = NULL;
 
 DPtrArray *pieces = NULL;
-pattern_data_t *pattern = NULL;
-
-extern engine_t fixed_engine;
-extern engine_t re_engine;
-
-engine_t *engines[] = {
-    &fixed_engine,
-    &re_engine
-};
+pattern_data_t pdata = { NULL, &fixed_engine };
 
 /* ========== getopt stuff ========== */
 
@@ -65,16 +63,19 @@ enum {
     BINARY_OPT = GETOPT_SPECIFIC
 };
 
-static char optstr[] = "d:f:";
+static char optstr[] = "EFb:c:d:f:vs";
 
 static struct option long_options[] =
 {
     GETOPT_COMMON_OPTIONS,
-    {"bytes",           required_argument, NULL, 'b'}, // no sense? ignore?
+    {"extended-regexp", no_argument,       NULL, 'E'}, // grep
+    {"fixed-string",    no_argument,       NULL, 'F'}, // grep
+    {"bytes",           required_argument, NULL, 'b'},
     {"characters",      required_argument, NULL, 'c'},
     {"delimiter",       required_argument, NULL, 'd'},
     {"fields",          required_argument, NULL, 'f'},
     {"version",         no_argument,       NULL, 'v'},
+    {"only-delimited",  no_argument,       NULL, 's'},
     {NULL,              no_argument,       NULL, 0}
 };
 
@@ -206,7 +207,7 @@ static int parseIntervalBoundary(const char *nptr, char **endptr, int32_t min, i
  * input data. If an element appears in the selection list more than once, it shall be
  * written exactly once.
  **/
-static UBool parseIntervals(error_t **error, const char *s, intervals_list_t *intervals) // TODO: add an error_t ** to arguments
+static UBool parseIntervals(error_t **error, const char *s, intervals_list_t *intervals)
 {
     int ret;
     char *endptr;
@@ -282,20 +283,27 @@ static int procfile(reader_t *reader, const char *filename)
                 print_error(error);
             }
             ustring_chomp(ustr);
-            count = fixed_engine.split(&error, pattern, ustr, pieces);
-            for (el = intervals->head; NULL != el; el = el->next) {
-                FETCH_DATA(el->data, i, interval_t);
+            count = pdata.engine->split(&error, pdata.pattern, ustr, pieces);
+            if (count < 0) {
+                print_error(error);
+            } else if (count > 0) {
+                for (el = intervals->head; NULL != el; el = el->next) {
+                    FETCH_DATA(el->data, i, interval_t);
 
-                for (j = i->lower_limit; j < MIN(count, i->upper_limit); j++) {
-                    match_t *m;
+                    for (j = i->lower_limit; j < MIN(count, i->upper_limit); j++) {
+                        match_t *m;
 
-                    m = dptrarray_at(pieces, j);
-                    u_file_write(m->ptr, m->len, ustdout);
-                    u_file_write(delim->ptr, delim->len, ustdout);
-                    //u_fprintf(ustdout, "%d: %.*S (%d)\n", j + 1, m->len, m->ptr, m->len);
+                        m = dptrarray_at(pieces, j);
+                        u_file_write(m->ptr, m->len, ustdout);
+                        //u_file_write(delim->ptr, delim->len, ustdout); // TODO: already freed by RE engine ; can we make it dynamic (capture)?
+                        //u_fprintf(ustdout, "%d: %.*S (%d)\n", j + 1, m->len, m->ptr, m->len);
+                    }
                 }
+                u_file_write(EOL, EOL_LEN, ustdout);
+            } else if (!sFlag) {
+                u_file_write(ustr->ptr, ustr->len, ustdout);
+                u_file_write(EOL, EOL_LEN, ustdout);
             }
-            u_file_write(EOL, EOL_LEN, ustdout);
         }
         reader_close(reader);
     } else {
@@ -314,18 +322,18 @@ static void exit_cb(void)
     if (NULL != pieces) {
         dptrarray_destroy(pieces);
     }
-    if (NULL != pattern) {
-        fixed_engine.destroy(pattern);
+    if (NULL != pdata.pattern) {
+        pdata.engine->destroy(pdata.pattern);
     }
     if (NULL != intervals) {
         intervals_destroy(intervals);
     }
 }
 
+// ./ucut -sd a -f 1 test/data/ucut.txt => is incorrect? (depends on output delim?)
 int main(int argc, char **argv)
 {
-    int c;
-    int ret;
+    int c, ret;
     error_t *error;
     reader_t reader;
     const char *intervals_arg, *delim_arg;
@@ -345,7 +353,14 @@ int main(int argc, char **argv)
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
+            case 'E':
+                pdata.engine = &re_engine;
+                break;
+            case 'F':
+                pdata.engine = &fixed_engine;
+                break;
             case 'b':
+                // no sense with Unicode, specially with UTF-16...
                 intervals_arg = optarg;
                 break;
             case 'c':
@@ -353,13 +368,14 @@ int main(int argc, char **argv)
                 intervals_arg = optarg;
                 break;
             case 'd':
-            {
                 delim_arg = optarg;
                 break;
-            }
             case 'f':
                 fFlag = TRUE;
                 intervals_arg = optarg;
+                break;
+            case 's':
+                sFlag = TRUE;
                 break;
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
@@ -373,17 +389,20 @@ int main(int argc, char **argv)
 
     env_apply();
 
-#if 0
     if (cFlag && fFlag) {
         usage();
     }
     if (!cFlag && !fFlag) {
         usage();
     }
-#endif
     if (!parseIntervals(&error, intervals_arg, intervals)) {
         print_error(error);
     }
+#if 0
+    if (intervals_empty(intervals)) {
+        fprintf(stderr, "list of fields, characters or bytes expected\n");
+    }
+#endif
 #ifdef DEBUG
     {
         slist_element_t *el;
@@ -402,7 +421,7 @@ int main(int argc, char **argv)
             print_error(error);
         }
     }
-    if (NULL == (pattern = fixed_engine.compile(&error, delim, 0))) {
+    if (NULL == (pdata.pattern = pdata.engine->compile(&error, delim, 0))) {
         print_error(error);
     }
     ustr = ustring_new();
