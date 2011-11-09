@@ -48,7 +48,7 @@ UBool cFlag = FALSE;
 UBool fFlag = FALSE;
 UBool sFlag = FALSE;
 
-const UChar DEFAULT_DELIM[] = { 0x09, 0 };
+const UChar DEFAULT_DELIM[] = { U_HT, 0 };
 
 UString *ustr = NULL;
 UString *delim = NULL;
