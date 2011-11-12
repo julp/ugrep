@@ -1,89 +1,58 @@
 #include "common.h"
-#include "struct/slist.h"
 #include "struct/intervals.h"
 
-#ifdef OLD_INTERVAL
-static interval_t *interval_new(int32_t, int32_t) WARN_UNUSED_RESULT;
-static void interval_append(slist_t *, int32_t, int32_t) NONNULL();
+static dlist_element_t *dlist_pool_element_new(interval_list_t *, const void *) WARN_UNUSED_RESULT NONNULL();
+static void dlist_pool_garbage_range(interval_list_t *, dlist_element_t *, dlist_element_t *) NONNULL();
+static void interval_list_append(interval_list_t *, const void *) NONNULL();
+static void interval_list_insert_before(interval_list_t *, const void *, dlist_element_t *) NONNULL();
 
-static interval_t *interval_new(int32_t lower_limit, int32_t upper_limit) /* WARN_UNUSED_RESULT */
+interval_list_t *interval_list_new(void) /* WARN_UNUSED_RESULT */
 {
-    interval_t *i;
-
-    i = mem_new(*i);
-    i->lower_limit = lower_limit;
-    i->upper_limit = upper_limit;
-
-    return i;
-}
-
-static void interval_append(slist_t *intervals, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
-{
-    require_else_return(NULL != intervals);
-
-    slist_append(intervals, interval_new(lower_limit, upper_limit));
-}
-
-static void interval_prepend(slist_t *intervals, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
-{
-    require_else_return(NULL != intervals);
-
-    slist_prepend(intervals, interval_new(lower_limit, upper_limit));
-}
-#else
-static slist_element_t *slist_pool_element_new(slist_pool_t *, const void *) WARN_UNUSED_RESULT NONNULL();
-static void slist_pool_garbage_element(slist_pool_t *, slist_element_t *, slist_element_t *) NONNULL();
-
-slist_pool_t *slist_pool_new(size_t elt_size, func_dtor_t dtor_func) /* WARN_UNUSED_RESULT */
-{
-    slist_pool_t *l;
+    interval_list_t *l;
 
     l = mem_new(*l);
-    l->elt_size = elt_size;
+    l->elt_size = sizeof(interval_t);
     l->garbage = l->tail = l->head = NULL;
     l->len = 0;
-# ifdef DEBUG
+#ifdef DEBUG
     l->recycled = 0;
-# endif /* DEBUG */
-    l->dtor_func = dtor_func;
+#endif /* DEBUG */
+    l->dtor_func = free;
 
     return l;
 }
 
-UBool slist_pool_empty(slist_pool_t *l) /* NONNULL() */
+UBool interval_list_empty(interval_list_t *l) /* NONNULL() */
 {
     require_else_return_false(NULL != l);
 
     return (NULL == l->head);
 }
 
-void slist_pool_clean(slist_pool_t *l) /* NONNULL() */
+void interval_list_clean(interval_list_t *l) /* NONNULL() */
 {
-    slist_element_t *el;
-
     require_else_return(NULL != l);
 
-    if (NULL != (el = l->head)) {
-        while (NULL != el) {
-            slist_element_t *tmp = el;
-            el = el->next;
-            tmp->next = l->garbage;
-            l->garbage = tmp;
+    if (NULL != l->tail) {
+        if (NULL != l->garbage) {
+            l->tail->next = l->garbage;
+            l->garbage->prev = l->tail;
         }
+        l->garbage = l->head;
         l->len = 0;
         l->head = l->tail = NULL;
     }
 }
 
-void slist_pool_destroy(slist_pool_t *l) /* NONNULL() */
+void interval_list_destroy(interval_list_t *l) /* NONNULL() */
 {
-    slist_element_t *el;
+    dlist_element_t *el;
 
     require_else_return(NULL != l);
 
     if (NULL != (el = l->head)) {
         while (NULL != el) {
-            slist_element_t *tmp = el;
+            dlist_element_t *tmp = el;
             el = el->next;
             if (NULL != l->dtor_func) {
                 l->dtor_func(tmp->data);
@@ -93,7 +62,7 @@ void slist_pool_destroy(slist_pool_t *l) /* NONNULL() */
     }
     if (NULL != (el = l->garbage)) {
         while (NULL != el) {
-            slist_element_t *tmp = el;
+            dlist_element_t *tmp = el;
             el = el->next;
             if (NULL != l->dtor_func) {
                 l->dtor_func(tmp->data);
@@ -104,9 +73,9 @@ void slist_pool_destroy(slist_pool_t *l) /* NONNULL() */
     free(l);
 }
 
-static slist_element_t *slist_pool_element_new(slist_pool_t *l, const void *src) /* WARN_UNUSED_RESULT NONNULL() */
+static dlist_element_t *dlist_pool_element_new(interval_list_t *l, const void *src) /* WARN_UNUSED_RESULT NONNULL() */
 {
-    slist_element_t *el;
+    dlist_element_t *el;
 
     require_else_return_null(NULL != l);
     require_else_return_null(NULL != src);
@@ -114,29 +83,35 @@ static slist_element_t *slist_pool_element_new(slist_pool_t *l, const void *src)
     if (NULL != l->garbage) {
         el = l->garbage;
         l->garbage = el->next;
-        el->next = NULL;
+        if (NULL != el->prev) {
+            el->prev->next = el->next;
+        }
+        if (NULL != el->next) {
+            el->next->prev = el->prev;
+        }
 # ifdef DEBUG
         l->recycled++;
 # endif /* DEBUG */
     } else {
         el = mem_new(*el);
-        el->next = NULL;
         el->data = _mem_alloc(l->elt_size);
     }
-
+    el->prev = el->next = NULL;
     memcpy(el->data, src, l->elt_size);
 
     return el;
 }
 
-void slist_pool_append(slist_pool_t *l, const void *src) /* NONNULL() */
+static void interval_list_append(interval_list_t *l, const void *src) /* NONNULL() */
 {
-    slist_element_t *el;
+    dlist_element_t *el;
 
     require_else_return(NULL != l);
     require_else_return(NULL != src);
 
-    el = slist_pool_element_new(l, src);
+    el = dlist_pool_element_new(l, src);
+    el->next = NULL;
+    el->prev = l->tail;
     if (NULL == l->tail) {
         l->head = l->tail = el;
     } else {
@@ -145,174 +120,116 @@ void slist_pool_append(slist_pool_t *l, const void *src) /* NONNULL() */
     }
 }
 
-void slist_pool_prepend(slist_pool_t *l, const void *src) /* NONNULL() */
+static void interval_list_insert_before(interval_list_t *l, const void *src, dlist_element_t *ref) /* NONNULL() */
 {
-    slist_element_t *el;
+    dlist_element_t *el;
 
     require_else_return(NULL != l);
     require_else_return(NULL != src);
 
-    el = slist_pool_element_new(l, src);
-    if (NULL == l->tail) {
-        l->head = l->tail = el;
+    el = dlist_pool_element_new(l, src);
+    el->prev = ref->prev;
+    el->next = ref;
+    if (NULL == ref->prev) {
+         l->head = el;
     } else {
-        el->next = l->head;
-        l->head = el;
+         ref->prev->next = el;
     }
+    ref->prev = el;
 }
 
-static void slist_pool_garbage_element(slist_pool_t *l, slist_element_t *target, slist_element_t *previous) /* NONNULL() */
+static void dlist_pool_garbage_range(interval_list_t *l, dlist_element_t *from, dlist_element_t *to) /* NONNULL() */
 {
     require_else_return(NULL != l);
-    require_else_return(NULL != target);
-    require_else_return(NULL != previous);
+    require_else_return(NULL != from);
+    require_else_return(NULL != to);
 
-    previous->next = target->next;
-    target->next = l->garbage->next;
-    l->garbage = target;
-# ifdef DEBUG
-    l->recycled++;
-# endif /* DEBUG */
+    if (NULL != from->prev) {
+        from->prev->next = to->next;
+    }
+    if (NULL != to->next) {
+        to->next->prev = from->prev;
+    }
+    if (NULL != l->garbage) {
+        l->garbage->prev = to;
+    }
+    from->prev = NULL;
+    to->next = l->garbage;
+    l->garbage = from;
 }
-#endif /* OLD_INTERVAL */
-
-#define BETWEEN(value, lower, upper) \
-    ((lower <= value) && (value <= upper))
-
-#define IN(value, interval) \
-    (((value) >= (interval)->lower_limit) && ((value) <= (interval)->upper_limit))
 
 /* Intervals are half-open: [lower_limit;upper_limit[ */
-#ifdef OLD_INTERVAL
-UBool interval_add(slist_t *intervals, int32_t max_upper_limit, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
-#else
-UBool interval_add(slist_pool_t *intervals, int32_t max_upper_limit, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
-#endif /* OLD_INTERVAL */
+UBool interval_list_add(interval_list_t *intervals, int32_t max_upper_limit, int32_t lower_limit, int32_t upper_limit) /* NONNULL() */
 {
-    int overlap;
-    slist_element_t *prev, *from, *to;
+    dlist_element_t *prev, *from, *to;
+    interval_t n = {lower_limit, upper_limit};
 
     require_else_return_false(NULL != intervals);
 
-    overlap = 0;
+    prev = from = to = NULL;
     if (lower_limit == 0 && upper_limit == max_upper_limit) {
         return TRUE;
     }
-#ifdef OLD_INTERVAL
-    if (slist_empty(intervals)) {
-#else
-    if (slist_pool_empty(intervals)) {
-#endif /* OLD_INTERVAL */
-#ifdef OLD_INTERVAL
-        interval_append(intervals, lower_limit, upper_limit);
-#else
-        interval_t i = {lower_limit, upper_limit};
-        slist_pool_append(intervals, &i);
-#endif /* OLD_INTERVAL */
+    if (interval_list_empty(intervals)) {
+        interval_list_append(intervals, &n);
+        return FALSE;
     } else {
-        for (from = intervals->head, prev = NULL; from; from = from->next) {
+        for (from = intervals->head, prev = NULL; NULL != from; from = from->next) {
             FETCH_DATA(from->data, i, interval_t);
 
-            if (IN(lower_limit, i) || IN(upper_limit, i)) {
-                overlap = 1;
-                break;
-            }
             if (lower_limit < i->lower_limit) {
-                overlap = 0;
-                break;
+                if (upper_limit < i->upper_limit) {
+                    interval_list_insert_before(intervals, &n, from);
+                    return FALSE;
+                } else {
+                    break;
+                }
+            } else {
+                if (lower_limit <= i->upper_limit) {
+                    if (upper_limit <= i->upper_limit) {
+                        return FALSE;
+                    } else {
+                        break;
+                    }
+                }
+                //break;
             }
             prev = from;
         }
-        if (!from) {
-#ifdef OLD_INTERVAL
-            interval_append(intervals, lower_limit, upper_limit);
-#else
-            interval_t i = {lower_limit, upper_limit};
-            slist_pool_append(intervals, &i);
-#endif /* OLD_INTERVAL */
+        if (NULL == from) {
+            interval_list_append(intervals, &n);
+            return FALSE;
         } else {
-            for (to = from->next, prev = NULL; to; to = to->next) {
+            for (to = from->next, prev = from; NULL != to; to = to->next) {
                 FETCH_DATA(to->data, i, interval_t);
 
-                //if (!IN(lower_limit, i) && !IN(upper_limit, i)) {
-                /*if (!BETWEEN(i->lower_limit, lower_limit, upper_limit) && !BETWEEN(i->upper_limit, lower_limit, upper_limit)) {
+                if (i->lower_limit >= upper_limit) {
+                    to = prev;
                     break;
                 }
-                if (i->upper_limit > upper_limit) {*/
-                if (i->upper_limit >= upper_limit && !BETWEEN(i->lower_limit, lower_limit, upper_limit) && !BETWEEN(i->upper_limit, lower_limit, upper_limit)) {
-                    to = prev;
+                if (i->upper_limit >= upper_limit) {
                     break;
                 }
                 prev = to;
             }
-            if (prev) {
-                if (!to) {
-                    to = prev;
-                }
-                {
-                    slist_element_t *el;
-                    FETCH_DATA(to->data, t, interval_t);
-                    FETCH_DATA(from->data, f, interval_t);
+            if (NULL == to) {
+                to = prev;
+            }
+            {
+                FETCH_DATA(to->data, t, interval_t);
+                FETCH_DATA(from->data, f, interval_t);
 
-                    f->lower_limit = MIN(f->lower_limit, lower_limit);
-                    f->upper_limit = MAX(t->upper_limit, upper_limit);
-                    if (f->lower_limit == 0 && f->upper_limit == max_upper_limit) {
-                        return TRUE;
-                    }
-                    for (el = from->next, prev = from; el; ) {
-                        slist_element_t *tmp = el;
-                        el = el->next;
-#ifdef OLD_INTERVAL
-                        if (NULL != intervals->dtor_func) {
-                            intervals->dtor_func(tmp->data);
-                        }
-                        prev->next = tmp->next;
-                        if (tmp == to) {
-                            free(tmp);
-                            break;
-                        }
-                        free(tmp);
-#else
-                        slist_pool_garbage_element(intervals, tmp, prev);
-                        if (tmp == to) {
-                            break;
-                        }
-#endif /* OLD_INTERVAL */
-                    }
+                f->lower_limit = MIN(f->lower_limit, lower_limit);
+                f->upper_limit = MAX(t->upper_limit, upper_limit);
+                if (f->lower_limit == 0 && f->upper_limit == max_upper_limit) {
+                    return TRUE;
                 }
-            } else {
-                FETCH_DATA(from->data, i, interval_t);
-
-                if (!overlap/*!IN(lower_limit, i) && !IN(upper_limit, i)*/) {
-#ifdef OLD_INTERVAL
-                    interval_prepend(intervals, lower_limit, upper_limit);
-#else
-                    interval_t new = {lower_limit, upper_limit};
-                    slist_pool_prepend(intervals, &new);
-#endif /* OLD_INTERVAL */
-                } else {
-                    i->lower_limit = MIN(i->lower_limit, lower_limit);
-                    i->upper_limit = MAX(i->upper_limit, upper_limit);
-                    if (i->lower_limit == 0 && i->upper_limit == max_upper_limit) {
-                        return TRUE;
-                    }
+                if (from != to) {
+                    dlist_pool_garbage_range(intervals, from->next, to);
                 }
             }
         }
     }
 
     return FALSE;
-}
-
-#ifdef OLD_INTERVAL
-slist_t *intervals_new(void) /* WARN_UNUSED_RESULT */
-#else
-slist_pool_t *intervals_new(void) /* WARN_UNUSED_RESULT */
-#endif /* OLD_INTERVAL */
-{
-#ifdef OLD_INTERVAL
-    return slist_new(free);
-#else
-    return slist_pool_new(sizeof(interval_t), free);
-#endif /* OLD_INTERVAL */
 }

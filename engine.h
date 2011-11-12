@@ -42,11 +42,7 @@ static inline void add_match(DPtrArray *array, const UString *subject, int32_t l
 typedef struct {
     void *(*compile)(error_t **, UString *, uint32_t); /* /!\ The UString will be owned by the engine: it can be freed at any time depending on the internal behavior of the engine /!\ */
     engine_return_t (*match)(error_t **, void *, const UString *);
-#ifdef OLD_INTERVAL
-    engine_return_t (*match_all)(error_t **, void *, const UString *, slist_t *);
-#else
-    engine_return_t (*match_all)(error_t **, void *, const UString *, slist_pool_t *);
-#endif /* OLD_INTERVAL */
+    engine_return_t (*match_all)(error_t **, void *, const UString *, interval_list_t *);
     engine_return_t (*whole_line_match)(error_t **, void *, const UString *);
     int32_t (*split)(error_t **, void *, const UString *, DPtrArray *);
     void (*destroy)(void *);

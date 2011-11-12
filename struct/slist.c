@@ -36,12 +36,13 @@ void slist_prepend(slist_t *l, void *data) /* NONNULL(1) */
     n = mem_new(*n);
     n->next = NULL;
     n->data = data;
-    if (NULL == l->tail) {
+    if (NULL == l->head) {
         l->head = l->tail = n;
     } else {
         n->next = l->head;
         l->head = n;
     }
+    ++l->len;
 }
 
 void slist_append(slist_t *l, void *data) /* NONNULL(1) */
@@ -59,6 +60,7 @@ void slist_append(slist_t *l, void *data) /* NONNULL(1) */
         l->tail->next = n;
         l->tail = n;
     }
+    ++l->len;
 }
 
 void slist_clean(slist_t *l) /* NONNULL() */

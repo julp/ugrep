@@ -156,11 +156,7 @@ static engine_return_t engine_fixed_match(error_t **error, void *data, const USt
     }
 }
 
-#ifdef OLD_INTERVAL
-static engine_return_t engine_fixed_match_all(error_t **error, void *data, const UString *subject, slist_t *intervals)
-#else
-static engine_return_t engine_fixed_match_all(error_t **error, void *data, const UString *subject, slist_pool_t *intervals)
-#endif /* OLD_INTERVAL */
+static engine_return_t engine_fixed_match_all(error_t **error, void *data, const UString *subject, interval_list_t *intervals)
 {
     int32_t matches;
     UErrorCode status;
@@ -208,7 +204,7 @@ static engine_return_t engine_fixed_match_all(error_t **error, void *data, const
             for (l = usearch_first(p->usearch, &status); U_SUCCESS(status) && USEARCH_DONE != l; l = usearch_next(p->usearch, &status)) {
                 matches++;
                 u = l + usearch_getMatchedLength(p->usearch);
-                if (interval_add(intervals, subject->len, l, u)) {
+                if (interval_list_add(intervals, subject->len, l, u)) {
                     return ENGINE_WHOLE_LINE_MATCH;
                 }
             }
@@ -237,7 +233,7 @@ static engine_return_t engine_fixed_match_all(error_t **error, void *data, const
             pos = m - subject->ptr;
             if (ubrk_isBoundary(p->ubrk, pos) && ubrk_isBoundary(p->ubrk, pos + p->pattern->len)) {
                 matches++;
-                if (interval_add(intervals, subject->len, pos, pos + p->pattern->len)) {
+                if (interval_list_add(intervals, subject->len, pos, pos + p->pattern->len)) {
                     return ENGINE_WHOLE_LINE_MATCH;
                 }
             }

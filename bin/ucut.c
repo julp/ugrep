@@ -12,18 +12,6 @@
 #include "common.h"
 #include "engine.h"
 
-#ifdef OLD_INTERVAL
-typedef slist_t intervals_list_t;
-# define intervals_clean(x) slist_clean(x)
-# define intervals_destroy(x) slist_destroy(x)
-# define intervals_empty(x) slist_empty(x)
-#else
-typedef slist_pool_t intervals_list_t;
-# define intervals_clean(x) slist_pool_clean(x)
-# define intervals_destroy(x) slist_pool_destroy(x)
-# define intervals_empty(x) slist_pool_empty(x)
-#endif /* OLD_INTERVAL */
-
 enum {
     UCUT_EXIT_SUCCESS = 0,
     UCUT_EXIT_FAILURE,
@@ -52,7 +40,7 @@ const UChar DEFAULT_DELIM[] = { U_HT, 0 };
 
 UString *ustr = NULL;
 UString *delim = NULL;
-intervals_list_t *intervals = NULL;
+interval_list_t *intervals = NULL;
 
 DPtrArray *pieces = NULL;
 pattern_data_t pdata = { NULL, &fixed_engine };
@@ -100,7 +88,7 @@ static int /*pieces_length*/ split_on_length(void/*?*/ *positions, void/*?*/ *pi
 }
 #endif
 
-static int32_t split_at_indices(UBreakIterator *ubrk, DPtrArray *pieces, intervals_list_t *intervals)
+static int32_t split_at_indices(UBreakIterator *ubrk, DPtrArray *pieces, interval_list_t *intervals)
 {
     int32_t count;
 
@@ -195,6 +183,7 @@ static int parseIntervalBoundary(const char *nptr, char **endptr, int32_t min, i
         *ret = acc;
     }
     if (*ret < min || *ret > max) {
+        *endptr = (char *) nptr;
         return FIELD_ERR_OUT_OF_RANGE;
     }
 
@@ -207,7 +196,7 @@ static int parseIntervalBoundary(const char *nptr, char **endptr, int32_t min, i
  * input data. If an element appears in the selection list more than once, it shall be
  * written exactly once.
  **/
-static UBool parseIntervals(error_t **error, const char *s, intervals_list_t *intervals)
+static UBool parseIntervals(error_t **error, const char *s, interval_list_t *intervals)
 {
     int ret;
     char *endptr;
@@ -228,8 +217,12 @@ static UBool parseIntervals(error_t **error, const char *s, intervals_list_t *in
         } else {
             if (NULL == memchr(p, '-', comma - p)) {
                 /* X */
-                if (0 != (ret = parseIntervalBoundary(p, &endptr, 1, INT32_MAX, &lower_limit)) || ('\0' != *endptr && ',' != *endptr)) {
+                if (0 != (ret = parseIntervalBoundary(p, &endptr, 1, INT32_MAX, &lower_limit))/* || ('\0' != *endptr && ',' != *endptr)*/) {
                     error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
+                    return FALSE;
+                }
+                if ('\0' != *endptr && ',' != *endptr) {
+                    error_set(error, FATAL, "digit or delimiter expected:\n%s\n%*c", s, endptr - s + 1, '^');
                     return FALSE;
                 }
                 upper_limit = lower_limit;
@@ -249,17 +242,28 @@ static UBool parseIntervals(error_t **error, const char *s, intervals_list_t *in
                         }
                     }
                 } else {
-                    error_set(error, FATAL, "'-' expected, get '%c' (%d):\n%*c", *endptr, *endptr, endptr - s + 1, '^');
+                    error_set(error, FATAL, "'-' expected, get '%c' (%d):\n%s\n%*c", *endptr, *endptr, s, endptr - s + 1, '^');
                     return FALSE;
                 }
             }
             if (lower_limit > upper_limit) {
-                error_set(error, FATAL, "invalid interval: lower limit greater then upper one");
+                error_set(error, FATAL, "invalid interval: lower limit greater then upper one:\n%s\n%*c", s, p - s + 1, '^');
                 return FALSE;
             }
         }
         debug("add [%d;%d[", lower_limit - 1, upper_limit);
-        interval_add(intervals, INT32_MAX, lower_limit - 1, upper_limit); // - 1 because first index is 0 not 1
+        interval_list_add(intervals, INT32_MAX, lower_limit - 1, upper_limit); // - 1 because first index is 0 not 1
+#ifdef DEBUG
+    {
+        dlist_element_t *el;
+
+        for (el = intervals->head; NULL != el; el = el->next) {
+            FETCH_DATA(el->data, i, interval_t);
+
+            debug("[%d;%d[", i->lower_limit, i->upper_limit);
+        }
+    }
+#endif
         if ('\0' == *comma) {
             break;
         }
@@ -273,7 +277,7 @@ static int procfile(reader_t *reader, const char *filename)
 {
     int32_t j, count;
     error_t *error;
-    slist_element_t *el;
+    dlist_element_t *el;
 
     error = NULL;
     dptrarray_clear(pieces);
@@ -326,7 +330,7 @@ static void exit_cb(void)
         pdata.engine->destroy(pdata.pattern);
     }
     if (NULL != intervals) {
-        intervals_destroy(intervals);
+        interval_list_destroy(intervals);
     }
 }
 
@@ -345,7 +349,7 @@ int main(int argc, char **argv)
 
     ret = 0;
     error = NULL;
-    intervals = intervals_new();
+    intervals = interval_list_new();
     intervals_arg = delim_arg = NULL;
     env_init();
     reader_init(&reader, DEFAULT_READER_NAME);
@@ -405,7 +409,7 @@ int main(int argc, char **argv)
 #endif
 #ifdef DEBUG
     {
-        slist_element_t *el;
+        dlist_element_t *el;
 
         for (el = intervals->head; NULL != el; el = el->next) {
             FETCH_DATA(el->data, i, interval_t);
@@ -413,6 +417,9 @@ int main(int argc, char **argv)
             debug("[%d;%d[", i->lower_limit, i->upper_limit);
         }
     }
+#endif
+#if 1
+    return UCUT_EXIT_SUCCESS;
 #endif
     if (NULL == delim_arg) {
         delim = ustring_dup_string_len(DEFAULT_DELIM, STR_LEN(DEFAULT_DELIM));

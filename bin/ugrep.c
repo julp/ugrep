@@ -98,11 +98,7 @@ static slist_t *patterns = NULL;
 int binbehave = BIN_FILE_SKIP;
 #ifndef NO_COLOR
 # ifndef _MSC_VER
-#  ifdef OLD_INTERVAL
-static slist_t *intervals = NULL;
-#  else
-static slist_pool_t *intervals = NULL;
-#  endif /* OLD_INTERVAL */
+static interval_list_t *intervals = NULL;
 # endif /* !_MSC_VER */
 #endif /* !NO_COLOR */
 
@@ -784,11 +780,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
 # ifdef _MSC_VER
             intervals = line->intervals;
 # else
-#  ifdef OLD_INTERVAL
-            slist_clean(intervals);
-#  else
-            slist_pool_clean(intervals);
-#  endif /* OLD_INTERVAL */
+            interval_list_clean(intervals);
 # endif /* _MSC_VER */
 #endif /* !NO_COLOR */
             for (p = patterns->head; NULL != p; p = p->next) {
@@ -841,7 +833,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
                     } else {
                         if (*colors[SINGLE_MATCH].value) {
                             int32_t decalage;
-                            slist_element_t *el;
+                            dlist_element_t *el;
                             UChar *before;
                             int32_t before_len;
 
@@ -1049,11 +1041,7 @@ static void exit_cb(void)
 #ifndef NO_COLOR
 # ifndef _MSC_VER
     if (NULL != intervals) {
-#  ifdef OLD_INTERVAL
-        slist_destroy(intervals);
-#  else
-        slist_pool_destroy(intervals);
-#  endif /* OLD_INTERVAL */
+        interval_list_destroy(intervals);
     }
 # endif /* !_MSC_VER */
 #endif /* !NO_COLOR */
@@ -1320,7 +1308,7 @@ int main(int argc, char **argv)
 #endif /* OLD_RING */
 #ifndef NO_COLOR
 # ifndef _MSC_VER
-    intervals = intervals_new();
+    intervals = interval_list_new();
 # endif /* !_MSC_VER */
 #endif /* !NO_COLOR */
 

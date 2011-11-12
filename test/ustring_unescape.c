@@ -1,6 +1,6 @@
 #include "common.h"
 
-int ut(const UChar *string, const UChar *expected)
+int ut(const UChar *string, const UChar *expected) // 0: pass, 1: failed
 {
     int ret;
     UString *ustr;

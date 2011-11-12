@@ -118,11 +118,7 @@ static engine_return_t engine_re_match(error_t **error, void *data, const UStrin
     return (ret ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
 }
 
-#ifdef OLD_INTERVAL
-static engine_return_t engine_re_match_all(error_t **error, void *data, const UString *subject, slist_t *intervals)
-#else
-static engine_return_t engine_re_match_all(error_t **error, void *data, const UString *subject, slist_pool_t *intervals)
-#endif /* OLD_INTERVAL */
+static engine_return_t engine_re_match_all(error_t **error, void *data, const UString *subject, interval_list_t *intervals)
 {
     int matches;
     int32_t l, u;
@@ -154,7 +150,7 @@ static engine_return_t engine_re_match_all(error_t **error, void *data, const US
         }
         if (ubrk_isBoundary(p->ubrk, l) && ubrk_isBoundary(p->ubrk, u)) {
             matches++;
-            if (interval_add(intervals, subject->len, l, u)) {
+            if (interval_list_add(intervals, subject->len, l, u)) {
                 return ENGINE_WHOLE_LINE_MATCH;
             }
         }
