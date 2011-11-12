@@ -95,28 +95,28 @@ engine_t *engines[] = {
 
 static fixed_circular_list_t *lines = NULL;
 static slist_t *patterns = NULL;
-int binbehave = BIN_FILE_SKIP;
+static int binbehave = BIN_FILE_SKIP;
 #ifndef NO_COLOR
 # ifndef _MSC_VER
 static interval_list_t *intervals = NULL;
 # endif /* !_MSC_VER */
 #endif /* !NO_COLOR */
 
-UBool xFlag = FALSE;
-UBool nFlag = FALSE;
-UBool vFlag = FALSE;
-UBool cFlag = FALSE;
-UBool lFlag = FALSE;
-UBool LFlag = FALSE;
+static UBool xFlag = FALSE;
+static UBool nFlag = FALSE;
+static UBool vFlag = FALSE;
+static UBool cFlag = FALSE;
+static UBool lFlag = FALSE;
+static UBool LFlag = FALSE;
 
-size_t after_context = 0;
-size_t before_context = 0;
+static size_t after_context = 0;
+static size_t before_context = 0;
 
-UBool file_print = FALSE; // -H/h
+static UBool file_print = FALSE; // -H/h
 #ifndef NO_COLOR
-UBool colorize = TRUE;
+static UBool colorize = TRUE;
 #endif /* !NO_COLOR */
-UBool line_print = TRUE;
+static UBool line_print = TRUE;
 
 static int return_values[2/*error?*/][2/*matches?*/] = {
     { UGREP_EXIT_FAILURE, UGREP_EXIT_MATCH },

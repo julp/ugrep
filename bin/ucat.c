@@ -22,16 +22,16 @@ enum {
 
 /* ========== global variables ========== */
 
-UString *ustr = NULL;
-size_t lineno = 0;
-UBool EFlag = FALSE;
-UBool TFlag = FALSE;
-UBool bFlag = FALSE;
-UBool nFlag = FALSE;
-UBool sFlag = FALSE;
-UBool vFlag = FALSE;
-UBool file_print = FALSE; // -H/h
-int binbehave = BIN_FILE_SKIP;
+static UString *ustr = NULL;
+static size_t lineno = 0;
+static UBool EFlag = FALSE;
+static UBool TFlag = FALSE;
+static UBool bFlag = FALSE;
+static UBool nFlag = FALSE;
+static UBool sFlag = FALSE;
+static UBool vFlag = FALSE;
+static UBool file_print = FALSE; // -H/h
+static int binbehave = BIN_FILE_SKIP;
 
 /* ========== getopt stuff ========== */
 

@@ -20,12 +20,12 @@ enum {
 
 /* ========== global variables ========== */
 
-RBTree *tree = NULL;
-UCollator *ucol = NULL;
+static RBTree *tree = NULL;
+static UCollator *ucol = NULL;
 
-UBool bFlag = FALSE;
-UBool rFlag = FALSE;
-UBool uFlag = FALSE;
+static UBool bFlag = FALSE;
+static UBool rFlag = FALSE;
+static UBool uFlag = FALSE;
 
 /* ========== getopt stuff ========== */
 

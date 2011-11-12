@@ -32,18 +32,18 @@ enum {
 extern engine_t fixed_engine;
 extern engine_t re_engine;
 
-UBool cFlag = FALSE;
-UBool fFlag = FALSE;
-UBool sFlag = FALSE;
+static UBool cFlag = FALSE;
+static UBool fFlag = FALSE;
+static UBool sFlag = FALSE;
 
-const UChar DEFAULT_DELIM[] = { U_HT, 0 };
+static const UChar DEFAULT_DELIM[] = { U_HT, 0 };
 
-UString *ustr = NULL;
-UString *delim = NULL;
-interval_list_t *intervals = NULL;
+static UString *ustr = NULL;
+static UString *delim = NULL;
+static interval_list_t *intervals = NULL;
 
-DPtrArray *pieces = NULL;
-pattern_data_t pdata = { NULL, &fixed_engine };
+static DPtrArray *pieces = NULL;
+static pattern_data_t pdata = { NULL, &fixed_engine };
 
 /* ========== getopt stuff ========== */
 

@@ -226,10 +226,10 @@ static const UChar NULL_UCHAR[] = { 0x28, 0x6E, 0x75, 0x6C, 0x6C, 0x29, 0 };
 
 static const KVString NULL_KVString = {
     (UChar *) &NULL_UCHAR,
-    6
+    STR_LEN(NULL_UCHAR)
 };
 
-void kvstring_debug(UString *output, const void *k, const void *v)
+static void kvstring_debug(UString *output, const void *k, const void *v)
 {
     const KVString *kk, *kv;
 
