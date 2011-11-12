@@ -5,7 +5,9 @@
 extern UFILE *ustdout;
 extern UFILE *ustderr;
 
+UChar *_(const char *format, ...);
 void env_apply(void);
+void env_deinit(void);
 const char *env_get_inputs_encoding(void);
 UNormalizationMode env_get_normalization(void);
 const char *env_get_stdin_encoding(void);

@@ -393,6 +393,9 @@ int main(int argc, char **argv)
 
     env_apply();
 
+#if 1
+    debug("%S", _("foo"));
+#endif
     if (cFlag && fFlag) {
         usage();
     }
@@ -418,7 +421,7 @@ int main(int argc, char **argv)
         }
     }
 #endif
-#if 1
+#if 0
     return UCUT_EXIT_SUCCESS;
 #endif
     if (NULL == delim_arg) {

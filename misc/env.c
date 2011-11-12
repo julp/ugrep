@@ -7,6 +7,9 @@
 char __progname[_MAX_PATH] = "<unknown>";
 #endif /* _MSC_VER */
 
+#include <unicode/ures.h>
+#include <unicode/umsg.h>
+
 #include "common.h"
 
 UFILE *ustdout = NULL;
@@ -23,6 +26,8 @@ static const char *inputs_encoding = NULL;
 static const char *outputs_encoding = NULL;
 static const char *stdin_encoding = NULL;
 static UNormalizationMode normalization = UNORM_NONE;//UNORM_NFC;
+
+static UResourceBundle *ures = NULL;
 
 /**
  *                          SYSTEM
@@ -211,4 +216,87 @@ void env_init(void)
         outputs_encoding = strdup(cp); // TODO: leak
     }
 #endif /* _MSC_VER */
+    {
+        UErrorCode status;
+
+        status = U_ZERO_ERROR;
+        ures = ures_open("/home/julp/ugrep/ugrep", NULL, &status);
+        if (U_FAILURE(status)) {
+            fprintf(stderr, "translation disabled: %s\n", u_errorName(status));
+#ifdef DEBUG
+        } else {
+            if (U_USING_DEFAULT_WARNING == status) {
+                fprintf(stderr, YELLOW("default") " translation enabled\n");
+            } else {
+                fprintf(stderr, "translation enabled: " GREEN("%s") "\n", ures_getLocaleByType(ures, ULOC_ACTUAL_LOCALE, &status));
+                assert(U_SUCCESS(status));
+            }
+#endif /* DEBUG */
+        }
+    }
+}
+
+void env_deinit(void)
+{
+    if (NULL != ures) {
+        ures_close(ures);
+    }
+}
+
+UChar *_(const char *format, ...)
+{
+    va_list args;
+    UErrorCode status;
+    int32_t msg_len, result_len;
+    UChar *result, *msg, **msgptr, buf[256];
+
+    if (NULL == ures) {
+        u_uastrncpy(buf, format, STR_LEN(buf));
+        result_len = u_strlen(buf);
+        result = mem_new_n(*result, result_len + 1);
+        u_memcpy(result, buf, result_len);
+        result[result_len] = 0;
+    } else {
+        msgptr = NULL;
+        status = U_ZERO_ERROR;
+        msg = (UChar *) ures_getStringByKey(ures, format, &msg_len, &status);
+        if (U_FAILURE(status)) {
+//             *msgptr = msg = mem_new_n(*msg, 128);
+            u_uastrncpy(buf, format, STR_LEN(buf));
+            msg_len = u_strlen(buf);
+            msg = buf;
+        }
+        {
+            int32_t ret;
+            UParseError pe = { -1, -1, {0}, {0} };
+
+            result_len = 128;
+            result = mem_new_n(*result, result_len);
+            va_start(args, format);
+            ret = u_vformatMessageWithError(NULL, msg, msg_len, result, result_len, &pe, args, &status);
+            va_end(args);
+            if (U_BUFFER_OVERFLOW_ERROR == status) {
+                status = U_ZERO_ERROR;
+
+                result_len = ret + 1;
+                result = mem_renew(result, *result, result_len);
+                va_start(args, format);
+                ret = u_vformatMessageWithError(NULL, msg, msg_len, result, result_len, &pe, args, &status);
+                va_end(args);
+            }
+            if (U_FAILURE(status)) {
+//                 if (NULL != msgptr) {
+//                     free(*msgptr);
+//                 }
+                free(result);
+                debug("%s", u_errorName(status)); // TODO: use UParseError
+                return NULL;
+            }
+        }
+//         if (NULL != msgptr) {
+//             free(*msgptr);
+//         }
+    }
+
+    return result;
 }

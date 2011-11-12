@@ -156,6 +156,62 @@ else(ICU_INCLUDE_DIRS)
     endif()
 endif(ICU_INCLUDE_DIRS)
 
+############################################################
+
+find_program(ICU_GENRB_EXECUTABLE genrb)
+find_program(ICU_PKGDATA_EXECUTABLE pkgdata)
+
+if(NOT ICU_GENRB_EXECUTABLE)
+    message(FATAL_ERROR "genrb not found")
+endif(NOT ICU_GENRB_EXECUTABLE)
+if(NOT ICU_PKGDATA_EXECUTABLE)
+    message(FATAL_ERROR "pkgdata not found")
+endif(NOT ICU_PKGDATA_EXECUTABLE)
+
+function(genrb)
+    set(IcuRb )
+    foreach (_source ${ARGN})
+        get_filename_component(_outputwe ${_source} NAME_WE)
+        set(_output "${_outputwe}.res")
+        add_custom_command(
+            OUTPUT ${_output}
+            #COMMAND ${ICU_GENRB_EXECUTABLE} -d ${PROJECT_NAME} ${_source}
+            COMMAND ${ICU_GENRB_EXECUTABLE} ${_source}
+            DEPENDS ${_source}
+        )
+        add_custom_target(
+            rb-${_outputwe}
+            COMMENT "Generate/Update ICU ResourceBundles for ${_outputwe}"
+            DEPENDS ${_source}
+        )
+        #list(APPEND IcuRb "rb-${_outputwe}")
+        list(APPEND IcuRb ${_output})
+        message(":${_source}: => :${_output}:")
+        # install(FILES ${output} DESTINATION ???)
+    endforeach(_source)
+    add_custom_target(
+        rb ALL
+        COMMENT "Generate/Update ICU ResourceBundles"
+        DEPENDS ${IcuRb}
+    )
+#     add_custom_command(
+#         OUTPUT "${PROJECT_NAME}.dat"
+#         COMMAND ${ICU_PKGDATA_EXECUTABLE} -F -p ${PROJECT_NAME} -m common ${IcuRb}
+#         DEPENDS ${IcuRb}
+#     )
+#     add_custom_target(
+#         pkg ALL
+#         COMMENT "Packaging data"
+#         DEPENDS "${PROJECT_NAME}.dat"
+#     )
+    # install(FILES ${output} DESTINATION ???)
+endfunction(genrb)
+
+icudebug("ICU_GENRB_EXECUTABLE")
+icudebug("ICU_PKGDATA_EXECUTABLE")
+
+############################################################
+
 mark_as_advanced(
     ICU_INCLUDE_DIRS
     ICU_LIBRARIES
