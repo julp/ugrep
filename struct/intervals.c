@@ -192,7 +192,6 @@ UBool interval_list_add(interval_list_t *intervals, int32_t max_upper_limit, int
                         break;
                     }
                 }
-                //break;
             }
             prev = from;
         }
