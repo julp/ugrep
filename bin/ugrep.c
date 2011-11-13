@@ -41,7 +41,7 @@ typedef struct {
     UBool match;
 #ifndef NO_COLOR
 # ifdef _MSC_VER
-    slist_t *intervals;
+    interval_list_t *intervals;
     engine_return_t ret;
     int pattern_matches;
 # endif /* _MSC_VER */
@@ -55,7 +55,7 @@ void *line_ctor(void) {
     l->ustr = ustring_new();
 #ifndef NO_COLOR
 # ifdef _MSC_VER
-    l->intervals = intervals_new();
+    l->intervals = interval_list_new();
 # endif /* _MSC_VER */
 #endif /* !NO_COLOR */
 
@@ -68,7 +68,7 @@ void line_dtor(void *data) {
     ustring_destroy(l->ustr);
 #ifndef NO_COLOR
 # ifdef _MSC_VER
-    slist_destroy(l->intervals);
+    interval_list_destroy(l->intervals);
 # endif /* _MSC_VER */
 #endif /* !NO_COLOR */
     free(l);
@@ -78,7 +78,7 @@ void line_dtor(void *data) {
 void line_clean(void *data) {
     FETCH_DATA(data, l, line_t);
 
-    slist_clean(l->intervals);
+    interval_list_clean(l->intervals);
 }
 #endif /* _MSC_VER */
 
@@ -738,7 +738,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
     error_t *error;
 #ifndef NO_COLOR
 # ifdef _MSC_VER
-    slist_t *intervals = NULL;
+    interval_list_t *intervals = NULL;
 # endif /* _MSC_VER */
     UBool _colorize;
 #endif /* !NO_COLOR */
@@ -891,7 +891,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
                                 u_fputs(l->ustr->ptr, ustdout);
                                 console_reset(LINE_MATCH);
                             } else if (l->pattern_matches /* > 0 */ && _colorize && colors[SINGLE_MATCH].value) {
-                                slist_element_t *e;
+                                dlist_element_t *e;
                                 int32_t last = 0;
 
                                 for (e = l->intervals->head; NULL != e; e = e->next) {
@@ -934,7 +934,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
                             u_fputs(ustr->ptr, ustdout);
                             console_reset(LINE_MATCH);
                         } else if (line->pattern_matches /* > 0 */ && _colorize && colors[SINGLE_MATCH].value) {
-                            slist_element_t *e;
+                            dlist_element_t *e;
                             int32_t last = 0;
 
                             for (e = intervals->head; NULL != e; e = e->next) {

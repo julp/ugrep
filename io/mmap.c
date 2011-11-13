@@ -31,7 +31,11 @@ static void *mmap_dopen(error_t **error, int fd, const char * const filename)
 
     this->ptr = this->start = NULL;
     this->len = 0;
+#ifdef _MSC_VER
+    this->fd = NULL;
+#else
     this->fd = -1;
+#endif /* _MSC_VER */
 
     if (-1 == (fstat(fd, &st))) {
         error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));

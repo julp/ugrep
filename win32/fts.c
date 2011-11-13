@@ -90,6 +90,9 @@ static FTSENT *fts_alloc(FTS *ftsp, char *name, size_t name_length)
         struct stat statbuf;
     };
 
+    if (DIRECTORY_SEPARATOR == name[name_length - 1]) {
+        name[name_length--] = '\0';
+    }
     if (ftsp->fts_options & FTS_NOSTAT) {
         len = sizeof(*p) + name_length + 1;
     } else {

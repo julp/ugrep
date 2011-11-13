@@ -30,13 +30,16 @@ error_t *error_win32_vnew(int type, const char *format, va_list args) /* WARN_UN
        NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR) &buf, 0, NULL
     );
     if (NULL != buf) {
-        buf_len = u_strlen(buf);
+        buf_len = u_strlen((UChar *) buf);
         error = mem_new(*error);
         length = u_vsnprintf(buffer, ERROR_MAX_LEN, format, args);
         error->type = type;
         error->message = mem_new_n(*error->message, length + buf_len + 1);
-        u_strcpy(error->message, buffer);
-        u_strcpy(error->message + length, buf, buf_len);
+//         u_strcpy(error->message, buffer);
+//         u_strcpy(error->message + length, buf, buf_len);
+        u_memcpy(error->message, (UChar *) buffer, length);
+        u_memcpy(error->message + length, (UChar *) buf, buf_len);
+        error->message[length + buf_len] = 0;
         LocalFree(buf);
     }
 

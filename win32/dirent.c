@@ -140,7 +140,7 @@ void *dir_init()
     struct p *x;
 
     x = mem_new(*x);
-    x->ht = hashtable_new(fd_hash, fd_equal, NULL, free, NULL, NULL);
+    x->ht = hashtable_new(fd_hash, fd_equal, NULL, free, NODUP, NODUP);
     x->lastfd = -1;
 
     return (void *) x;

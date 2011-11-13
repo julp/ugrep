@@ -50,7 +50,7 @@ void dptrarray_destroy(DPtrArray *this) /* NONNULL() */
     assert(NULL != this);
 
     if (NULL != this->dtor_func) {
-        uint i;
+        size_t i;
 
         for (i = 0; i < this->length; i++) {
             this->dtor_func(this->data[i]);
@@ -65,7 +65,7 @@ void dptrarray_clear(DPtrArray *this) /* NONNULL() */
     assert(NULL != this);
 
     if (NULL != this->dtor_func) {
-        uint i;
+        size_t i;
 
         for (i = 0; i < this->length; i++) {
             this->dtor_func(this->data[i]);
@@ -112,7 +112,7 @@ void dptrarray_unshift(DPtrArray *this, void *data) /* NONNULL(1) */
     ++this->length;
 }
 
-void dptrarray_insert(DPtrArray *this, uint offset, void *data) /* NONNULL(1) */
+void dptrarray_insert(DPtrArray *this, size_t offset, void *data) /* NONNULL(1) */
 {
     assert(NULL != this);
     assert(offset <= this->length);
@@ -148,7 +148,7 @@ void dptrarray_remove_range(DPtrArray *this, size_t from, size_t to) /* NONNULL(
 
     diff = to - from + 1;
     if (NULL != this->dtor_func) {
-        uint i;
+        size_t i;
 
         for (i = from; i <= to; i++) {
             this->dtor_func(this->data[i]);
@@ -158,7 +158,7 @@ void dptrarray_remove_range(DPtrArray *this, size_t from, size_t to) /* NONNULL(
     this->length -= diff;
 }
 
-void *dptrarray_at(DPtrArray *this, uint offset) /* NONNULL() */
+void *dptrarray_at(DPtrArray *this, size_t offset) /* NONNULL() */
 {
     assert(NULL != this);
 
@@ -169,7 +169,7 @@ void *dptrarray_at(DPtrArray *this, uint offset) /* NONNULL() */
     }
 }
 
-void dptrarray_swap(DPtrArray *this, uint offset1, uint offset2) /* NONNULL() */
+void dptrarray_swap(DPtrArray *this, size_t offset1, size_t offset2) /* NONNULL() */
 {
     void *tmp;
 
@@ -188,7 +188,7 @@ void dptrarray_set_size(DPtrArray *this, size_t length) /* NONNULL() */
 
     if (length < this->length) {
         if (NULL != this->dtor_func) {
-            uint i;
+            size_t i;
 
             for (i = length - 1; i < this->length; i++) {
                 this->dtor_func(this->data[i]);

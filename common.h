@@ -71,6 +71,7 @@
 #  define fdopen _fdopen
 #  define isblank isspace
 #  define snprintf sprintf_s
+#  define strcasecmp _stricmp
 #  define DIRECTORY_SEPARATOR '\\'
 extern char __progname[];
 # else
