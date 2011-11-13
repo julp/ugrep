@@ -243,60 +243,30 @@ void env_deinit(void)
     }
 }
 
-UChar *_(const char *format, ...)
+/**
+ * TODO:
+ * - leak if the string is not issued from ures_getStringByKey (collect them in a slist_t?)
+ * - use a UString?
+ **/
+UChar *_(const char *id)
 {
-    va_list args;
     UErrorCode status;
     int32_t msg_len, result_len;
     UChar *result, *msg, **msgptr, buf[256];
 
-    if (NULL == ures) {
-        u_uastrncpy(buf, format, STR_LEN(buf));
-        result_len = u_strlen(buf);
-        result = mem_new_n(*result, result_len + 1);
-        u_memcpy(result, buf, result_len);
-        result[result_len] = 0;
-    } else {
+    status = U_ZERO_ERROR;
+    if (NULL != ures) {
         msgptr = NULL;
-        status = U_ZERO_ERROR;
-        msg = (UChar *) ures_getStringByKey(ures, format, &msg_len, &status);
-        if (U_FAILURE(status)) {
-//             *msgptr = msg = mem_new_n(*msg, 128);
-            u_uastrncpy(buf, format, STR_LEN(buf));
-            msg_len = u_strlen(buf);
-            msg = buf;
+        msg = (UChar *) ures_getStringByKey(ures, id, &msg_len, &status);
+        if (U_SUCCESS(status)) {
+            return msg;
         }
-        {
-            int32_t ret;
-            UParseError pe = { -1, -1, {0}, {0} };
-
-            result_len = 128;
-            result = mem_new_n(*result, result_len);
-            va_start(args, format);
-            ret = u_vformatMessageWithError(NULL, msg, msg_len, result, result_len, &pe, args, &status);
-            va_end(args);
-            if (U_BUFFER_OVERFLOW_ERROR == status) {
-                status = U_ZERO_ERROR;
-
-                result_len = ret + 1;
-                result = mem_renew(result, *result, result_len);
-                va_start(args, format);
-                ret = u_vformatMessageWithError(NULL, msg, msg_len, result, result_len, &pe, args, &status);
-                va_end(args);
-            }
-            if (U_FAILURE(status)) {
-//                 if (NULL != msgptr) {
-//                     free(*msgptr);
-//                 }
-                free(result);
-                debug("%s", u_errorName(status)); // TODO: use UParseError
-                return NULL;
-            }
-        }
-//         if (NULL != msgptr) {
-//             free(*msgptr);
-//         }
     }
+    u_uastrncpy(buf, id, STR_LEN(buf));
+    result_len = u_strlen(buf);
+    result = mem_new_n(*result, result_len + 1);
+    u_memcpy(result, buf, result_len);
+    result[result_len] = 0;
 
     return result;
 }
