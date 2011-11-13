@@ -168,14 +168,24 @@ if(NOT ICU_PKGDATA_EXECUTABLE)
     message(FATAL_ERROR "pkgdata not found")
 endif(NOT ICU_PKGDATA_EXECUTABLE)
 
-function(genrb)
+# genrb([PACKAGE <name>] [pattern or list of files])
+function(genrb _arg1)
     set(IcuRb )
-    foreach (_source ${ARGN})
+    if (${_arg1} STREQUAL "PACKAGE")
+        #set(_pkg_name ${ARGV1})
+        get_filename_component(_pkg_name ${ARGV1} NAME_WE)
+        get_filename_component(_pkg_dir ${ARGV1} PATH)
+# message("name = ${_pkg_name}; dir = ${_pkg_dir} ; ")
+        set(_list_index 2)
+    else(${_arg1} STREQUAL "PACKAGE")
+        set(_list_index 0)
+    endif(${_arg1} STREQUAL "PACKAGE")
+    list(GET ARGV ${_list_index} -1 _sources)
+    foreach(_source ${_sources})
         get_filename_component(_outputwe ${_source} NAME_WE)
         set(_output "${_outputwe}.res")
         add_custom_command(
             OUTPUT ${_output}
-            #COMMAND ${ICU_GENRB_EXECUTABLE} -d ${PROJECT_NAME} ${_source}
             COMMAND ${ICU_GENRB_EXECUTABLE} ${_source}
             DEPENDS ${_source}
         )
@@ -184,27 +194,35 @@ function(genrb)
             COMMENT "Generate/Update ICU ResourceBundles for ${_outputwe}"
             DEPENDS ${_source}
         )
-        #list(APPEND IcuRb "rb-${_outputwe}")
         list(APPEND IcuRb ${_output})
-        message(":${_source}: => :${_output}:")
-        # install(FILES ${output} DESTINATION ???)
+# message(":${_source}: => :${_output}:")
+#         if(NOT _pkg_name)
+#             install(FILES ${output} DESTINATION ???)
+#         endif(NOT _pkg_name)
     endforeach(_source)
-    add_custom_target(
-        rb ALL
-        COMMENT "Generate/Update ICU ResourceBundles"
-        DEPENDS ${IcuRb}
-    )
-#     add_custom_command(
-#         OUTPUT "${PROJECT_NAME}.dat"
-#         COMMAND ${ICU_PKGDATA_EXECUTABLE} -F -p ${PROJECT_NAME} -m common ${IcuRb}
-#         DEPENDS ${IcuRb}
-#     )
-#     add_custom_target(
-#         pkg ALL
-#         COMMENT "Packaging data"
-#         DEPENDS "${PROJECT_NAME}.dat"
-#     )
-    # install(FILES ${output} DESTINATION ???)
+    if(_pkg_name)
+        set(_pkg_list_file "${_pkg_name}.dat.txt")
+        add_custom_target(
+            rb ALL
+            COMMENT "Generate/Update ICU ResourceBundles"
+            DEPENDS ${IcuRb}
+        )
+        file(WRITE ${_pkg_list_file} "")
+        foreach(_rb ${IcuRb})
+            file(APPEND ${_pkg_list_file} "${_rb}\n")
+        endforeach(_rb)
+        add_custom_command(
+            OUTPUT "${_pkg_name}.dat" # ${_pkg_dir}
+            COMMAND ${ICU_PKGDATA_EXECUTABLE} -F -p ${_pkg_name} -T ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY} -m common ${_pkg_list_file} # ${_pkg_dir}
+            DEPENDS ${IcuRb}
+        )
+        add_custom_target(
+            pkg ALL
+            COMMENT "Packaging data"
+            DEPENDS "${_pkg_name}.dat" # ${_pkg_dir}
+        )
+#     install(FILES ${output} DESTINATION ???)
+    endif(_pkg_name)
 endfunction(genrb)
 
 icudebug("ICU_GENRB_EXECUTABLE")
