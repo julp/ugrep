@@ -174,7 +174,7 @@ UBool interval_list_add(interval_list_t *intervals, int32_t max_upper_limit, int
         interval_list_append(intervals, &n);
         return FALSE;
     } else {
-        for (from = intervals->head, prev = NULL; NULL != from; from = from->next) {
+        for (from = intervals->head; NULL != from; from = from->next) {
             FETCH_DATA(from->data, i, interval_t);
 
             if (lower_limit < i->lower_limit) {
@@ -193,7 +193,6 @@ UBool interval_list_add(interval_list_t *intervals, int32_t max_upper_limit, int
                     }
                 }
             }
-            prev = from;
         }
         if (NULL == from) {
             interval_list_append(intervals, &n);
