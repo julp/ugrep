@@ -24,9 +24,58 @@ enum {
 // #  define NO_PHYSICAL_REWIND 1
 // # endif
 
+# ifdef DYNAMIC_READERS
+#  define STRINGIFY(x) #x
+#  if defined(_MSC_VER)
+#   include <windows.h>
+#   define DL_LOAD(name, major) LoadLibrary(name "lib" STRINGIFY(major) ".dll")
+#   define DL_FETCH_SYMBOL      GetProcAddress
+#   define DL_UNLOAD            FreeLibrary
+#   define DL_HANDLE            HMODULE
+#   define HAVE_DL_ERROR        0
+#   define DL_ERROR
+#  elif defined(HAVE_LIBDL)
+#   include <dlfcn.h>
+#   ifndef RTLD_LAZY
+#    define RTLD_LAZY 1
+#   endif /* !RTLD_LAZY */
+#   ifndef RTLD_GLOBAL
+#    define RTLD_GLOBAL 0
+#   endif /* !RTLD_GLOBAL */
+#   if defined(RTLD_GROUP) && defined(RTLD_WORLD) && defined(RTLD_PARENT)
+#    define DL_LOAD(name, major) dlopen("lib" name ".so." STRINGIFY(major), RTLD_LAZY | RTLD_GLOBAL | RTLD_GROUP | RTLD_WORLD | RTLD_PARENT)
+#   elif defined(RTLD_DEEPBIND)
+#    define DL_LOAD(name, major) dlopen("lib" name ".so." STRINGIFY(major), RTLD_LAZY | RTLD_GLOBAL | RTLD_DEEPBIND)
+#   else
+#    define DL_LOAD(name, major) dlopen("lib" name ".so." STRINGIFY(major), RTLD_LAZY | RTLD_GLOBAL)
+#   endif /* RTLD_GROUP && RTLD_WORLD && RTLD_PARENT */
+#   define DL_UNLOAD             dlclose
+#   define DL_FETCH_SYMBOL       dlsym
+#   define DL_HANDLE             void *
+#   define HAVE_DL_ERROR         1
+#   define DL_ERROR              dlerror()
+#  endif /* _MSC_VER */
+# define DL_GET_SYM(handle, var, name) \
+    do { \
+        *(void **) &var = DL_FETCH_SYMBOL(handle, name); \
+        if (!var) { \
+            if (HAVE_DL_ERROR) { \
+                debug("failed loading " name ": %s", DL_ERROR); \
+            } else { \
+                debug("failed loading " name); \
+            } \
+            DL_UNLOAD(handle); \
+            return FALSE; \
+        } \
+    } while (0);
+# endif /* DYNAMIC_READERS */
+
 typedef struct {
     UBool internal;
     const char *name;
+# ifdef DYNAMIC_READERS
+    UBool (*available)(void);
+# endif /* DYNAMIC_READERS */
     void *(*dopen)(error_t **, int, const char * const);
     void (*close)(void *);
     UBool (*eof)(void *);

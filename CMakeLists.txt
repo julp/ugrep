@@ -22,10 +22,16 @@ check_type_size("void *" SIZEOF_VOIDP)
 check_type_size("long" SIZEOF_LONG)
 check_type_size("long long" SIZEOF_LONG_LONG)
 
+include(CheckIncludeFile)
+check_include_file(dlfcn.h HAVE_DLFCN_H)
+
+include(CheckLibraryExists)
+check_library_exists("dl" "dlopen" "lib" HAVE_LIBDL)
+
 # set(ICU_DEBUG TRUE)
 find_package(ICU 4.4 COMPONENTS i18n io REQUIRED)
-find_package(ZLIB QUIET)
-find_package(BZip2 QUIET)
+# find_package(ZLIB QUIET)
+# find_package(BZip2 QUIET)
 
 set(COMMON_BASE_SOURCES io/mmap.c io/stdio.c io/string.c io/reader.c)
 file(GLOB MISC_SOURCES ${CMAKE_SOURCE_DIR}/misc/*.c)
@@ -57,6 +63,14 @@ if(BZIP2_FOUND)
     set(EXTRA_LIBS ${EXTRA_LIBS} ${BZIP2_LIBRARIES})
     set(HAVE_BZIP2 TRUE)
 endif(BZIP2_FOUND)
+
+if(NOT ZLIB_FOUND AND NOT BZIP2_FOUND)
+    set(EXTRA_LIBS ${EXTRA_LIBS} "dl")
+    add_definitions(-DDYNAMIC_READERS=1)
+    list(APPEND COMMON_BASE_SOURCES io/zlib.c)
+#     list(APPEND COMMON_BASE_SOURCES io/zlib.c io/bzip2.c)
+    include_directories(${CMAKE_SOURCE_DIR}/missing/)
+endif(NOT ZLIB_FOUND AND NOT BZIP2_FOUND)
 
 if(MSVC)
     file(GLOB WIN32_SPECIFIC_SOURCES ${CMAKE_SOURCE_DIR}/win32/*.c)

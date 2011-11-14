@@ -207,20 +207,20 @@ int main(int argc, char **argv)
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = UCAT_EXIT_FAILURE;
 
-#if defined(HAVE_BZIP2) || defined(HAVE_ZLIB)
+#if defined(HAVE_BZIP2) || defined(HAVE_ZLIB) || defined(DYNAMIC_READERS)
     switch (__progname[1]) {
-# ifdef HAVE_BZIP2
+# if defined(HAVE_BZIP2)/* || defined(DYNAMIC_READERS)*/
         case 'b':
             if ('z' == __progname[1]) {
                 reader_set_imp_by_name(&reader, "bzip2");
             }
             break;
-# endif /* HAVE_BZIP2 */
-# ifdef HAVE_ZLIB
+# endif /* HAVE_BZIP2 || DYNAMIC_READERS */
+# if defined(HAVE_ZLIB) || defined(DYNAMIC_READERS)
         case 'z':
             reader_set_imp_by_name(&reader, "gzip");
             break;
-# endif /* HAVE_ZLIB */
+# endif /* HAVE_ZLIB || DYNAMIC_READERS */
     }
 #endif /* HAVE_BZIP2 || HAVE_ZLIB */
 

@@ -118,6 +118,9 @@ reader_imp_t bzip2_reader_imp =
 {
     FALSE,
     "bzip2",
+#ifdef DYNAMIC_READERS
+    NULL,
+#endif /* DYNAMIC_READERS */
     bzip2_dopen,
     bzip2_close,
     bzip2_eof,

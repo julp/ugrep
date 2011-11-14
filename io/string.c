@@ -64,6 +64,9 @@ reader_imp_t string_reader_imp =
 {
     TRUE,
     "string",
+#ifdef DYNAMIC_READERS
+    NULL,
+#endif /* DYNAMIC_READERS */
     NULL,
     string_close,
     string_eof,
