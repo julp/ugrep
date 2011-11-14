@@ -83,13 +83,18 @@ static int fts_palloc(FTS *ftsp, size_t len)
 static FTSENT *fts_alloc(FTS *ftsp, char *name, size_t name_length)
 {
     FTSENT *p;
-    size_t len;
+    size_t i, len;
 
     struct ftsent_withstat {
         FTSENT ent;
         struct stat statbuf;
     };
 
+    for (i = 0; i < name_length; i++) {
+        if ('/' == name[i]) {
+            name[i] = DIRECTORY_SEPARATOR;
+        }
+    }
     if (DIRECTORY_SEPARATOR == name[name_length - 1]) {
         name[name_length--] = '\0';
     }
@@ -160,7 +165,7 @@ static void fts_padjust(FTS *ftsp, FTSENT *head)
 
 static int fts_stat(FTS *ftsp, FTSENT *p, int follow)
 {
-    FTSENT *t;
+    /*FTSENT *t;*/
     dev_t dev;
     ino_t ino;
     struct stat *sbp, sb;
