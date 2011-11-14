@@ -220,7 +220,7 @@ void env_init(void)
         UErrorCode status;
 
         status = U_ZERO_ERROR;
-        ures = ures_open("/home/julp/ugrep/ugrep", NULL, &status);
+        ures = ures_open("/home/julp/ugrep/ugrep", NULL, &status); // TODO: get installation path
         if (U_FAILURE(status)) {
             fprintf(stderr, "translation disabled: %s\n", u_errorName(status));
 #ifdef DEBUG

@@ -1,0 +1,7 @@
+fr:table {
+    version:int { 1 }
+    foo:string { "bar" }
+    ucut:table {
+        x:string { "list of fields, characters or bytes expected" }
+    }
+}
