@@ -4,13 +4,13 @@
 #include "common.h"
 
 #ifdef DYNAMIC_READERS
-# define NS(name) d##name
-static const char *(*dgzerror)(gzFile, int *) = NULL;
-static gzFile (*dgzdopen)(int, const char *) = NULL;
-static int (*dgzread)(gzFile, voidp, unsigned) = NULL;
-static int (*dgzclose)(gzFile) = NULL;
-static int (*dgzeof)(gzFile) = NULL;
-static z_off_t (*dgzseek)(gzFile, z_off_t, int) = NULL;
+# define NS(name) dl##name
+static const char *(*NS(gzerror))(gzFile, int *) = NULL;
+static gzFile (*NS(gzdopen))(int, const char *) = NULL;
+static int (*NS(gzread))(gzFile, voidp, unsigned) = NULL;
+static int (*NS(gzclose))(gzFile) = NULL;
+static int (*NS(gzeof))(gzFile) = NULL;
+static z_off_t (*NS(gzseek))(gzFile, z_off_t, int) = NULL;
 
 static UBool zlib_available(void)
 {
@@ -25,12 +25,12 @@ static UBool zlib_available(void)
 #endif /* DL_ERROR */
         return FALSE;
     }
-    DL_GET_SYM(handle, dgzerror, "gzerror");
-    DL_GET_SYM(handle, dgzdopen, "gzdopen");
-    DL_GET_SYM(handle, dgzread, "gzread");
-    DL_GET_SYM(handle, dgzclose, "gzclose");
-    DL_GET_SYM(handle, dgzeof, "gzeof");
-    DL_GET_SYM(handle, dgzseek, "gzseek");
+    DL_GET_SYM(handle, NS(gzerror), "gzerror");
+    DL_GET_SYM(handle, NS(gzdopen), "gzdopen");
+    DL_GET_SYM(handle, NS(gzread), "gzread");
+    DL_GET_SYM(handle, NS(gzclose), "gzclose");
+    DL_GET_SYM(handle, NS(gzeof), "gzeof");
+    DL_GET_SYM(handle, NS(gzseek), "gzseek");
 
     return TRUE;
 }
@@ -40,7 +40,7 @@ static UBool zlib_available(void)
 
 static void *zlib_dopen(error_t **error, int fd, const char * const filename)
 {
-    gzFile *fp;
+    gzFile fp;
 
     if (NULL == (fp = NS(gzdopen)(fd, "rb"))) {
         error_set(error, WARN, "gzdopen failed on %s", filename);
@@ -51,23 +51,23 @@ static void *zlib_dopen(error_t **error, int fd, const char * const filename)
 
 static void zlib_close(void *fp)
 {
-    NS(gzclose)((gzFile *) fp);
+    NS(gzclose)((gzFile) fp);
 }
 
 static UBool zlib_eof(void *fp)
 {
-// debug("eof = %d", gzeof((gzFile *) fp));
-    return NS(gzeof)((gzFile *) fp);
+// debug("eof = %d", gzeof((gzFile) fp));
+    return NS(gzeof)((gzFile) fp);
 }
 
 #ifndef NO_PHYSICAL_REWIND
 static UBool zlib_rewindTo(void *fp, error_t **error, int32_t signature_length)
 {
-    if (signature_length != NS(gzseek)((gzFile *) fp, signature_length, SEEK_SET)) {
+    if (signature_length != NS(gzseek)((gzFile) fp, signature_length, SEEK_SET)) {
         int errnum;
         const char *zerrstr;
 
-        zerrstr = NS(gzerror)((gzFile *) fp, &errnum);
+        zerrstr = NS(gzerror)((gzFile) fp, &errnum);
         if (Z_ERRNO == errnum) {
             error_set(error, WARN, "zlib external error from gzseek(): %s", strerror(errno));
         } else {
@@ -84,11 +84,11 @@ static int32_t zlib_readBytes(void *fp, error_t **error, char *buffer, size_t ma
 {
     int ret;
 
-    if (-1 == (ret = NS(gzread)((gzFile *) fp, buffer, max_len))) {
+    if (-1 == (ret = NS(gzread)((gzFile) fp, buffer, max_len))) {
         int errnum;
         const char *zerrstr;
 
-        zerrstr = NS(gzerror)((gzFile *) fp, &errnum);
+        zerrstr = NS(gzerror)((gzFile) fp, &errnum);
         if (Z_ERRNO == errnum) {
             error_set(error, WARN, "zlib external error from gzread(): %s", strerror(errno));
         } else {
