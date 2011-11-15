@@ -50,23 +50,27 @@ static pattern_data_t pdata = { NULL, &fixed_engine };
 /* ========== getopt stuff ========== */
 
 enum {
-    BINARY_OPT = GETOPT_SPECIFIC
+    BINARY_OPT = GETOPT_SPECIFIC,
+    OUTPUT_DELIMITER_OPT,
+    COMPLEMENT_OPT
 };
 
-static char optstr[] = "EFb:c:d:f:vs";
+static char optstr[] = "EFb:c:d:f:nvs";
 
 static struct option long_options[] =
 {
     GETOPT_COMMON_OPTIONS,
-    {"extended-regexp", no_argument,       NULL, 'E'}, // grep
-    {"fixed-string",    no_argument,       NULL, 'F'}, // grep
-    {"bytes",           required_argument, NULL, 'b'},
-    {"characters",      required_argument, NULL, 'c'},
-    {"delimiter",       required_argument, NULL, 'd'},
-    {"fields",          required_argument, NULL, 'f'},
-    {"version",         no_argument,       NULL, 'v'},
-    {"only-delimited",  no_argument,       NULL, 's'},
-    {NULL,              no_argument,       NULL, 0}
+    {"extended-regexp",  no_argument,       NULL, 'E'}, // grep
+    {"fixed-string",     no_argument,       NULL, 'F'}, // grep
+    {"bytes",            required_argument, NULL, 'b'},
+    {"characters",       required_argument, NULL, 'c'},
+    {"complement",       no_argument,       NULL, COMPLEMENT_OPT},
+    {"delimiter",        required_argument, NULL, 'd'},
+    {"fields",           required_argument, NULL, 'f'},
+    {"version",          no_argument,       NULL, 'v'},
+    {"only-delimited",   no_argument,       NULL, 's'},
+    {"output-delimiter", no_argument,       NULL, OUTPUT_DELIMITER_OPT},
+    {NULL,               no_argument,       NULL, 0}
 };
 
 static void usage(void)
@@ -455,6 +459,9 @@ int main(int argc, char **argv)
             case 'f':
                 fFlag = TRUE;
                 intervals_arg = optarg;
+                break;
+            case 'n':
+                /* NOP: ignore, compatibility only */
                 break;
             case 's':
                 sFlag = TRUE;
