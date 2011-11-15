@@ -12,6 +12,8 @@
 #include "common.h"
 #include "engine.h"
 
+#include <unicode/ubrk.h>
+
 enum {
     UCUT_EXIT_SUCCESS = 0,
     UCUT_EXIT_FAILURE,
@@ -88,18 +90,85 @@ static int /*pieces_length*/ split_on_length(void/*?*/ *positions, void/*?*/ *pi
 }
 #endif
 
-static int32_t split_at_indices(UBreakIterator *ubrk, DPtrArray *pieces, interval_list_t *intervals)
+// From utr.c (move/delete them to ustring.c if used here too)
+int32_t grapheme_count(UBreakIterator *ubrk, const UString *ustr)
 {
-    int32_t count;
+    int32_t i, count;
+    UErrorCode status;
 
     count = 0;
-    if (NULL == ubrk) {
-        //
-    } else {
-        //
+    status = U_ZERO_ERROR;
+    ubrk_setText(ubrk, ustr->ptr, ustr->len, &status);
+    if (U_FAILURE(status)) {
+        return -1;
     }
+    if (UBRK_DONE != (i = ubrk_first(ubrk))) {
+        while (UBRK_DONE != (i = ubrk_next(ubrk))) {
+            ++count;
+        }
+    }
+    ubrk_setText(ubrk, NULL, 0, &status);
+    assert(U_SUCCESS(status));
 
     return count;
+}
+
+static int32_t split_on_indices(UBreakIterator *ubrk, UString *ustr, DPtrArray *array, interval_list_t *intervals) // TODO: add error_t **error
+{
+    dlist_element_t *el;
+    int32_t pieces, l, u;
+
+    pieces = l = u = 0;
+    if (NULL == ubrk) {
+        int32_t lastU = 0;
+
+        for (el = intervals->head; NULL != el && (size_t) u < ustr->len; el = el->next) {
+            FETCH_DATA(el->data, i, interval_t);
+
+            if (i->lower_limit > 0) {
+                U16_FWD_N(ustr->ptr, l, ustr->len, i->lower_limit - lastU);
+                u = l;
+            }
+            U16_FWD_N(ustr->ptr, u, ustr->len, i->upper_limit - i->lower_limit);
+            add_match(array, ustr, l, u);
+            ++pieces;
+            lastU = i->upper_limit;
+            l = u;
+        }
+    } else {
+#if 0
+        UErrorCode status;
+
+        status = U_ZERO_ERROR;
+        ubrk_setText(ubrk, ustr->ptr, ustr->len, &status);
+        if (U_FAILURE(status)) {
+            // TODO: error
+            return -1;
+        }
+        if (UBRK_DONE != (l = ubrk_first(ubrk))) {
+            /*for (el = intervals->head; NULL != el; el = el->next) {
+                FETCH_DATA(el->data, i, interval_t);
+            }*/
+            while (UBRK_DONE != (u = ubrk_next(ubrk))) {
+                //
+                l = u;
+            }
+        }
+        if (!pieces) {
+//         add_match(array, ustr, 0, ustr->len);
+//         ++pieces;
+        } else if ((size_t) u < ustr->len) {
+            add_match(array, ustr, u, ustr->len);
+            ++pieces;
+        }
+        ubrk_setText(ubrk, NULL, 0, &status);
+        assert(U_SUCCESS(status));
+#else
+        assert(FALSE);
+#endif
+    }
+
+    return pieces;
 }
 
 /* ========== main ========== */
@@ -253,7 +322,7 @@ static UBool parseIntervals(error_t **error, const char *s, interval_list_t *int
         }
         debug("add [%d;%d[", lower_limit - 1, upper_limit);
         interval_list_add(intervals, INT32_MAX, lower_limit - 1, upper_limit); // - 1 because first index is 0 not 1
-#ifdef DEBUG
+#if defined(DEBUG) && 0
         interval_list_debug(intervals);
 #endif
         if ('\0' == *comma) {
@@ -279,21 +348,38 @@ static int procfile(reader_t *reader, const char *filename)
                 print_error(error);
             }
             ustring_chomp(ustr);
-            count = pdata.engine->split(&error, pdata.pattern, ustr, pieces);
+            if (fFlag) {
+                count = pdata.engine->split(&error, pdata.pattern, ustr, pieces);
+            } else if (cFlag) {
+                count = split_on_indices(NULL, ustr, pieces, intervals);
+            } else {
+                assert(FALSE);
+            }
             if (count < 0) {
                 print_error(error);
             } else if (count > 0) {
-                for (el = intervals->head; NULL != el; el = el->next) {
-                    FETCH_DATA(el->data, i, interval_t);
+                if (fFlag) {
+                    for (el = intervals->head; NULL != el; el = el->next) {
+                        FETCH_DATA(el->data, i, interval_t);
 
-                    for (j = i->lower_limit; j < MIN(count, i->upper_limit); j++) {
+                        for (j = i->lower_limit; j < MIN(count, i->upper_limit); j++) {
+                            match_t *m;
+
+                            m = dptrarray_at(pieces, j);
+                            u_file_write(m->ptr, m->len, ustdout);
+                            //u_file_write(delim->ptr, delim->len, ustdout); // TODO: already freed by RE engine ; can we make it dynamic (capture)?
+                            //u_fprintf(ustdout, "%d: %.*S (%d)\n", j + 1, m->len, m->ptr, m->len);
+                        }
+                    }
+                } else if (cFlag) {
+                    for (j = 0; j < count; j++) {
                         match_t *m;
 
                         m = dptrarray_at(pieces, j);
                         u_file_write(m->ptr, m->len, ustdout);
-                        //u_file_write(delim->ptr, delim->len, ustdout); // TODO: already freed by RE engine ; can we make it dynamic (capture)?
-                        //u_fprintf(ustdout, "%d: %.*S (%d)\n", j + 1, m->len, m->ptr, m->len);
                     }
+                } else {
+                    assert(FALSE);
                 }
                 u_file_write(EOL, EOL_LEN, ustdout);
             } else if (!sFlag) {
@@ -402,7 +488,7 @@ int main(int argc, char **argv)
 #ifdef DEBUG
     interval_list_debug(intervals);
 #endif
-#if 1
+#if 0
     return UCUT_EXIT_SUCCESS;
 #endif
     if (NULL == delim_arg) {
@@ -412,7 +498,7 @@ int main(int argc, char **argv)
             print_error(error);
         }
     }
-    if (NULL == (pdata.pattern = pdata.engine->compile(&error, delim, 0))) {
+    if (fFlag && NULL == (pdata.pattern = pdata.engine->compile(&error, delim, 0))) {
         print_error(error);
     }
     ustr = ustring_new();
