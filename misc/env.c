@@ -209,6 +209,61 @@ void env_init(void)
 
         snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
         outputs_encoding = strdup(cp); // TODO: leak
+        env_register_resource(outputs_encoding, free);
     }
 #endif /* _MSC_VER */
+}
+
+typedef struct resource_t {
+    void *ptr;
+    func_dtor_t dtor_func;
+    struct resource_t *next;
+#ifdef DEBUG
+    int lineno;
+    const char *filename;
+#endif /* DEBUG */
+} resource_t;
+
+static resource_t *resources = NULL; /* LIFO */
+
+#ifdef DEBUG
+void _env_register_resource(void *ptr, func_dtor_t dtor_func, const char *filename, int lineno) /* NONNULL() */
+#else
+void env_register_resource(void *ptr, func_dtor_t dtor_func) /* NONNULL() */
+#endif /* DEBUG */
+{
+    resource_t *res;
+
+    require_else_return(NULL != ptr);
+    require_else_return(NULL != dtor_func);
+
+    res = mem_new(*res);
+    res->next = resources;
+    res->ptr = ptr;
+    res->dtor_func = dtor_func;
+#ifdef DEBUG
+    res->filename = filename; // no dup
+    res->lineno = lineno;
+#endif /* DEBUG */
+    resources = res;
+}
+
+#include <unicode/uclean.h>
+void env_close(void)
+{
+    if (NULL != resources) {
+        resource_t *current, *next;
+
+        current = resources;
+        while (NULL != current) {
+            next = current->next;
+//             if (NULL != current->ptr && NULL != current->dtor_func) {
+                current->dtor_func(current->ptr);
+//             }
+            free(current);
+            current = next;
+        }
+        resources = NULL;
+    }
+    u_cleanup();
 }

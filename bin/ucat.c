@@ -78,7 +78,6 @@ static void usage(void)
         __progname,
         optstr
     );
-    exit(UCAT_EXIT_USAGE);
 }
 
 static int procfile(reader_t *reader, const char *filename)
@@ -182,13 +181,6 @@ static int procdir(reader_t *reader, char **dirname)
 
 /* ========== main ========== */
 
-static void exit_cb(void)
-{
-    if (NULL != ustr) {
-        ustring_destroy(ustr);
-    }
-}
-
 int main(int argc, char **argv)
 {
     int c, ret;
@@ -196,11 +188,6 @@ int main(int argc, char **argv)
 #ifndef WITHOUT_FTS
     UBool rFlag = FALSE;
 #endif /* !WITHOUT_FTS */
-
-    if (0 != atexit(exit_cb)) {
-        fputs("can't register atexit() callback", stderr);
-        return UCAT_EXIT_FAILURE;
-    }
 
     ret = 0;
     env_init();
@@ -248,7 +235,8 @@ int main(int argc, char **argv)
                 break;
             case 'V':
                 fprintf(stderr, "BSD ucat version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
-                exit(EXIT_SUCCESS);
+                env_close();
+                return EXIT_SUCCESS;
                 break;
             case 'b':
                 bFlag = TRUE;
@@ -299,6 +287,8 @@ int main(int argc, char **argv)
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
                     usage();
+                    env_close();
+                    return UCAT_EXIT_USAGE;
                 }
                 break;
         }
@@ -311,6 +301,7 @@ int main(int argc, char **argv)
     reader_set_binary_behavior(&reader, binbehave);
 
     ustr = ustring_new();
+    env_register_resource(ustr, (func_dtor_t) ustring_destroy);
 
     if (0 == argc) {
         ret |= procfile(&reader, "-");
@@ -323,6 +314,8 @@ int main(int argc, char **argv)
             ret |= procfile(&reader, *argv);
         }
     }
+
+    env_close();
 
     return (0 == ret ? UCAT_EXIT_SUCCESS : UCAT_EXIT_FAILURE);
 }
