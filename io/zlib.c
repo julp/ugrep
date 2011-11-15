@@ -5,7 +5,7 @@
 
 static void *zlib_dopen(error_t **error, int fd, const char * const filename)
 {
-    gzFile *fp;
+    gzFile fp;
 
     if (NULL == (fp = gzdopen(fd, "rb"))) {
         error_set(error, WARN, "gzdopen failed on %s", filename);
@@ -16,23 +16,23 @@ static void *zlib_dopen(error_t **error, int fd, const char * const filename)
 
 static void zlib_close(void *fp)
 {
-    gzclose((gzFile *) fp);
+    gzclose((gzFile) fp);
 }
 
 static UBool zlib_eof(void *fp)
 {
-// debug("eof = %d", gzeof((gzFile *) fp));
-    return gzeof((gzFile *) fp);
+// debug("eof = %d", gzeof((gzFile) fp));
+    return gzeof((gzFile) fp);
 }
 
 #ifndef NO_PHYSICAL_REWIND
 static UBool zlib_rewindTo(void *fp, error_t **error, int32_t signature_length)
 {
-    if (signature_length != gzseek((gzFile *) fp, signature_length, SEEK_SET)) {
+    if (signature_length != gzseek((gzFile) fp, signature_length, SEEK_SET)) {
         int errnum;
         const char *zerrstr;
 
-        zerrstr = gzerror((gzFile *) fp, &errnum);
+        zerrstr = gzerror((gzFile) fp, &errnum);
         if (Z_ERRNO == errnum) {
             error_set(error, WARN, "zlib external error from gzseek(): %s", strerror(errno));
         } else {
@@ -49,11 +49,11 @@ static int32_t zlib_readBytes(void *fp, error_t **error, char *buffer, size_t ma
 {
     int ret;
 
-    if (-1 == (ret = gzread((gzFile *) fp, buffer, max_len))) {
+    if (-1 == (ret = gzread((gzFile) fp, buffer, max_len))) {
         int errnum;
         const char *zerrstr;
 
-        zerrstr = gzerror((gzFile *) fp, &errnum);
+        zerrstr = gzerror((gzFile) fp, &errnum);
         if (Z_ERRNO == errnum) {
             error_set(error, WARN, "zlib external error from gzread(): %s", strerror(errno));
         } else {
