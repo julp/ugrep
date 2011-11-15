@@ -213,7 +213,7 @@ static inline void *clone(dup_t duper, void *value) {
         unsigned long size;
 
         size = (duper >> 1) & LONG_MAX;
-        copy = malloc(size);
+        copy = _mem_alloc(size);
         memcpy(copy, value, size);
         return copy;
     } else {
