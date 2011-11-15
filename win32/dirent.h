@@ -27,7 +27,7 @@ struct dirent {
 typedef struct _dir DIR;
 
 int chdir(const char *);
-int closedir(/*void *, */DIR *);
+int closedir(DIR *);
 void dir_deinit(void *);
 void *dir_init(void);
 int dirfd(DIR *);

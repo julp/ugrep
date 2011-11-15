@@ -1,12 +1,12 @@
 #include <sys/stat.h>
 
+#include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fts.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include "common.h"
 
 //#define _open(path, omode, x) win32_open(sp->fts_priv, path, omode)
