@@ -103,7 +103,8 @@ void report(int type, const char *format, ...)
         va_start(args, format);
         u_vfprintf(ustderr, format, args);
         va_end(args);
-        if (type == FATAL) {
+        if (FATAL == type) {
+            env_close();
             exit(exit_failure_value);
         }
     }

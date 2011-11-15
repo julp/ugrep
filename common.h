@@ -84,6 +84,7 @@ extern char *__progname;
         if (EXPECTED(expr)) {                                                                                   \
         } else {                                                                                                \
             fprintf(stderr, "[%s:%d]: assertion \"%s\" failed in %s()\n", __FILE__, __LINE__, #expr, __func__); \
+            env_close();                                                                                        \
             exit(EXIT_FAILURE);                                                                                 \
         }                                                                                                       \
     } while (0);
