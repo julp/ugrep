@@ -27,6 +27,9 @@ typedef struct {
 UBool interval_list_add(interval_list_t *, int32_t, int32_t, int32_t) NONNULL();
 interval_list_t *interval_list_new(void) WARN_UNUSED_RESULT;
 void interval_list_clean(interval_list_t *) NONNULL();
+# ifdef DEBUG
+void interval_list_debug(interval_list_t *) NONNULL();
+# endif /* DEBUG */
 void interval_list_destroy(interval_list_t *) NONNULL();
 UBool interval_list_empty(interval_list_t *) NONNULL();
 

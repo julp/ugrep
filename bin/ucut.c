@@ -254,15 +254,7 @@ static UBool parseIntervals(error_t **error, const char *s, interval_list_t *int
         debug("add [%d;%d[", lower_limit - 1, upper_limit);
         interval_list_add(intervals, INT32_MAX, lower_limit - 1, upper_limit); // - 1 because first index is 0 not 1
 #ifdef DEBUG
-    {
-        dlist_element_t *el;
-
-        for (el = intervals->head; NULL != el; el = el->next) {
-            FETCH_DATA(el->data, i, interval_t);
-
-            debug("[%d;%d[", i->lower_limit, i->upper_limit);
-        }
-    }
+        interval_list_debug(intervals);
 #endif
         if ('\0' == *comma) {
             break;
@@ -408,15 +400,7 @@ int main(int argc, char **argv)
     }
 #endif
 #ifdef DEBUG
-    {
-        dlist_element_t *el;
-
-        for (el = intervals->head; NULL != el; el = el->next) {
-            FETCH_DATA(el->data, i, interval_t);
-
-            debug("[%d;%d[", i->lower_limit, i->upper_limit);
-        }
-    }
+    interval_list_debug(intervals);
 #endif
 #if 1
     return UCUT_EXIT_SUCCESS;

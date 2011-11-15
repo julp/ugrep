@@ -231,3 +231,18 @@ UBool interval_list_add(interval_list_t *intervals, int32_t max_upper_limit, int
 
     return FALSE;
 }
+
+#ifdef DEBUG
+void interval_list_debug(interval_list_t *intervals) /* NONNULL() */
+{
+    dlist_element_t *el;
+
+    require_else_return(NULL != intervals);
+
+    for (el = intervals->head; NULL != el; el = el->next) {
+        FETCH_DATA(el->data, i, interval_t);
+
+        debug("[%d;%d[", i->lower_limit, i->upper_limit);
+    }
+}
+#endif /* DEBUG */
