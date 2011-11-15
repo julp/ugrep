@@ -69,10 +69,10 @@ typedef struct {
 
 #define DEFAULT_READER_NAME "mmap"
 
-void reader_close(reader_t *) NONNULL(1);
-UBool reader_eof(reader_t *) NONNULL(1);
-const reader_imp_t *reader_get_by_name(const char *);
-void *reader_get_user_data(reader_t *) NONNULL(1);
+void reader_close(reader_t *) NONNULL();
+UBool reader_eof(reader_t *) NONNULL();
+const reader_imp_t *reader_get_by_name(const char *) NONNULL();
+void *reader_get_user_data(reader_t *) NONNULL();
 void reader_init(reader_t *, const char *) NONNULL(1);
 UBool reader_open(reader_t *, error_t **, const char *) NONNULL(1, 3);
 UBool reader_open_stdin(reader_t *, error_t **) NONNULL(1);
@@ -81,7 +81,7 @@ UBool reader_readline(reader_t *, error_t **, UString *) NONNULL(1, 3);
 UChar32 reader_readuchar32(reader_t *, error_t **) NONNULL(1);
 int32_t reader_readuchars(reader_t *, error_t **, UChar *, int32_t) NONNULL(1, 3);
 int32_t reader_readuchars32(reader_t *, error_t **, UChar32 *, int32_t) NONNULL(1, 3);
-void reader_set_binary_behavior(reader_t *, int) NONNULL(1);
+void reader_set_binary_behavior(reader_t *, int) NONNULL();
 void reader_set_default_encoding(reader_t *, const char *) NONNULL(1);
 UBool reader_set_encoding(reader_t *, error_t **, const char *) NONNULL(1);
 UBool reader_set_imp_by_name(reader_t *, const char *) NONNULL(1);

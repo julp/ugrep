@@ -326,9 +326,11 @@ static UBool reader_rewind(reader_t *this, error_t **UNUSED(error))
 
 /* ==================== public implementation getter/setter ==================== */
 
-const reader_imp_t *reader_get_by_name(const char *name)
+const reader_imp_t *reader_get_by_name(const char *name) /* NONNULL() */
 {
     const reader_imp_t **imp;
+
+    require_else_return_null(NULL != name);
 
     for (imp = available_readers; NULL != *imp; imp++) {
         if (!(*imp)->internal && !strcmp((*imp)->name, name)) {
@@ -339,11 +341,12 @@ const reader_imp_t *reader_get_by_name(const char *name)
     return NULL;
 }
 
-UBool reader_set_imp_by_name(reader_t *this, const char *name) /* NONNULL(1) */
+UBool reader_set_imp_by_name(reader_t *this, const char *name) /* NONNULL() */
 {
     const reader_imp_t **imp;
 
     require_else_return_false(NULL != this);
+    require_else_return_false(NULL != name);
 
     for (imp = available_readers; NULL != *imp; imp++) {
         if (!(*imp)->internal && !strcmp((*imp)->name, name)) {
@@ -357,7 +360,7 @@ UBool reader_set_imp_by_name(reader_t *this, const char *name) /* NONNULL(1) */
 
 /* ==================== public misc setter ==================== */
 
-void reader_set_binary_behavior(reader_t *this, int binbehave) /* NONNULL(1) */
+void reader_set_binary_behavior(reader_t *this, int binbehave) /* NONNULL() */
 {
     require_else_return(NULL != this);
     require_else_return(binbehave >= BIN_FILE_BIN && binbehave <= BIN_FILE_TEXT);
@@ -395,7 +398,7 @@ void reader_set_default_encoding(reader_t *this, const char *encoding) /* NONNUL
 
 /* ==================== public get/set user data ==================== */
 
-void *reader_get_user_data(reader_t *this) /* NONNULL(1) */
+void *reader_get_user_data(reader_t *this) /* NONNULL() */
 {
     require_else_return_null(NULL != this);
 
@@ -454,7 +457,7 @@ UBool reader_open_string(reader_t *this, error_t **error, const char *string) /*
 
 /* ==================== public main interface ==================== */
 
-UBool reader_eof(reader_t *this) /* NONNULL(1) */
+UBool reader_eof(reader_t *this) /* NONNULL() */
 {
     require_else_return_false(NULL != this);
 
@@ -488,7 +491,7 @@ void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
     this->utf16.ptr = this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.buffer;
 }
 
-void reader_close(reader_t *this) /* NONNULL(1) */
+void reader_close(reader_t *this) /* NONNULL() */
 {
     require_else_return(NULL != this);
 
