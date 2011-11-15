@@ -236,7 +236,7 @@ void env_init(void)
     }
 }
 
-void env_deinit(void)
+void env_close(void)
 {
     if (NULL != ures) {
         ures_close(ures);
