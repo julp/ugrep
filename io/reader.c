@@ -331,14 +331,16 @@ const reader_imp_t *reader_get_by_name(const char *name)
     const reader_imp_t **imp;
 
     for (imp = available_readers; NULL != *imp; imp++) {
-        if (!(*imp)->internal && !strcmp((*imp)->name, name)) {
+        if (!strcmp((*imp)->name, name)) {
 #ifdef DYNAMIC_READERS
-            if (NULL == (*imp)->available || (*imp)->available()) {
+            if ((*imp)->internal || (NULL != (*imp)->available && !(*imp)->available())) {
+#else
+            if ((*imp)->internal) {
 #endif /* DYNAMIC_READERS */
-            return *imp;
-#ifdef DYNAMIC_READERS
+                return NULL;
+            } else {
+                return *imp;
             }
-#endif /* DYNAMIC_READERS */
         }
     }
 
@@ -352,15 +354,17 @@ UBool reader_set_imp_by_name(reader_t *this, const char *name) /* NONNULL(1) */
     require_else_return_false(NULL != this);
 
     for (imp = available_readers; NULL != *imp; imp++) {
-        if (!(*imp)->internal && !strcmp((*imp)->name, name)) {
+        if (!strcmp((*imp)->name, name)) {
 #ifdef DYNAMIC_READERS
-            if (NULL == (*imp)->available || (*imp)->available()) {
+            if ((*imp)->internal || (NULL != (*imp)->available && !(*imp)->available())) {
+#else
+            if ((*imp)->internal) {
 #endif /* DYNAMIC_READERS */
-            this->default_imp = this->imp = *imp;
-            return TRUE;
-#ifdef DYNAMIC_READERS
+                return FALSE;
+            } else {
+                this->default_imp = this->imp = *imp;
+                return TRUE;
             }
-#endif /* DYNAMIC_READERS */
         }
     }
 
