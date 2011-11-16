@@ -69,9 +69,14 @@
 #  define isatty _isatty
 #  define fileno _fileno
 #  define fdopen _fdopen
+#  define open _open
+#  define close _close
 #  define isblank isspace
 #  define snprintf sprintf_s
 #  define strcasecmp _stricmp
+#  define strdup _strdup
+#  define stat _stat
+#  define fstat _fstat
 #  define DIRECTORY_SEPARATOR '\\'
 extern char __progname[];
 # else
