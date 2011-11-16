@@ -19,7 +19,4 @@
 #  define S_ISLNK(mode) 0
 # endif /* !S_ISLNK */
 
-# define stat _stat
-# define fstat _fstat
-
 #endif /* !WIN32_UNISTD_H */
