@@ -16,12 +16,6 @@ const char *ubasename(const char *);
 
 # define debug(format, ...) \
     msg(INFO, format, ## __VA_ARGS__)
-
-# define u_printf(...)                                \
-    do {                                              \
-        UFILE *ustdout = u_finit(stdout, NULL, NULL); \
-        u_fprintf(ustdout, ## __VA_ARGS__);           \
-    } while (0);
 #else
 # define msg(type, format, ...) \
     report(type, format "\n", ## __VA_ARGS__)

@@ -723,11 +723,11 @@ void fixed_circular_list_print(fixed_circular_list_t *l) /* NONNULL() */
 
     require_else_return(NULL != l);
 
-    u_printf("| i |   ADDR   | USED | PTR | HEAD | USTRING\n");
-    u_printf("--------------------------------------------\n");
+    u_fprintf(ustdout, "| i |   ADDR   | USED | PTR | HEAD | USTRING\n");
+    u_fprintf(ustdout, "--------------------------------------------\n");
     for (i = 0; i < l->len; i++) {
         FETCH_DATA(l->elts[i].data, x, line_t);
-        u_printf("| %d | %p | %4d | %3d | %4d | %S\n", i, &l->elts[i], RING_ELEMENT_USED(l->elts[i]), &l->elts[i] == l->ptr, &l->elts[i] == l->head, x->ustr->ptr);
+        u_fprintf(ustdout, "| %d | %p | %4d | %3d | %4d | %S\n", i, &l->elts[i], RING_ELEMENT_USED(l->elts[i]), &l->elts[i] == l->ptr, &l->elts[i] == l->head, x->ustr->ptr);
     }
 }
 #endif /* DEBUG */
