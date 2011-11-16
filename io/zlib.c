@@ -19,9 +19,9 @@ static UBool zlib_available(void)
     handle = DL_LOAD("z", 1); // zlib1.dll vs libz.so.1
     if (!handle) {
 #if HAVE_DL_ERROR
-        debug("failed loading zlib: %s", DL_ERROR);
+        stdio_debug("failed loading zlib: %s", DL_ERROR);
 #else
-        debug("failed loading zlib");
+        stdio_debug("failed loading zlib");
 #endif /* DL_ERROR */
         return FALSE;
     }

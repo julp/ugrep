@@ -33,7 +33,7 @@ enum {
 #   define DL_UNLOAD            FreeLibrary
 #   define DL_HANDLE            HMODULE
 #   define HAVE_DL_ERROR        0
-#   define DL_ERROR
+#   define DL_ERROR             ""
 #  elif defined(HAVE_LIBDL)
 #   include <dlfcn.h>
 #   ifndef RTLD_LAZY
@@ -60,9 +60,9 @@ enum {
         *(void **) &var = DL_FETCH_SYMBOL(handle, name); \
         if (!var) { \
             if (HAVE_DL_ERROR) { \
-                debug("failed loading " name ": %s", DL_ERROR); \
+                stdio_debug("failed loading " name ": %s", DL_ERROR); \
             } else { \
-                debug("failed loading " name); \
+                stdio_debug("failed loading " name); \
             } \
             DL_UNLOAD(handle); \
             return FALSE; \
