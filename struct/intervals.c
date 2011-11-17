@@ -5,6 +5,7 @@ static dlist_element_t *dlist_pool_element_new(interval_list_t *, const void *) 
 static void dlist_pool_garbage_range(interval_list_t *, dlist_element_t *, dlist_element_t *) NONNULL();
 static void interval_list_append(interval_list_t *, const void *) NONNULL();
 static void interval_list_insert_before(interval_list_t *, const void *, dlist_element_t *) NONNULL();
+static dlist_element_t *interval_list_shift(interval_list_t *) NONNULL();
 
 interval_list_t *interval_list_new(void) /* WARN_UNUSED_RESULT */
 {
@@ -120,6 +121,32 @@ static void interval_list_append(interval_list_t *l, const void *src) /* NONNULL
     }
 }
 
+static dlist_element_t *interval_list_shift(interval_list_t *l) /* NONNULL() */
+{
+    require_else_return_null(NULL != l);
+
+    if (NULL != l->head) {
+        dlist_element_t *el;
+
+        el = l->head;
+        if (el == l->tail) {
+            l->head = l->tail = NULL;
+        } else {
+            l->head = l->head->next;
+            l->head->prev = NULL;
+        }
+        if (NULL != l->garbage) {
+            l->garbage->prev = el;
+        }
+        el->next = l->garbage;
+        l->garbage = el;
+
+        return l->head;
+    } else {
+        return NULL;
+    }
+}
+
 static void interval_list_insert_before(interval_list_t *l, const void *src, dlist_element_t *ref) /* NONNULL() */
 {
     dlist_element_t *el;
@@ -147,8 +174,14 @@ static void dlist_pool_garbage_range(interval_list_t *l, dlist_element_t *from, 
     if (NULL != from->prev) {
         from->prev->next = to->next;
     }
+    if (l->tail == to) {
+        l->tail = (NULL == from->prev ? NULL : from->prev);
+    }
     if (NULL != to->next) {
         to->next->prev = from->prev;
+    }
+    if (l->head == from) {
+        l->head = (NULL == to->next ? NULL : to->next);
     }
     if (NULL != l->garbage) {
         l->garbage->prev = to;
@@ -168,6 +201,19 @@ UBool interval_list_add(interval_list_t *intervals, int32_t max_upper_limit, int
 
     prev = from = to = NULL;
     if (lower_limit == 0 && upper_limit == max_upper_limit) {
+        if (NULL != intervals->head) {
+            if (intervals->head == intervals->tail) {
+                FETCH_DATA(intervals->head->data, i, interval_t);
+
+                i->lower_limit = lower_limit;
+                i->upper_limit = upper_limit;
+            } else {
+                dlist_pool_garbage_range(intervals, intervals->head, intervals->tail);
+                interval_list_append(intervals, &n);
+            }
+        } else {
+            interval_list_append(intervals, &n);
+        }
         return TRUE;
     }
     if (interval_list_empty(intervals)) {
@@ -230,6 +276,54 @@ UBool interval_list_add(interval_list_t *intervals, int32_t max_upper_limit, int
     }
 
     return FALSE;
+}
+
+void interval_list_complement(interval_list_t *intervals, int32_t min, int32_t max) /* NONNULL() */
+{
+    require_else_return(NULL != intervals);
+    require_else_return(min < max);
+
+    if (NULL == intervals->head) {
+        interval_t n = {min, max};
+        interval_list_append(intervals, &n);
+    } else {
+        int32_t l, lastu;
+        dlist_element_t *current;
+
+        lastu = min;
+        current = intervals->head;
+        {
+            FETCH_DATA(current->data, i, interval_t);
+
+            if (i->lower_limit <= min && i->upper_limit >= max) {
+                dlist_pool_garbage_range(intervals, intervals->head, intervals->tail);
+                return;
+            }
+        }
+        while (NULL != current) {
+            FETCH_DATA(current->data, i, interval_t);
+
+            if (lastu > max) {
+                break;
+            }
+            if (current == intervals->head && i->lower_limit <= min) {
+                lastu = MAX(i->upper_limit, min);
+                current = interval_list_shift(intervals);
+            } else {
+                l = i->lower_limit;
+                i->lower_limit = lastu;
+                lastu = i->upper_limit;
+                i->upper_limit = MIN(l, max);
+                current = current->next;
+            }
+        }
+        if (NULL != current) {
+            dlist_pool_garbage_range(intervals, current, intervals->tail);
+        } else if (lastu < max) {
+            interval_t n = {lastu, max};
+            interval_list_append(intervals, &n);
+        }
+    }
 }
 
 #ifdef DEBUG

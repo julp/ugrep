@@ -422,6 +422,7 @@ int main(int argc, char **argv)
     int c, ret;
     error_t *error;
     reader_t reader;
+    UBool complement = FALSE;
     const char *intervals_arg, *delim_arg;
 
     if (0 != atexit(exit_cb)) {
@@ -466,6 +467,9 @@ int main(int argc, char **argv)
             case 's':
                 sFlag = TRUE;
                 break;
+            case COMPLEMENT_OPT:
+                complement = TRUE;
+                break;
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
                     usage();
@@ -487,11 +491,14 @@ int main(int argc, char **argv)
     if (!parseIntervals(&error, intervals_arg, intervals)) {
         print_error(error);
     }
-#if 0
-    if (intervals_empty(intervals)) {
-        fprintf(stderr, "list of fields, characters or bytes expected\n");
-    }
+    if (complement) {
+        interval_list_complement(intervals, 0, INT32_MAX);
+#if 1
+        if (interval_list_empty(intervals)) {
+            fprintf(stderr, "non empty list of fields, characters or bytes expected\n");
+        }
 #endif
+    }
 #ifdef DEBUG
     interval_list_debug(intervals);
 #endif
