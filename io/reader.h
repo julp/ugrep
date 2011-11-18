@@ -25,6 +25,7 @@ enum {
 // # endif
 
 # ifdef DYNAMIC_READERS
+#  define DRNS(name) dl##name
 #  define STRINGIFY(x) #x
 #  if defined(_MSC_VER)
 #   include <windows.h>
@@ -33,7 +34,7 @@ enum {
 #   define DL_UNLOAD            FreeLibrary
 #   define DL_HANDLE            HMODULE
 #   define HAVE_DL_ERROR        0
-#   define DL_ERROR             ""
+#   define DL_ERROR             NULL
 #  elif defined(HAVE_LIBDL)
 #   include <dlfcn.h>
 #   ifndef RTLD_LAZY
@@ -68,6 +69,8 @@ enum {
             return FALSE; \
         } \
     } while (0);
+# else
+#  define DRNS(name) name
 # endif /* DYNAMIC_READERS */
 
 typedef struct {

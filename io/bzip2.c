@@ -9,6 +9,35 @@ typedef struct {
     BZFILE *fp;
 } BZIP2;
 
+#ifdef DYNAMIC_READERS
+static const char *(*DRNS(BZ2_bzerror))(BZFILE *,int *) = NULL;
+static BZFILE *(*DRNS(BZ2_bzReadOpen))(int *, FILE *, int, int, void *, int) = NULL;
+static int (*DRNS(BZ2_bzRead))(int *, BZFILE *, void *, int) = NULL;
+static void (*DRNS(BZ2_bzReadClose))(int *, BZFILE *) = NULL;
+
+static UBool bzip2_available(void)
+{
+    DL_HANDLE handle;
+
+    handle = DL_LOAD("bz2", 1);
+    if (!handle) {
+        if (HAVE_DL_ERROR) {
+            stdio_debug("failed loading bzip2: %s", DL_ERROR);
+        } else {
+            stdio_debug("failed loading bzip2");
+        }
+        return FALSE;
+    }
+    DL_GET_SYM(handle, DRNS(BZ2_bzerror), "BZ2_bzerror");
+    DL_GET_SYM(handle, DRNS(BZ2_bzReadOpen), "BZ2_bzReadOpen");
+    DL_GET_SYM(handle, DRNS(BZ2_bzRead), "BZ2_bzRead");
+    DL_GET_SYM(handle, DRNS(BZ2_bzReadClose), "BZ2_bzReadClose");
+    //env_register_resource(handle, DL_UNLOAD);
+
+    return TRUE;
+}
+#endif /* DYNAMIC_READERS */
+
 static void *bzip2_dopen(error_t **error, int fd, const char * const filename)
 {
     BZIP2 *this;
@@ -20,10 +49,10 @@ static void *bzip2_dopen(error_t **error, int fd, const char * const filename)
         error_set(error, WARN, "fdopen failed on %s: %s", filename, strerror(errno));
         return NULL;
     }
-    this->fp = BZ2_bzReadOpen(&bzerror, this->f, 0, 0, NULL, 0);
+    this->fp = DRNS(BZ2_bzReadOpen)(&bzerror, this->f, 0, 0, NULL, 0);
     if (BZ_OK != bzerror) {
-        error_set(error, WARN, "bzip2 internal error from BZ2_bzReadOpen(): %s", BZ2_bzerror(this->fp, &bzerror));
-        BZ2_bzReadClose(&bzerror, this->fp);
+        error_set(error, WARN, "bzip2 internal error from BZ2_bzReadOpen(): %s", DRNS(BZ2_bzerror)(this->fp, &bzerror));
+        DRNS(BZ2_bzReadClose)(&bzerror, this->fp);
         return NULL;
     }
 
@@ -36,7 +65,7 @@ static void bzip2_close(void *fp)
     int bzerror;
 
     this = (BZIP2 *) fp;
-    BZ2_bzReadClose(&bzerror, this->fp);
+    DRNS(BZ2_bzReadClose)(&bzerror, this->fp);
     fclose(this->f);
     free(this);
 }
@@ -59,20 +88,20 @@ static UBool bzip2_rewindTo(void *fp, error_t **error, int32_t signature_length)
     char buffer[SIG_MAX_LEN];
 
     this = (BZIP2 *) fp;
-    BZ2_bzReadClose(&bzerror, this->fp);
+    DRNS(BZ2_bzReadClose)(&bzerror, this->fp);
     this->eof = FALSE;
     if (0 != fseek(this->f, (long) signature_length, SEEK_SET)) {
         error_set(error, WARN, "fseek failed: %s", strerror(errno));
         return FALSE;
     }
-    this->fp = BZ2_bzReadOpen(&bzerror, this->f, 0, 0, NULL, 0);
+    this->fp = DRNS(BZ2_bzReadOpen)(&bzerror, this->f, 0, 0, NULL, 0);
     if (BZ_OK != bzerror) {
-        error_set(error, WARN, "bzip2 internal error from BZ2_bzReadOpen(): %s", BZ2_bzerror(this->fp, &bzerror));
-        BZ2_bzReadClose(&bzerror, this->fp);
+        error_set(error, WARN, "bzip2 internal error from BZ2_bzReadOpen(): %s", DRNS(BZ2_bzerror)(this->fp, &bzerror));
+        DRNS(BZ2_bzReadClose)(&bzerror, this->fp);
         return FALSE;
     }
     if (signature_length > 0) {
-        BZ2_bzRead(&bzerror, this->fp, buffer, signature_length);
+        DRNS(BZ2_bzRead)(&bzerror, this->fp, buffer, signature_length);
         switch (bzerror) {
             case BZ_OK:
                 break;
@@ -80,7 +109,7 @@ static UBool bzip2_rewindTo(void *fp, error_t **error, int32_t signature_length)
                 this->eof = TRUE;
                 break;
             default:
-                error_set(error, WARN, "bzip2 internal error from BZ2_bzread(): %s", BZ2_bzerror(this->fp, &bzerror));
+                error_set(error, WARN, "bzip2 internal error from BZ2_bzread(): %s", DRNS(BZ2_bzerror)(this->fp, &bzerror));
                 return FALSE;
         }
     }
@@ -99,7 +128,7 @@ static int32_t bzip2_readBytes(void *fp, error_t **error, char *buffer, size_t m
     if (this->eof) {
         return 0;
     }
-    ret = BZ2_bzRead(&bzerror, this->fp, buffer, max_len);
+    ret = DRNS(BZ2_bzRead)(&bzerror, this->fp, buffer, max_len);
     switch (bzerror) {
         case BZ_OK:
             break;
@@ -107,7 +136,7 @@ static int32_t bzip2_readBytes(void *fp, error_t **error, char *buffer, size_t m
             this->eof = TRUE;
             break;
         default:
-            error_set(error, WARN, "bzip2 internal error from BZ2_bzread(): %s", BZ2_bzerror(this->fp, &bzerror));
+            error_set(error, WARN, "bzip2 internal error from BZ2_bzread(): %s", DRNS(BZ2_bzerror)(this->fp, &bzerror));
             return -1;
     }
 
@@ -119,7 +148,7 @@ reader_imp_t bzip2_reader_imp =
     FALSE,
     "bzip2",
 #ifdef DYNAMIC_READERS
-    NULL,
+    bzip2_available,
 #endif /* DYNAMIC_READERS */
     bzip2_dopen,
     bzip2_close,

@@ -4,13 +4,15 @@
 #include "common.h"
 
 #ifdef DYNAMIC_READERS
-# define NS(name) dl##name
-static const char *(*NS(gzerror))(gzFile, int *) = NULL;
-static gzFile (*NS(gzdopen))(int, const char *) = NULL;
-static int (*NS(gzread))(gzFile, voidp, unsigned) = NULL;
-static int (*NS(gzclose))(gzFile) = NULL;
-static int (*NS(gzeof))(gzFile) = NULL;
-static z_off_t (*NS(gzseek))(gzFile, z_off_t, int) = NULL;
+static const char *(*DRNS(gzerror))(gzFile, int *) = NULL;
+#ifdef _MSC_VER
+static gzFile (*DRNS(gzopen))(const char *, const char *) = NULL;
+#endif /* _MSC_VER */
+static gzFile (*DRNS(gzdopen))(int, const char *) = NULL;
+static int (*DRNS(gzread))(gzFile, voidp, unsigned) = NULL;
+static int (*DRNS(gzclose))(gzFile) = NULL;
+static int (*DRNS(gzeof))(gzFile) = NULL;
+static z_off_t (*DRNS(gzseek))(gzFile, z_off_t, int) = NULL;
 
 static UBool zlib_available(void)
 {
@@ -18,56 +20,68 @@ static UBool zlib_available(void)
 
     handle = DL_LOAD("z", 1); // zlib1.dll vs libz.so.1
     if (!handle) {
-#if HAVE_DL_ERROR
-        stdio_debug("failed loading zlib: %s", DL_ERROR);
-#else
-        stdio_debug("failed loading zlib");
-#endif /* DL_ERROR */
+        if (HAVE_DL_ERROR) {
+            stdio_debug("failed loading zlib: %s", DL_ERROR);
+        } else {
+            stdio_debug("failed loading zlib");
+        }
         return FALSE;
     }
-    DL_GET_SYM(handle, NS(gzerror), "gzerror");
-    DL_GET_SYM(handle, NS(gzdopen), "gzdopen");
-    DL_GET_SYM(handle, NS(gzread), "gzread");
-    DL_GET_SYM(handle, NS(gzclose), "gzclose");
-    DL_GET_SYM(handle, NS(gzeof), "gzeof");
-    DL_GET_SYM(handle, NS(gzseek), "gzseek");
+    DL_GET_SYM(handle, DRNS(gzerror), "gzerror");
+    DL_GET_SYM(handle, DRNS(gzdopen), "gzdopen");
+#ifdef _MSC_VER
+    DL_GET_SYM(handle, DRNS(gzopen), "gzopen");
+#endif /* _MSC_VER */
+    DL_GET_SYM(handle, DRNS(gzread), "gzread");
+    DL_GET_SYM(handle, DRNS(gzclose), "gzclose");
+    DL_GET_SYM(handle, DRNS(gzeof), "gzeof");
+    DL_GET_SYM(handle, DRNS(gzseek), "gzseek");
+    //env_register_resource(handle, DL_UNLOAD);
 
     return TRUE;
 }
-#else
-# define NS(name) name
 #endif /* DYNAMIC_READERS */
 
 static void *zlib_dopen(error_t **error, int fd, const char * const filename)
 {
     gzFile fp;
 
-    if (NULL == (fp = NS(gzdopen)(fd, "rb"))) {
-        error_set(error, WARN, "gzdopen failed on %s", filename);
+#ifdef _MSC_VER
+    if (fd == fileno(stdin)) {
+#endif /* _MSC_VER */
+        if (NULL == (fp = DRNS(gzdopen)(fd, "rb"))) {
+            error_set(error, WARN, "gzdopen failed on %s", filename);
+        }
+#ifdef _MSC_VER
+    } else {
+        if (NULL == (fp = DRNS(gzopen)(filename, "rb"))) {
+            error_set(error, WARN, "gzopen failed on %s", filename);
+        }
     }
+#endif /* _MSC_VER */
 
     return fp;
 }
 
 static void zlib_close(void *fp)
 {
-    NS(gzclose)((gzFile) fp);
+    DRNS(gzclose)((gzFile) fp);
 }
 
 static UBool zlib_eof(void *fp)
 {
 // debug("eof = %d", gzeof((gzFile) fp));
-    return NS(gzeof)((gzFile) fp);
+    return DRNS(gzeof)((gzFile) fp);
 }
 
 #ifndef NO_PHYSICAL_REWIND
 static UBool zlib_rewindTo(void *fp, error_t **error, int32_t signature_length)
 {
-    if (signature_length != NS(gzseek)((gzFile) fp, signature_length, SEEK_SET)) {
+    if (signature_length != DRNS(gzseek)((gzFile) fp, signature_length, SEEK_SET)) {
         int errnum;
         const char *zerrstr;
 
-        zerrstr = NS(gzerror)((gzFile) fp, &errnum);
+        zerrstr = DRNS(gzerror)((gzFile) fp, &errnum);
         if (Z_ERRNO == errnum) {
             error_set(error, WARN, "zlib external error from gzseek(): %s", strerror(errno));
         } else {
@@ -84,11 +98,11 @@ static int32_t zlib_readBytes(void *fp, error_t **error, char *buffer, size_t ma
 {
     int ret;
 
-    if (-1 == (ret = NS(gzread)((gzFile) fp, buffer, max_len))) {
+    if (-1 == (ret = DRNS(gzread)((gzFile) fp, buffer, max_len))) {
         int errnum;
         const char *zerrstr;
 
-        zerrstr = NS(gzerror)((gzFile) fp, &errnum);
+        zerrstr = DRNS(gzerror)((gzFile) fp, &errnum);
         if (Z_ERRNO == errnum) {
             error_set(error, WARN, "zlib external error from gzread(): %s", strerror(errno));
         } else {
@@ -105,7 +119,7 @@ reader_imp_t zlib_reader_imp =
     FALSE,
     "gzip",
 #ifdef DYNAMIC_READERS
-    zlib_available, // TODO: call DL_UNLOAD at the end
+    zlib_available,
 #endif /* DYNAMIC_READERS */
     zlib_dopen,
     zlib_close,

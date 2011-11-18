@@ -17,7 +17,7 @@ extern reader_imp_t string_reader_imp;
 #if defined(HAVE_ZLIB) || defined(DYNAMIC_READERS)
 extern reader_imp_t zlib_reader_imp;
 #endif /* HAVE_ZLIB || DYNAMIC_READERS */
-#if defined(HAVE_BZIP2)/* || defined(DYNAMIC_READERS)*/
+#if defined(HAVE_BZIP2) || defined(DYNAMIC_READERS)
 extern reader_imp_t bzip2_reader_imp;
 #endif /* HAVE_BZIP2 || DYNAMIC_READERS */
 
@@ -27,7 +27,7 @@ static const reader_imp_t *available_readers[] = {
 #if defined(HAVE_ZLIB) || defined(DYNAMIC_READERS)
     &zlib_reader_imp,
 #endif /* HAVE_ZLIB || DYNAMIC_READERS */
-#if defined(HAVE_BZIP2)/* || defined(DYNAMIC_READERS)*/
+#if defined(HAVE_BZIP2) || defined(DYNAMIC_READERS)
     &bzip2_reader_imp,
 #endif /* HAVE_BZIP2 || DYNAMIC_READERS */
     NULL
