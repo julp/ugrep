@@ -42,6 +42,7 @@ static const UChar DEFAULT_DELIM[] = { U_HT, 0 };
 
 static UString *ustr = NULL;
 static UString *delim = NULL;
+static UBreakIterator *ubrk = NULL;
 static interval_list_t *intervals = NULL;
 
 static DPtrArray *pieces = NULL;
@@ -85,47 +86,22 @@ static void usage(void)
 
 /* ========== cutter ========== */
 
-#if 0
-static int /*pieces_length*/ split_on_length(void/*?*/ *positions, void/*?*/ *pieces)
+UBool ubrk_fwd_n(UBreakIterator *ubrk, size_t n, int32_t *r)
 {
-    // ustring_sync_copy with a ratio of 2 ?
-    // dynamic array of UChar * ?
-    // list (slist_t) ?
-}
-#endif
-
-// From utr.c (move/delete them to ustring.c if used here too)
-int32_t grapheme_count(UBreakIterator *ubrk, const UString *ustr)
-{
-    int32_t i, count;
-    UErrorCode status;
-
-    count = 0;
-    status = U_ZERO_ERROR;
-    ubrk_setText(ubrk, ustr->ptr, ustr->len, &status);
-    if (U_FAILURE(status)) {
-        return -1;
+    while (n > 0 && UBRK_DONE != (*r = ubrk_next(ubrk))) {
+        --n;
     }
-    if (UBRK_DONE != (i = ubrk_first(ubrk))) {
-        while (UBRK_DONE != (i = ubrk_next(ubrk))) {
-            ++count;
-        }
-    }
-    ubrk_setText(ubrk, NULL, 0, &status);
-    assert(U_SUCCESS(status));
 
-    return count;
+    return (0 == n);
 }
 
-static int32_t split_on_indices(UBreakIterator *ubrk, UString *ustr, DPtrArray *array, interval_list_t *intervals) // TODO: add error_t **error
+static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *ustr, DPtrArray *array, interval_list_t *intervals)
 {
     dlist_element_t *el;
-    int32_t pieces, l, u;
+    int32_t pieces, l, u, lastU;
 
-    pieces = l = u = 0;
+    lastU = pieces = l = u = 0;
     if (NULL == ubrk) {
-        int32_t lastU = 0;
-
         for (el = intervals->head; NULL != el && (size_t) u < ustr->len; el = el->next) {
             FETCH_DATA(el->data, i, interval_t);
 
@@ -140,36 +116,41 @@ static int32_t split_on_indices(UBreakIterator *ubrk, UString *ustr, DPtrArray *
             l = u;
         }
     } else {
-#if 0
         UErrorCode status;
 
         status = U_ZERO_ERROR;
         ubrk_setText(ubrk, ustr->ptr, ustr->len, &status);
         if (U_FAILURE(status)) {
-            // TODO: error
+            icu_error_set(error, FATAL, status, "ubrk_setText");
             return -1;
         }
         if (UBRK_DONE != (l = ubrk_first(ubrk))) {
-            /*for (el = intervals->head; NULL != el; el = el->next) {
+            for (el = intervals->head; NULL != el && u != UBRK_DONE; el = el->next) {
                 FETCH_DATA(el->data, i, interval_t);
-            }*/
-            while (UBRK_DONE != (u = ubrk_next(ubrk))) {
-                //
+
+                if (i->lower_limit > 0) {
+                    if (!ubrk_fwd_n(ubrk, i->lower_limit - lastU, &l)) {
+                        break;
+                    }
+                }
+                if (!ubrk_fwd_n(ubrk, i->upper_limit - i->lower_limit, &u)) {
+                    break;
+                }
+                add_match(array, ustr, l, u);
+                ++pieces;
+                lastU = i->upper_limit;
                 l = u;
             }
         }
         if (!pieces) {
 //         add_match(array, ustr, 0, ustr->len);
 //         ++pieces;
-        } else if ((size_t) u < ustr->len) {
-            add_match(array, ustr, u, ustr->len);
+        } else if (UBRK_DONE != l && UBRK_DONE == u && (size_t) l < ustr->len) {
+            add_match(array, ustr, l, ustr->len);
             ++pieces;
         }
         ubrk_setText(ubrk, NULL, 0, &status);
         assert(U_SUCCESS(status));
-#else
-        assert(FALSE);
-#endif
     }
 
     return pieces;
@@ -355,7 +336,7 @@ static int procfile(reader_t *reader, const char *filename)
             if (fFlag) {
                 count = pdata.engine->split(&error, pdata.pattern, ustr, pieces);
             } else if (cFlag) {
-                count = split_on_indices(NULL, ustr, pieces, intervals);
+                count = split_on_indices(&error, ubrk, ustr, pieces, intervals);
             } else {
                 assert(FALSE);
             }
@@ -422,7 +403,7 @@ int main(int argc, char **argv)
     int c, ret;
     error_t *error;
     reader_t reader;
-    UBool complement = FALSE;
+    UBool complement;
     const char *intervals_arg, *delim_arg;
 
     if (0 != atexit(exit_cb)) {
@@ -432,6 +413,7 @@ int main(int argc, char **argv)
 
     ret = 0;
     error = NULL;
+    complement = FALSE;
     intervals = interval_list_new();
     intervals_arg = delim_arg = NULL;
     env_init();
@@ -447,7 +429,7 @@ int main(int argc, char **argv)
                 pdata.engine = &fixed_engine;
                 break;
             case 'b':
-                // no sense with Unicode, specially with UTF-16...
+                // no sense with Unicode, specially with UTF-16 (after a conversion and a possible normalization)...
                 intervals_arg = optarg;
                 break;
             case 'c':
@@ -487,6 +469,16 @@ int main(int argc, char **argv)
     }
     if (!cFlag && !fFlag) {
         usage();
+    }
+    if (cFlag && UNORM_NONE != env_get_normalization()) {
+        UErrorCode status;
+
+        status = U_ZERO_ERROR;
+        ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+        if (U_FAILURE(status)) {
+            icu_error_set(&error, FATAL, status, "ubrk_open");
+            print_error(error);
+        }
     }
     if (!parseIntervals(&error, intervals_arg, intervals)) {
         print_error(error);
