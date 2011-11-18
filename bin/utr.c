@@ -208,8 +208,7 @@ int32_t grapheme_count(UBreakIterator *ubrk, const UString *ustr)
             ++count;
         }
     }
-    ubrk_setText(ubrk, NULL, 0, &status);
-    assert(U_SUCCESS(status));
+    ubrk_unbindText(ubrk);
 
     return count;
 }
@@ -420,8 +419,7 @@ void grapheme_process(
             l = u;
         }
     }
-    ubrk_setText(ubrk, NULL, 0, &status);
-    assert(U_SUCCESS(status));
+    ubrk_unbindText(ubrk);
 }
 
 void cp_process(
@@ -493,8 +491,7 @@ void single_process(
                 l = u;
             }
         }
-        ubrk_setText(ubrk, NULL, 0, &status);
-        assert(U_SUCCESS(status));
+        ubrk_unbindText(ubrk);
     } else {
         size_t l, u;
 

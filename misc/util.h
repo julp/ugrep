@@ -2,6 +2,10 @@
 
 # define UTIL_H
 
+# include <unicode/ubrk.h>
+# include <unicode/uregex.h>
+# include <unicode/usearch.h>
+
 extern int verbosity;
 extern int exit_failure_value;
 
@@ -29,7 +33,9 @@ void print_error(error_t *);
 void report(int, const char *, ...);
 UBool stdin_is_tty(void);
 UBool stdout_is_tty(void);
-
+void ubrk_unbindText(UBreakIterator *);
+void uregex_unbindText(URegularExpression *);
+void usearch_unbindText(UStringSearch *);
 UBool util_opt_parse(int, const char *, reader_t *);
 
 #endif /* UTIL_H */

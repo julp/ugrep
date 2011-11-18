@@ -13,13 +13,8 @@ typedef struct {
 
 static void re_pattern_reset(re_pattern_t *p)
 {
-    UErrorCode status;
-
-    status = U_ZERO_ERROR;
-    ubrk_setText(p->ubrk, NULL, 0, &status);
-    assert(U_SUCCESS(status));
-    uregex_setText(p->uregex, UREGEXP_FAKE_USTR, &status);
-    assert(U_SUCCESS(status));
+    ubrk_unbindText(p->ubrk);
+    uregex_unbindText(p->uregex);
 }
 
 static void re_pattern_destroy(re_pattern_t *p)

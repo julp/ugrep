@@ -108,3 +108,36 @@ void report(int type, const char *format, ...)
         }
     }
 }
+
+static const UChar _EMPTY_USTR[] = { 0 };
+#define EMPTY_USTR _EMPTY_USTR, 0
+
+void ubrk_unbindText(UBreakIterator *ubrk)
+{
+    UErrorCode status;
+
+    assert(NULL != ubrk);
+    status = U_ZERO_ERROR;
+    ubrk_setText(ubrk, NULL, 0, &status);
+    assert(U_SUCCESS(status));
+}
+
+void uregex_unbindText(URegularExpression *uregex)
+{
+    UErrorCode status;
+
+    assert(NULL != uregex);
+    status = U_ZERO_ERROR;
+    uregex_setText(uregex, EMPTY_USTR, &status);
+    assert(U_SUCCESS(status));
+}
+
+void usearch_unbindText(UStringSearch *usearch)
+{
+    UErrorCode status;
+
+    assert(NULL != usearch);
+    status = U_ZERO_ERROR;
+    usearch_setText(usearch, EMPTY_USTR, &status);
+    assert(U_SUCCESS(status));
+}

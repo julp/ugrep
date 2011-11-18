@@ -124,8 +124,7 @@ static engine_return_t engine_fixed_match(error_t **error, void *data, const USt
                 icu_error_set(error, FATAL, status, "usearch_first");
                 return ENGINE_FAILURE;
             }
-            usearch_setText(p->usearch, USEARCH_FAKE_USTR, &status);
-            assert(U_SUCCESS(status));
+            usearch_unbindText(p->usearch);
 
             return (ret != USEARCH_DONE ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
         } else {
@@ -149,8 +148,7 @@ static engine_return_t engine_fixed_match(error_t **error, void *data, const USt
             }
             pos += p->pattern->len;
         }
-        ubrk_setText(p->ubrk, NULL, 0, &status);
-        assert(U_SUCCESS(status));
+        ubrk_unbindText(p->ubrk);
 
         return ret;
     }
@@ -212,8 +210,7 @@ static engine_return_t engine_fixed_match_all(error_t **error, void *data, const
                 icu_error_set(error, FATAL, status, "usearch_[first|next]");
                 return ENGINE_FAILURE;
             }
-            usearch_setText(p->usearch, USEARCH_FAKE_USTR, &status);
-            assert(U_SUCCESS(status));
+            usearch_unbindText(p->usearch);
 
             return (matches ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
         } else {
@@ -239,8 +236,7 @@ static engine_return_t engine_fixed_match_all(error_t **error, void *data, const
             }
             pos += p->pattern->len;
         }
-        ubrk_setText(p->ubrk, NULL, 0, &status);
-        assert(U_SUCCESS(status));
+        ubrk_unbindText(p->ubrk);
 
         return (matches ? ENGINE_MATCH_FOUND : ENGINE_NO_MATCH);
     }
@@ -267,8 +263,7 @@ static engine_return_t engine_fixed_whole_line_match(error_t **error, void *data
             icu_error_set(error, FATAL, status, "usearch_first");
             return ENGINE_FAILURE;
         }
-        usearch_setText(p->usearch, USEARCH_FAKE_USTR, &status);
-        assert(U_SUCCESS(status));
+        usearch_unbindText(p->usearch);
 
         return (ret != USEARCH_DONE && ((size_t) usearch_getMatchedLength(p->usearch)) == subject->len ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
     } else {
@@ -303,8 +298,7 @@ static int32_t engine_fixed_split(error_t **error, void *data, const UString *su
             icu_error_set(error, FATAL, status, "usearch_[first|next]");
             return ENGINE_FAILURE;
         }
-        usearch_setText(p->usearch, USEARCH_FAKE_USTR, &status);
-        assert(U_SUCCESS(status));
+        usearch_unbindText(p->usearch);
     } else {
         UChar *m;
 
@@ -321,8 +315,7 @@ static int32_t engine_fixed_split(error_t **error, void *data, const UString *su
             }
             l = u = u + p->pattern->len;
         }
-        ubrk_setText(p->ubrk, NULL, 0, &status);
-        assert(U_SUCCESS(status));
+        ubrk_unbindText(p->ubrk);
     }
     if (!pieces) {
 //         add_match(array, subject, 0, subject->len);
