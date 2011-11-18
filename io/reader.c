@@ -501,6 +501,10 @@ void reader_close(reader_t *this) /* NONNULL() */
     ucnv_close(this->ucnv);
     this->ucnv = NULL;
     this->fp = NULL;
+    if (0 > this->fd) {
+        close(this->fd);
+    }
+    this->fd = -1;
 }
 
 UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONNULL(1, 3) */

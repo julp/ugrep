@@ -23,6 +23,7 @@
 #define SEP_NO_MATCH_UCHAR 0x002d
 
 
+#define UGREP_EXIT_SUCCESS UGREP_EXIT_NO_MATCH
 enum {
     UGREP_EXIT_MATCH    = 0,
     UGREP_EXIT_NO_MATCH = 1,
@@ -224,7 +225,6 @@ static void usage(void)
         "\t[pattern] [file ...]\n",
         __progname
     );
-    exit(UGREP_EXIT_USAGE);
 }
 
 /* ========== adding patterns ========== */
@@ -769,7 +769,6 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
             ret = ENGINE_FAILURE;
             if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
-                return 1;
             }
             pattern_matches = 0;
             ustring_chomp(ustr);
@@ -800,6 +799,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
 #endif /* !NO_COLOR */
                 }
                 if (ENGINE_FAILURE == ret) {
+                    reader_close(reader);
                     print_error(error);
                     return 1;
                 } else if (ENGINE_WHOLE_LINE_MATCH == ret) {
@@ -977,11 +977,11 @@ endfile:
                 u_fprintf(ustdout, "Binary file %s matches\n", reader->sourcename);
             }
         }
-        reader_close(reader);
     } else {
         print_error(error);
         return 1;
     }
+    reader_close(reader);
     *matches += arg_matches;
 
     return 0;
@@ -1030,23 +1030,6 @@ static int procdir(reader_t *reader, char **dirname, int *matches)
 
 /* ========== main ========== */
 
-static void exit_cb(void)
-{
-    if (NULL != lines) {
-        fixed_circular_list_destroy(lines);
-    }
-    if (NULL != patterns) {
-        slist_destroy(patterns);
-    }
-#ifndef NO_COLOR
-# ifndef _MSC_VER
-    if (NULL != intervals) {
-        interval_list_destroy(intervals);
-    }
-# endif /* !_MSC_VER */
-#endif /* !NO_COLOR */
-}
-
 int main(int argc, char **argv)
 {
 #ifndef NO_COLOR
@@ -1088,14 +1071,10 @@ int main(int argc, char **argv)
 #endif /* !NO_COLOR */
     pattern_type = PATTERN_AUTO;
 
-    if (0 != atexit(exit_cb)) {
-        fputs("can't register atexit() callback", stderr);
-        return UGREP_EXIT_FAILURE;
-    }
-
     env_init();
     reader_init(&reader, DEFAULT_READER_NAME);
     patterns = slist_new(pattern_destroy);
+    env_register_resource(patterns, (func_dtor_t) slist_destroy);
     exit_failure_value = UGREP_EXIT_FAILURE;
 
     switch (__progname[1]) {
@@ -1138,6 +1117,7 @@ int main(int argc, char **argv)
                     val = strtol(optarg, &endptr, 10);
                     if (0 != errno || endptr == optarg || *endptr != '\0' || val </*=*/ 0) {
                         fprintf(stderr, "Context out of range\n");
+                        env_close();
                         return UGREP_EXIT_USAGE;
                     }
                     if ('A' != c) {
@@ -1167,7 +1147,8 @@ int main(int argc, char **argv)
 #endif /* !WITHOUT_FTS */
             case 'V':
                 fprintf(stderr, "BSD ugrep version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
-                exit(EXIT_SUCCESS);
+                env_close();
+                return UGREP_EXIT_SUCCESS;
                 break;
             case 'c':
                 cFlag = TRUE;
@@ -1227,6 +1208,7 @@ int main(int argc, char **argv)
                     color = COLOR_ALWAYS;
                 } else {
                     fprintf(stderr, "Unknown colo(u)r option\n");
+                    env_close();
                     return UGREP_EXIT_USAGE;
                 }
 #endif /* !NO_COLOR */
@@ -1240,12 +1222,15 @@ int main(int argc, char **argv)
                     binbehave = BIN_FILE_TEXT;
                 } else {
                     fprintf(stderr, "Unknown binary-files option\n");
+                    env_close();
                     return UGREP_EXIT_USAGE;
                 }
                 break;
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
                     usage();
+                    env_close();
+                    return UGREP_EXIT_USAGE;
                 }
                 break;
         }
@@ -1276,12 +1261,13 @@ int main(int argc, char **argv)
     if (slist_empty(patterns)) {
         if (argc < 1) {
             usage();
+            env_close();
+            return UGREP_EXIT_USAGE;
         } else {
             if (!add_patternC(&error, patterns, *argv++, pattern_type, strength | flags)) {
                 print_error(error);
             }
             argc--;
-            // TODO: make sure pattern was not empty
         }
     }
 
@@ -1306,9 +1292,11 @@ int main(int argc, char **argv)
 #else
     lines = fixed_circular_list_new(before_context + 1, line_ctor, line_dtor);
 #endif /* OLD_RING */
+    env_register_resource(lines, (func_dtor_t) fixed_circular_list_destroy);
 #ifndef NO_COLOR
 # ifndef _MSC_VER
     intervals = interval_list_new();
+    env_register_resource(intervals, (func_dtor_t) interval_list_destroy);
 # endif /* !_MSC_VER */
 #endif /* !NO_COLOR */
 
@@ -1324,5 +1312,6 @@ int main(int argc, char **argv)
         }
     }
 
+    env_close();
     return return_values[0 == ret][matches > 0];
 }
