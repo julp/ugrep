@@ -429,8 +429,8 @@ int main(int argc, char **argv)
                 pdata.engine = &fixed_engine;
                 break;
             case 'b':
-                // no sense with Unicode, specially with UTF-16 (after a conversion and a possible normalization)...
-                intervals_arg = optarg;
+                fputs("Working with bytes makes no sense: ucut works in UTF-16, after a possible charset conversion and normalization", stderr);
+                return UCUT_EXIT_FAILURE;
                 break;
             case 'c':
                 cFlag = TRUE;
@@ -491,11 +491,8 @@ int main(int argc, char **argv)
         }
 #endif
     }
-#ifdef DEBUG
+#if defined(DEBUG) && 0
     interval_list_debug(intervals);
-#endif
-#if 0
-    return UCUT_EXIT_SUCCESS;
 #endif
     if (NULL == delim_arg) {
         delim = ustring_dup_string_len(DEFAULT_DELIM, STR_LEN(DEFAULT_DELIM));
