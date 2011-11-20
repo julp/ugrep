@@ -769,7 +769,6 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
             ret = ENGINE_FAILURE;
             if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
-                return 1;
             }
             pattern_matches = 0;
             ustring_chomp(ustr);
