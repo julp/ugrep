@@ -118,6 +118,9 @@ reader_imp_t bzip2_reader_imp =
 {
     FALSE,
     "bzip2",
+#if 0
+    "BZh",
+#endif
     bzip2_dopen,
     bzip2_close,
     bzip2_eof,

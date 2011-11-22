@@ -69,6 +69,9 @@ reader_imp_t zlib_reader_imp =
 {
     FALSE,
     "gzip",
+#if 0
+    "\x1F\x8B",
+#endif
     zlib_dopen,
     zlib_close,
     zlib_eof,
