@@ -482,12 +482,14 @@ void reader_close(reader_t *this) /* NONNULL() */
 {
     require_else_return(NULL != this);
 
-    if (NULL != this->imp->close) {
+    if (NULL != this->imp->close && NULL != this->fp) {
         this->imp->close(this->fp);
+        this->fp = NULL;
     }
-    ucnv_close(this->ucnv);
-    this->ucnv = NULL;
-    this->fp = NULL;
+    if (NULL != this->ucnv) {
+        ucnv_close(this->ucnv);
+        this->ucnv = NULL;
+    }
     if (0 > this->fd && STDIN_FILENO != this->fd) {
         close(this->fd);
     }
@@ -640,11 +642,6 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
 
     return TRUE;
 failed:
-    if (0 > this->fd) {
-        close(this->fd);
-    }
-    if (NULL != this->fp) {
-        reader_close(this);
-    }
+    reader_close(this);
     return FALSE;
 }
