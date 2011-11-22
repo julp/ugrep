@@ -212,6 +212,10 @@ void env_init(void)
         env_register_resource(outputs_encoding, free);
     }
 #endif /* _MSC_VER */
+    if (0 != atexit(env_close)) {
+        fputs("can't register atexit() callback", stderr);
+        exit(EXIT_FAILURE);
+    }
 }
 
 typedef struct resource_t {

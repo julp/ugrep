@@ -225,6 +225,7 @@ static void usage(void)
         "\t[pattern] [file ...]\n",
         __progname
     );
+    exit(UGREP_EXIT_USAGE);
 }
 
 /* ========== adding patterns ========== */
@@ -1117,7 +1118,6 @@ int main(int argc, char **argv)
                     val = strtol(optarg, &endptr, 10);
                     if (0 != errno || endptr == optarg || *endptr != '\0' || val </*=*/ 0) {
                         fprintf(stderr, "Context out of range\n");
-                        env_close();
                         return UGREP_EXIT_USAGE;
                     }
                     if ('A' != c) {
@@ -1147,7 +1147,6 @@ int main(int argc, char **argv)
 #endif /* !WITHOUT_FTS */
             case 'V':
                 fprintf(stderr, "BSD ugrep version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
-                env_close();
                 return UGREP_EXIT_SUCCESS;
                 break;
             case 'c':
@@ -1208,7 +1207,6 @@ int main(int argc, char **argv)
                     color = COLOR_ALWAYS;
                 } else {
                     fprintf(stderr, "Unknown colo(u)r option\n");
-                    env_close();
                     return UGREP_EXIT_USAGE;
                 }
 #endif /* !NO_COLOR */
@@ -1222,15 +1220,12 @@ int main(int argc, char **argv)
                     binbehave = BIN_FILE_TEXT;
                 } else {
                     fprintf(stderr, "Unknown binary-files option\n");
-                    env_close();
                     return UGREP_EXIT_USAGE;
                 }
                 break;
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
                     usage();
-                    env_close();
-                    return UGREP_EXIT_USAGE;
                 }
                 break;
         }
@@ -1261,8 +1256,6 @@ int main(int argc, char **argv)
     if (slist_empty(patterns)) {
         if (argc < 1) {
             usage();
-            env_close();
-            return UGREP_EXIT_USAGE;
         } else {
             if (!add_patternC(&error, patterns, *argv++, pattern_type, strength | flags)) {
                 print_error(error);
@@ -1312,6 +1305,5 @@ int main(int argc, char **argv)
         }
     }
 
-    env_close();
     return return_values[0 == ret][matches > 0];
 }

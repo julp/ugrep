@@ -381,22 +381,6 @@ static int procfile(reader_t *reader, const char *filename)
     return 0;
 }
 
-static void exit_cb(void)
-{
-    if (NULL != ustr) {
-        ustring_destroy(ustr);
-    }
-    if (NULL != pieces) {
-        dptrarray_destroy(pieces);
-    }
-    if (NULL != pdata.pattern) {
-        pdata.engine->destroy(pdata.pattern);
-    }
-    if (NULL != intervals) {
-        interval_list_destroy(intervals);
-    }
-}
-
 // ./ucut -sd a -f 1 test/data/ucut.txt => is incorrect? (depends on output delim?)
 int main(int argc, char **argv)
 {
@@ -405,11 +389,6 @@ int main(int argc, char **argv)
     reader_t reader;
     UBool complement;
     const char *intervals_arg, *delim_arg;
-
-    if (0 != atexit(exit_cb)) {
-        fputs("can't register atexit() callback", stderr);
-        return UCUT_EXIT_FAILURE;
-    }
 
     ret = 0;
     error = NULL;
@@ -431,7 +410,6 @@ int main(int argc, char **argv)
             case 'b':
                 fputs("Working with bytes makes no sense: ucut works in UTF-16, after a possible charset conversion and normalization", stderr);
                 return UCUT_EXIT_FAILURE;
-                break;
             case 'c':
                 cFlag = TRUE;
                 intervals_arg = optarg;
@@ -494,6 +472,7 @@ int main(int argc, char **argv)
 #if defined(DEBUG) && 0
     interval_list_debug(intervals);
 #endif
+    env_register_resource(intervals, (func_dtor_t) interval_list_destroy);
     if (NULL == delim_arg) {
         delim = ustring_dup_string_len(DEFAULT_DELIM, STR_LEN(DEFAULT_DELIM));
     } else {
@@ -501,11 +480,17 @@ int main(int argc, char **argv)
             print_error(error);
         }
     }
-    if (fFlag && NULL == (pdata.pattern = pdata.engine->compile(&error, delim, 0))) {
-        print_error(error);
+    if (fFlag) {
+        if (NULL == (pdata.pattern = pdata.engine->compile(&error, delim, 0))) {
+            print_error(error);
+        } else {
+            env_register_resource(pdata.pattern, pdata.engine->destroy);
+        }
     }
     ustr = ustring_new();
+    env_register_resource(ustr, (func_dtor_t) ustring_destroy);
     pieces = dptrarray_new(free);
+    env_register_resource(pieces, (func_dtor_t) dptrarray_destroy);
 
     if (0 == argc) {
         ret |= procfile(&reader, "-");

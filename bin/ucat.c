@@ -78,6 +78,7 @@ static void usage(void)
         __progname,
         optstr
     );
+    exit(UCAT_EXIT_USAGE);
 }
 
 static int procfile(reader_t *reader, const char *filename)
@@ -235,8 +236,7 @@ int main(int argc, char **argv)
                 break;
             case 'V':
                 fprintf(stderr, "BSD ucat version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
-                env_close();
-                return EXIT_SUCCESS;
+                return UCAT_EXIT_SUCCESS;
                 break;
             case 'b':
                 bFlag = TRUE;
@@ -287,8 +287,6 @@ int main(int argc, char **argv)
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {
                     usage();
-                    env_close();
-                    return UCAT_EXIT_USAGE;
                 }
                 break;
         }
@@ -314,8 +312,6 @@ int main(int argc, char **argv)
             ret |= procfile(&reader, *argv);
         }
     }
-
-    env_close();
 
     return (0 == ret ? UCAT_EXIT_SUCCESS : UCAT_EXIT_FAILURE);
 }
