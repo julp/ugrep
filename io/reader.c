@@ -48,9 +48,8 @@ static int32_t fill_buffer(reader_t *this, error_t **error)
     status = U_ZERO_ERROR;
     utf16diff = this->utf16.ptr - this->utf16.buffer;
     if (utf16diff > 0) {
-        u_memmove(this->utf16.buffer, this->utf16.ptr, this->utf16.internalEnd - this->utf16.ptr);
-        this->utf16.internalEnd -= utf16diff;
-        this->utf16.externalEnd -= utf16diff;
+        u_memmove(this->utf16.buffer, this->utf16.ptr, this->utf16.end - this->utf16.ptr);
+        this->utf16.end -= utf16diff;
         this->utf16.ptr = this->utf16.buffer;
     }
     bytesdiff = this->byte.ptr - this->byte.buffer;
@@ -81,19 +80,7 @@ static int32_t fill_buffer(reader_t *this, error_t **error)
         return -1;
     }
     utf16Length = utf16Ptr - this->utf16.ptr;
-    this->utf16.internalEnd = this->utf16.externalEnd = utf16Ptr;
-
-#if 0
-    if (this->utf16.externalEnd == this->utf16.limit) {
-//         UChar lastCU;
-
-//         lastCU = *(this->utf16.externalEnd - 1);
-        if (/*!U16_IS_SINGLE(lastCU) &&*/ U16_IS_LEAD(*(this->utf16.externalEnd - 1))) {
-            --this->utf16.externalEnd;
-debug("CP split detected. before : >%.*S< ; after : >%.*S<", this->utf16.internalEnd - this->utf16.ptr, this->utf16.ptr, this->utf16.externalEnd - this->utf16.ptr, this->utf16.ptr);
-        }
-    }
-#endif
+    this->utf16.end = utf16Ptr;
 
     return utf16Length;
 }
@@ -102,8 +89,8 @@ debug("CP split detected. before : >%.*S< ; after : >%.*S<", this->utf16.interna
 
 static void copy_full_buffer_into_ustring(reader_t *this, UString *ustr)
 {
-    ustring_append_string_len(ustr, this->utf16.ptr, this->utf16.externalEnd - this->utf16.ptr);
-    this->utf16.ptr = this->utf16.externalEnd;
+    ustring_append_string_len(ustr, this->utf16.ptr, this->utf16.end - this->utf16.ptr);
+    this->utf16.ptr = this->utf16.end;
 }
 
 static void copy_buffer_until_into_ustring(reader_t *this, UString *ustr, UChar *includedLimit)
@@ -126,7 +113,7 @@ UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
     require_else_return_false(NULL != ustr);
 
     ustring_truncate(ustr);
-    available = this->utf16.externalEnd - this->utf16.ptr;
+    available = this->utf16.end - this->utf16.ptr;
     if (0 == available) {
         //if (-1 == (available = fill_buffer(this, error))) {
         if ((available = fill_buffer(this, error)) < 1) {
@@ -135,10 +122,10 @@ UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
     }
     while (available > 0) {
         p = this->utf16.ptr;
-        while (p < this->utf16.externalEnd) {
+        while (p < this->utf16.end) {
             switch (*p) {
                 case U_CR:
-                    if ((p + 1) >= this->utf16.externalEnd) {
+                    if ((p + 1) >= this->utf16.end) {
                         copy_full_buffer_into_ustring(this, ustr);
                         if (-1 == fill_buffer(this, error)) {
                             return FALSE;
@@ -185,15 +172,15 @@ UChar32 reader_readuchar32(reader_t *this, error_t **error) /* NONNULL(1) */
 {
     require_else_return_val(NULL != this, -1);
 
-    if ((this->utf16.externalEnd - this->utf16.ptr) < 2) {
+    if ((this->utf16.end - this->utf16.ptr) < 2) {
         fill_buffer(this, error);
     }
-    if (this->utf16.ptr < this->utf16.externalEnd) {
+    if (this->utf16.ptr < this->utf16.end) {
         UChar32 c;
 
         c = *this->utf16.ptr++;
         if (U16_IS_LEAD(c)) {
-            if (this->utf16.ptr < this->utf16.externalEnd) {
+            if (this->utf16.ptr < this->utf16.end) {
                 c = U16_GET_SUPPLEMENTARY(c, *this->utf16.ptr);
                 ++this->utf16.ptr;
             } else {
@@ -216,7 +203,7 @@ int32_t reader_readuchars32(reader_t *this, error_t **error, UChar32 *buffer, in
     require_else_return_val(maxLen >= 1, -1);
 
     for (i = 0; i < maxLen; i++) {
-        if ((this->utf16.externalEnd - this->utf16.ptr) < 2) {
+        if ((this->utf16.end - this->utf16.ptr) < 2) {
             if ((available = fill_buffer(this, error)) < 1) {
                 if (-1 == available) {
                     i = -1;
@@ -244,7 +231,7 @@ int32_t reader_readuchars(reader_t *this, error_t **error, UChar *buffer, int32_
 
     copyLen = count = 0;
     do {
-        available = this->utf16.externalEnd - this->utf16.ptr;
+        available = this->utf16.end - this->utf16.ptr;
         if (available < 1) {
             if ((available = fill_buffer(this, error)) < 1) {
                 if (-1 == available) {
@@ -314,7 +301,7 @@ static UBool reader_rewind(reader_t *this, error_t **UNUSED(error))
 //     ucnv_reset(this->ucnv);
 //     ucnv_resetToUnicode(this->ucnv);
 #ifndef NO_PHYSICAL_REWIND
-    this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.ptr = this->utf16.buffer;
+    this->utf16.end = this->utf16.ptr = this->utf16.buffer;
     ret = this->imp->rewindTo(this->fp, error, this->signature_length);
 #else
     this->utf16.ptr = this->utf16.buffer;
@@ -461,7 +448,7 @@ UBool reader_eof(reader_t *this) /* NONNULL() */
 {
     require_else_return_false(NULL != this);
 
-    return this->imp->eof(this->fp) && this->utf16.internalEnd == this->utf16.ptr /*&& this->byte.end == this->byte.buffer*/;
+    return this->imp->eof(this->fp) && this->utf16.end == this->utf16.ptr /*&& this->byte.end == this->byte.buffer*/;
 }
 
 void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
@@ -488,7 +475,7 @@ void reader_init(reader_t *this, const char *name) /* NONNULL(1) */
     this->byte.limit = this->byte.buffer + CHAR_BUFFER_SIZE;
     this->utf16.limit = this->utf16.buffer + UCHAR_BUFFER_SIZE;
     this->byte.ptr = this->byte.end = this->byte.buffer;
-    this->utf16.ptr = this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.buffer;
+    this->utf16.ptr = this->utf16.end = this->utf16.buffer;
 }
 
 void reader_close(reader_t *this) /* NONNULL() */
@@ -501,7 +488,7 @@ void reader_close(reader_t *this) /* NONNULL() */
     ucnv_close(this->ucnv);
     this->ucnv = NULL;
     this->fp = NULL;
-    if (0 > this->fd) {
+    if (0 > this->fd && STDIN_FILENO != this->fd) {
         close(this->fd);
     }
     this->fd = -1;
@@ -509,7 +496,6 @@ void reader_close(reader_t *this) /* NONNULL() */
 
 UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONNULL(1, 3) */
 {
-    /*struct stat st;*/
     UErrorCode status;
     size_t buffer_len;
     const char *encoding;
@@ -517,11 +503,6 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
 
     require_else_return_false(NULL != this);
     require_else_return_false(NULL != filename);
-
-    /*if (-1 == (stat(filename, &st))) {
-        error_set(error, WARN, "can't stat %s: %s", filename, strerror(errno));
-        return FALSE;
-    }*/
 
     if (!strcmp("-", filename)) {
         this->sourcename = "(standard input)";
@@ -534,7 +515,6 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
             error_set(error, WARN, "can't open %s: %s", filename, strerror(errno));
             goto failed;
         }
-        // TODO: fstat?
     }
 
     if (NULL == (this->fp = this->imp->dopen(error, this->fd, this->sourcename))) {
@@ -547,10 +527,9 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
     status = U_ZERO_ERROR;
     this->lineno = 0;
     this->binary = FALSE;
-    /*this->filesize = st.st_size;*/
     this->signature_length = 0;
     this->byte.ptr = this->byte.end = this->byte.buffer;
-    this->utf16.ptr = this->utf16.externalEnd = this->utf16.internalEnd = this->utf16.buffer;
+    this->utf16.ptr = this->utf16.end = this->utf16.buffer;
 
     if (reader_is_seekable(this)) {
         if ((buffer_len = this->imp->readBytes(this->fp, error, buffer, MAX_ENC_REL_LEN)) > 0) {
@@ -631,7 +610,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
             icu_error_set(error, FATAL, status, "ucnv_toUnicode");
             return FALSE;
         }
-        this->utf16.internalEnd = this->utf16.externalEnd = utf16Ptr;
+        this->utf16.end = utf16Ptr;
     }
 #endif /* NO_PHYSICAL_REWIND */
     if (reader_is_seekable(this)) {

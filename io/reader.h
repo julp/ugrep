@@ -61,8 +61,7 @@ typedef struct {
     struct {
         UChar buffer[UCHAR_BUFFER_SIZE];
         UChar *ptr;
-        UChar *internalEnd; /* /!\ usage restricted to fill_buffer /!\ */
-        UChar *externalEnd;
+        UChar *end;
         const UChar *limit;
     } utf16;
 } reader_t;
