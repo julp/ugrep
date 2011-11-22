@@ -408,7 +408,7 @@ int main(int argc, char **argv)
                 pdata.engine = &fixed_engine;
                 break;
             case 'b':
-                fputs("Working with bytes makes no sense: ucut works in UTF-16, after a possible charset conversion and normalization", stderr);
+                fprintf(stderr, "Working with bytes makes no sense: %s works in UTF-16, after a possible charset conversion and normalization\n", "ucut");
                 return UCUT_EXIT_FAILURE;
             case 'c':
                 cFlag = TRUE;
