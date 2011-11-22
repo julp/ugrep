@@ -119,18 +119,21 @@ static int procfile(reader_t *reader, const char *filename)
             }
             if (uFlag) {
                 rbtree_insert(tree, ustr, NULL, 0, NULL);
+                // TODO: leaks on (new) non unique strings
             } else {
                 int v;
                 int *p;
 
                 v = 1;
                 if (!rbtree_insert(tree, ustr, (void *) &v, RBTREE_INSERT_ON_DUP_KEY_FETCH, (void **) &p)) {
+                    ustring_destroy(ustr);
                     (*p)++;
                 }
             }
         }
-        reader_close(reader);
-    } else {
+    }
+    reader_close(reader);
+    if (NULL != error) {
         print_error(error);
         return 1;
     }
@@ -140,13 +143,6 @@ static int procfile(reader_t *reader, const char *filename)
 
 /* ========== main ========== */
 
-static void exit_cb(void)
-{
-    if (NULL != tree) {
-        rbtree_destroy(tree);
-    }
-}
-
 int main(int argc, char **argv)
 {
     int wanted;
@@ -154,11 +150,6 @@ int main(int argc, char **argv)
     error_t *error;
     reader_t reader;
     UErrorCode status;
-
-    if (0 != atexit(exit_cb)) {
-        fputs("can't register atexit() callback", stderr);
-        return USORT_EXIT_FAILURE;
-    }
 
     ret = 0;
     wanted = ALL;
@@ -218,6 +209,7 @@ int main(int argc, char **argv)
 
 //     if (ALL == wanted) {
         tree = rbtree_collated_new(ucol, rFlag, NODUP, uFlag ? NODUP : SIZE_TO_DUP_T(sizeof(int)), (func_dtor_t) ustring_destroy, uFlag ? NULL : free);
+        env_register_resource(tree, (func_dtor_t) rbtree_destroy);
 //     }
 
     if (0 == argc) {
