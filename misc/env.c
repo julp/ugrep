@@ -248,7 +248,13 @@ void env_close(void)
  * - leak if the string is not issued from ures_getStringByKey (collect them in a slist_t?)
  * - use a UString?
  **/
-UChar *_(const char *id)
+#ifdef NO_I18N
+# define _(/*const char **/ id, /*const char **/ fallback) fallback
+#else
+// _("icu", u_errorName(status), u_errorName(status))
+// _("ucut", "encodingIs", "encoding is: %s")
+// ns can be NULL, fallback too to indicate to use id?
+UChar *_(/*const char *ns,*/const char *id, const char *fallback)
 {
     UErrorCode status;
     int32_t msg_len, result_len;
@@ -270,3 +276,4 @@ UChar *_(const char *id)
 
     return result;
 }
+#endif /* NO_I18N */
