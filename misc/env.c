@@ -208,7 +208,7 @@ void env_init(void)
         char cp[30] = { 0 };
 
         snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
-        outputs_encoding = strdup(cp); // TODO: leak
+        outputs_encoding = strdup(cp);
         env_register_resource(outputs_encoding, free);
     }
 #endif /* _MSC_VER */
