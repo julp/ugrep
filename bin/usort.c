@@ -21,6 +21,7 @@ enum {
 /* ========== global variables ========== */
 
 static RBTree *tree = NULL;
+static UString *ustr = NULL;
 static UCollator *ucol = NULL;
 
 static UBool bFlag = FALSE;
@@ -107,9 +108,6 @@ static int procfile(reader_t *reader, const char *filename)
     error = NULL;
     if (reader_open(reader, &error, filename)) {
         while (!reader_eof(reader)) {
-            UString *ustr;
-
-            ustr = ustring_new();
             if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
             }
@@ -119,14 +117,12 @@ static int procfile(reader_t *reader, const char *filename)
             }
             if (uFlag) {
                 rbtree_insert(tree, ustr, NULL, 0, NULL);
-                // TODO: leaks on (new) non unique strings
             } else {
                 int v;
                 int *p;
 
                 v = 1;
                 if (!rbtree_insert(tree, ustr, (void *) &v, RBTREE_INSERT_ON_DUP_KEY_FETCH, (void **) &p)) {
-                    ustring_destroy(ustr);
                     (*p)++;
                 }
             }
@@ -208,9 +204,11 @@ int main(int argc, char **argv)
     env_apply();
 
 //     if (ALL == wanted) {
-        tree = rbtree_collated_new(ucol, rFlag, NODUP, uFlag ? NODUP : SIZE_TO_DUP_T(sizeof(int)), (func_dtor_t) ustring_destroy, uFlag ? NULL : free);
+        tree = rbtree_collated_new(ucol, rFlag, (dup_t) ustring_dup, uFlag ? NODUP : SIZE_TO_DUP_T(sizeof(int)), (func_dtor_t) ustring_destroy, uFlag ? NULL : free);
         env_register_resource(tree, (func_dtor_t) rbtree_destroy);
 //     }
+    ustr = ustring_new();
+    env_register_resource(ustr, (func_dtor_t) ustring_destroy);
 
     if (0 == argc) {
         ret |= procfile(&reader, "-");

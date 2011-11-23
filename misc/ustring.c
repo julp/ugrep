@@ -62,6 +62,21 @@ UString *ustring_new(void) /* WARN_UNUSED_RESULT */
     return ustring_sized_new(USTRING_INITIAL_LENGTH);
 }
 
+UString *ustring_dup(const UString *ustr) /* WARN_UNUSED_RESULT NONNULL() */
+{
+    UString *copy;
+
+    require_else_return_null(NULL != ustr);
+
+    copy = mem_new(*copy);
+    copy->allocated = copy->len = ustr->len;
+    copy->ptr = mem_new_n(*copy->ptr, copy->allocated + 1);
+    u_memcpy(copy->ptr, ustr->ptr, ustr->len);
+    copy->ptr[copy->len] = 0;
+
+    return copy;
+}
+
 UString *ustring_sized_new(size_t requested) /* WARN_UNUSED_RESULT */
 {
     UString *ustr;
