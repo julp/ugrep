@@ -168,7 +168,7 @@ void env_apply(void)
 #endif /* DEBUG */
 }
 
-void env_init(void)
+void env_init(const char *argv0)
 {
     const char *tmp;
 
@@ -216,24 +216,76 @@ void env_init(void)
         outputs_encoding = strdup(cp); // TODO: leak
     }
 #endif /* _MSC_VER */
+#ifndef NO_I18N
     {
-        UErrorCode status;
+        char rbpath[MAXPATHLEN];
 
-        status = U_ZERO_ERROR;
-        ures = ures_open("/home/julp/ugrep/ugrep", NULL, &status); // TODO: get installation path
-        if (U_FAILURE(status)) {
-            fprintf(stderr, "translation disabled: %s\n", u_errorName(status));
-#ifdef DEBUG
-        } else {
-            if (U_USING_DEFAULT_WARNING == status) {
-                fprintf(stderr, YELLOW("default") " translation enabled\n");
+        *rbpath = '\0';
+# ifdef _MSC_VER
+        //
+# else
+        {
+# include <errno.h>
+
+            char bin[MAXPATHLEN];
+
+            if (NULL == realpath(argv0, bin)) {
+                stdio_debug("realpath failed: %s", strerror(errno));
             } else {
-                fprintf(stderr, "translation enabled: " GREEN("%s") "\n", ures_getLocaleByType(ures, ULOC_ACTUAL_LOCALE, &status));
-                assert(U_SUCCESS(status));
+                char *c;
+
+                if (NULL != (c = strrchr(bin, DIRECTORY_SEPARATOR))) {
+                    c[1] = '\0';
+                    strncat(bin, "../share/", STR_SIZE(bin));
+                    if (NULL == realpath(bin, rbpath)) {
+                        *rbpath = '\0';
+                        stdio_debug("realpath failed: %s", strerror(errno));
+                    } else {
+                        strncat(rbpath, "/ugrep", STR_SIZE(bin));
+                    }
+                }
             }
-#endif /* DEBUG */
+        }
+        /*{
+# include <errno.h>
+            int ret;
+            char proc[MAXPATHLEN];
+
+            ret = snprintf(proc, STR_SIZE(proc), "/proc/%d/exe", getpid());
+            if (ret < 0 || ret >= (int) STR_SIZE(proc)) {
+                *rbpath = '\0';
+            } else {
+                ssize_t fill;
+
+                if (-1 == (fill = readlink(proc, rbpath, STR_SIZE(rbpath)))) {
+                    *rbpath = '\0';
+                    stdio_debug("readlink failed: %s", strerror(errno));
+                } else {
+                    rbpath[fill] = '\0';
+                }
+            }
+        }*/
+# endif /* _MSC_VER */
+        if ('\0' != *rbpath) {
+            UErrorCode status;
+
+            status = U_ZERO_ERROR;
+            ures = ures_open(rbpath, NULL, &status);
+            if (U_FAILURE(status)) {
+                fprintf(stderr, "translation disabled: %s\n", u_errorName(status));
+# ifdef DEBUG
+            } else {
+                if (U_USING_DEFAULT_WARNING == status) {
+                    fprintf(stderr, YELLOW("default") " translation enabled\n");
+                } else {
+                    fprintf(stderr, "translation enabled: " GREEN("%s") "\n", ures_getLocaleByType(ures, ULOC_ACTUAL_LOCALE, &status));
+                    assert(U_SUCCESS(status));
+                }
+# endif /* DEBUG */
+            }
         }
     }
+#endif /* !NO_I18N */
 }
 
 void env_close(void)
@@ -243,18 +295,11 @@ void env_close(void)
     }
 }
 
-/**
- * TODO:
- * - leak if the string is not issued from ures_getStringByKey (collect them in a slist_t?)
- * - use a UString?
- **/
-#ifdef NO_I18N
-# define _(/*const char **/ id, /*const char **/ fallback) fallback
-#else
+#ifndef NO_I18N
 // _("icu", u_errorName(status), u_errorName(status))
 // _("ucut", "encodingIs", "encoding is: %s")
 // ns can be NULL, fallback too to indicate to use id?
-UChar *_(/*const char *ns,*/const char *id, const char *fallback)
+UChar *_(const char *UNUSED(ns), const char *id, const char *fallback)
 {
     UErrorCode status;
     int32_t msg_len, result_len;
@@ -268,12 +313,13 @@ UChar *_(/*const char *ns,*/const char *id, const char *fallback)
             return msg;
         }
     }
-    u_uastrncpy(buf, id, STR_LEN(buf));
+    u_uastrncpy(buf, fallback, STR_LEN(buf));
     result_len = u_strlen(buf);
     result = mem_new_n(*result, result_len + 1);
     u_memcpy(result, buf, result_len);
     result[result_len] = 0;
+    //env_register_resource(result, free);
 
     return result;
 }
-#endif /* NO_I18N */
+#endif /* !NO_I18N */

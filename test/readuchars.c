@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     int c, ret;
     reader_t reader;
 
-    env_init();
+    env_init(argv[0]);
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = EXIT_FAILURE;
 

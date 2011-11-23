@@ -17,6 +17,9 @@ const char *ubasename(const char *);
 # define debug(format, ...) \
     msg(INFO, format, ## __VA_ARGS__)
 
+# define stdio_debug(format, ...) \
+    fprintf(stderr, "%s:%d:" format " in %s()\n", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
+
 # define u_printf(...)                                \
     do {                                              \
         UFILE *ustdout = u_finit(stdout, NULL, NULL); \
@@ -27,6 +30,7 @@ const char *ubasename(const char *);
     report(type, format "\n", ## __VA_ARGS__)
 
 # define debug(format, ...) /* NOP */
+# define stdio_debug(format, ...) /* NOP */
 #endif /* DEBUG */
 
 # define icu_error_set(error, type, status, function) \

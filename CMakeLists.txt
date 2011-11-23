@@ -112,6 +112,7 @@ foreach (UgrepBinary ${UgrepBinaries})
 endforeach(UgrepBinary)
 
 genrb(PACKAGE ugrep root.txt fr.txt)
+install(FILES ugrep.dat DESTINATION share/ugrep/)
 
 #install(CODE "EXEC_PROGRAM(${CMAKE_COMMAND} ARGS -E create_symlink \"${CMAKE_INSTALL_PREFIX}/bin/ugrep\" \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
 #list(APPEND CMAKE_INSTALL_MANIFEST_FILES \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")

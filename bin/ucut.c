@@ -351,7 +351,7 @@ int main(int argc, char **argv)
     error = NULL;
     intervals = interval_list_new();
     intervals_arg = delim_arg = NULL;
-    env_init();
+    env_init(argv[0]);
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = UCUT_EXIT_FAILURE;
 
@@ -394,8 +394,8 @@ int main(int argc, char **argv)
     env_apply();
 
 #if 1
-    debug("%S", _("foo"));
-    debug("%S", _("john"));
+    debug("%S", _(NULL, "foo", "Ffoo"));
+    debug("%S", _(NULL, "john", "Fjohn"));
 #endif
     if (cFlag && fFlag) {
         usage();

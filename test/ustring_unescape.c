@@ -13,7 +13,7 @@ int ut(const UChar *string, const UChar *expected) // 0: pass, 1: failed
     return ret;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     int ret, r;
     size_t i;
@@ -51,7 +51,7 @@ int main(void)
     };
 
     ret = 0;
-    env_init();
+    env_init(argv[0]);
     env_apply();
     for (i = 0; i < ARRAY_SIZE(tests); i++) {
         r = ut(tests[i][0], tests[i][1]);

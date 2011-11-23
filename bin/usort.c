@@ -163,7 +163,7 @@ int main(int argc, char **argv)
     ret = 0;
     wanted = ALL;
     error = NULL;
-    env_init();
+    env_init(argv[0]);
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = USORT_EXIT_FAILURE;
 

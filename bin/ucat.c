@@ -203,7 +203,7 @@ int main(int argc, char **argv)
     }
 
     ret = 0;
-    env_init();
+    env_init(argv[0]);
     reader_init(&reader, DEFAULT_READER_NAME);
     exit_failure_value = UCAT_EXIT_FAILURE;
 
@@ -247,6 +247,7 @@ int main(int argc, char **argv)
                 TFlag = TRUE;
                 break;
             case 'V':
+                printf("%s\n", __progname);
                 fprintf(stderr, "BSD ucat version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 exit(EXIT_SUCCESS);
                 break;

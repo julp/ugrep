@@ -177,7 +177,7 @@ int ut(interval_list_t *l, interval_t *array) // 0: pass, 1: failed
     return ret;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     size_t i;
     int ret, r;
@@ -213,7 +213,7 @@ int main(void)
     };
 
     ret = 0;
-    env_init();
+    env_init(argv[0]);
     env_apply();
     l = interval_list_new();
     for (i = 0; i < ARRAY_SIZE(tests); i++) {

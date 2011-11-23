@@ -563,7 +563,7 @@ int main(int argc, char **argv)
     set1_case_type = set2_case_type = UCASE_NONE;
     match = isError = set2_expected = cFlag = dFlag = sFlag = FALSE;
 
-    env_init();
+    env_init(argv[0]);
     reader_init(&reader, DEFAULT_READER_NAME);
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {

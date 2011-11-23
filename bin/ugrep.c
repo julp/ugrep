@@ -1093,7 +1093,7 @@ int main(int argc, char **argv)
         return UGREP_EXIT_FAILURE;
     }
 
-    env_init();
+    env_init(argv[0]);
     reader_init(&reader, DEFAULT_READER_NAME);
     patterns = slist_new(pattern_destroy);
     exit_failure_value = UGREP_EXIT_FAILURE;
