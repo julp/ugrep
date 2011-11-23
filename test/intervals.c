@@ -88,6 +88,7 @@ int main(void)
 
     ret = 0;
     env_init();
+    exit_failure_value = EXIT_FAILURE;
     env_apply();
     error = NULL;
     l = interval_list_new();
