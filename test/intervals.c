@@ -1,162 +1,6 @@
 #include "common.h"
 #include "struct/intervals.c"
 
-enum {
-    FIELD_NO_ERR = 0,
-    FIELD_ERR_NUMBER_EXPECTED, // s == *endptr
-    FIELD_ERR_OUT_OF_RANGE,    // number not in [min;max] ([1;INT_MAX] here)
-    FIELD_ERR_NON_DIGIT_FOUND, // *endptr not in ('\0', ',')
-    FIELD_ERR_INVALID_RANGE,   // lower_limit > upper_limit
-    FIELD_ERR__COUNT
-};
-
-static const char *intervalParsingErrorName(int code)
-{
-    switch (code) {
-        case FIELD_NO_ERR:
-            return "no error";
-        case FIELD_ERR_NUMBER_EXPECTED:
-            return "number expected";
-        case FIELD_ERR_OUT_OF_RANGE:
-            return "number is out of the range [1;INT32_MAX[";
-        case FIELD_ERR_NON_DIGIT_FOUND:
-            return "non digit character found";
-        case FIELD_ERR_INVALID_RANGE:
-            return "invalid range: upper limit should be greater or equal than lower limit";
-        default:
-            return "bogus error code";
-    }
-}
-
-#ifndef HAVE_STRCHRNUL
-static char *strchrnul(const char *s, int c)
-{
-    while (('\0' != *s) && (*s != c)) {
-        s++;
-    }
-
-    return (char *) s;
-}
-#endif /* HAVE_STRCHRNUL */
-
-static int parseIntervalBoundary(const char *nptr, char **endptr, int32_t min, int32_t max, int32_t *ret)
-{
-    char c;
-    const char *s;
-    UBool negative;
-    int any, cutlim;
-    uint32_t cutoff, acc;
-
-    s = nptr;
-    acc = any = 0;
-    if ('-' == (c = *s++)) {
-        negative = TRUE;
-        c = *s++;
-    } else {
-        negative = FALSE;
-        if ('+' == *s) {
-            c = *s++;
-        }
-    }
-    cutoff = negative ? (uint32_t) - (INT32_MIN + INT32_MAX) + INT32_MAX : INT32_MAX;
-    cutlim = cutoff % 10;
-    cutoff /= 10;
-    do {
-        if (c >= '0' && c <= '9') {
-            c -= '0';
-        } else {
-            break;
-        }
-        if (any < 0 || acc > cutoff || (acc == cutoff && c > cutlim)) {
-            any = -1;
-        } else {
-            any = 1;
-            acc *= 10;
-            acc += c;
-        }
-    } while ('\0' != (c = *s++));
-    if (NULL != endptr) {
-        *endptr = (char *) (any ? s - 1 : nptr);
-    }
-    if (any < 0) {
-        *ret = negative ? INT32_MIN : INT32_MAX;
-        return FIELD_ERR_OUT_OF_RANGE;
-    } else if (!any) {
-        return FIELD_ERR_NUMBER_EXPECTED;
-    } else if (negative) {
-        *ret = -acc;
-    } else {
-        *ret = acc;
-    }
-    if (*ret < min || *ret > max) {
-        return FIELD_ERR_OUT_OF_RANGE;
-    }
-
-    return FIELD_NO_ERR;
-}
-
-static UBool parseIntervals(error_t **error, const char *s, interval_list_t *intervals)
-{
-    int ret;
-    char *endptr;
-    const char *p, *comma;
-    int32_t lower_limit, upper_limit;
-
-    p = s;
-    while ('\0' != *p) {
-        lower_limit = 0;
-        upper_limit = INT32_MAX;
-        comma = strchrnul(p, ',');
-        if ('-' == *p) {
-            /* -Y */
-            if (0 != (ret = parseIntervalBoundary(p + 1, &endptr, 0, INT32_MAX, &upper_limit)) || ('\0' != *endptr && ',' != *endptr)) {
-                error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
-                return FALSE;
-            }
-        } else {
-            if (NULL == memchr(p, '-', comma - p)) {
-                /* X */
-                if (0 != (ret = parseIntervalBoundary(p, &endptr, 0, INT32_MAX, &lower_limit)) || ('\0' != *endptr && ',' != *endptr)) {
-                    error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
-                    return FALSE;
-                }
-                upper_limit = lower_limit;
-            } else {
-                /* X- or X-Y */
-                if (0 != (ret = parseIntervalBoundary(p, &endptr, 0, INT32_MAX, &lower_limit))) {
-                    error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
-                    return FALSE;
-                }
-                if ('-' == *endptr) {
-                    if ('\0' == *(endptr + 1)) {
-                        // NOP (lower_limit = 0)
-                    } else {
-                        if (0 != (ret = parseIntervalBoundary(endptr + 1, &endptr, 0, INT32_MAX, &upper_limit)) || ('\0' != *endptr && ',' != *endptr)) {
-                            error_set(error, FATAL, "%s:\n%s\n%*c", intervalParsingErrorName(ret), s, endptr - s + 1, '^');
-                            return FALSE;
-                        }
-                    }
-                } else {
-                    error_set(error, FATAL, "'-' expected, get '%c' (%d):\n%*c", *endptr, *endptr, endptr - s + 1, '^');
-                    return FALSE;
-                }
-            }
-            if (lower_limit > upper_limit) {
-                error_set(error, FATAL, "invalid interval: lower limit greater then upper one");
-                return FALSE;
-            }
-        }
-//         debug("add [%d;%d[", lower_limit, upper_limit);
-        interval_list_add(intervals, INT32_MAX, lower_limit, upper_limit);
-        if ('\0' == *comma) {
-            break;
-        }
-        p = comma + 1;
-    }
-
-    return TRUE;
-}
-
 int ut(interval_list_t *l, interval_t *array) // 0: pass, 1: failed
 {
     int j, ret;
@@ -250,12 +94,12 @@ int main(void)
     for (i = 0; i < ARRAY_SIZE(tests); i++) {
         interval_list_clean(l);
         if ('!' == tests[i][0]) {
-            if (!parseIntervals(&error, tests[i] + 1, l)) {
+            if (!parseIntervals(&error, tests[i] + 1, l, 0)) {
                 print_error(error);
             }
             interval_list_complement(l, 200, 1000);
         } else {
-            if (!parseIntervals(&error, tests[i], l)) {
+            if (!parseIntervals(&error, tests[i], l, 0)) {
                 print_error(error);
             }
         }
