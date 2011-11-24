@@ -133,10 +133,10 @@ static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *
                 l = u;
             }
         }
-        if (!pieces) {
+        /*if (!pieces) {
 //         add_match(array, ustr, 0, ustr->len);
 //         ++pieces;
-        } else if (UBRK_DONE != l && UBRK_DONE == u && (size_t) l < ustr->len) {
+        } else */if (UBRK_DONE != l && UBRK_DONE == u && (size_t) l < ustr->len) {
             add_match(array, ustr, l, ustr->len);
             ++pieces;
         }
@@ -197,7 +197,7 @@ static int procfile(reader_t *reader, const char *filename)
                     assert(FALSE);
                 }
                 u_file_write(EOL, EOL_LEN, ustdout);
-            } else if (!sFlag) {
+            } else if (!sFlag && fFlag) {
                 u_file_write(ustr->ptr, ustr->len, ustdout);
                 u_file_write(EOL, EOL_LEN, ustdout);
             }
