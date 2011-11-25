@@ -22,6 +22,8 @@ static const char *system_encoding = NULL;
 static const char *inputs_encoding = NULL;
 static const char *outputs_encoding = NULL;
 static const char *stdin_encoding = NULL;
+
+static int unit = UNIT_CODEPOINT;
 static UNormalizationMode normalization = UNORM_NONE;//UNORM_NFC;
 
 /**
@@ -41,6 +43,23 @@ static UNormalizationMode normalization = UNORM_NONE;//UNORM_NFC;
  *                     \     /
  *                      stdin
  **/
+
+int env_get_unit(void)
+{
+    return unit;
+}
+
+void env_set_unit(int mode)
+{
+    switch (unit) {
+        case UNIT_GRAPHEME:
+        case UNIT_CODEPOINT:
+            unit = mode;
+            break;
+        default:
+            fprintf(stderr, "Unknown unit (%d), skip\n", mode);
+    }
+}
 
 UNormalizationMode env_get_normalization(void)
 {

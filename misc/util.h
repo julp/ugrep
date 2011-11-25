@@ -18,6 +18,7 @@ extern int exit_failure_value;
     {"output", required_argument, NULL, OUTPUT_OPT}, \
     {"system", required_argument, NULL, SYSTEM_OPT}, \
     {"form",   required_argument, NULL, FORM_OPT},   \
+    {"unit",   required_argument, NULL, UNIT_OPT},   \
     {"reader", required_argument, NULL, READER_OPT}
 
 enum {
@@ -26,6 +27,7 @@ enum {
     OUTPUT_OPT,
     SYSTEM_OPT,
     FORM_OPT,
+    UNIT_OPT,
     READER_OPT
 };
 

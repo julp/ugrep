@@ -25,6 +25,15 @@ UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
                 return TRUE;
             }
             return FALSE;
+        case UNIT_OPT:
+            if (!strcmp("codepoint", optarg) || !strcmp("cp", optarg)) {
+                env_set_unit(UNIT_CODEPOINT);
+                return TRUE;
+            } else if (!strcmp("grapheme", optarg)) {
+                env_set_unit(UNIT_GRAPHEME);
+                return TRUE;
+            }
+            return FALSE;
         case READER_OPT:
             if (!reader_set_imp_by_name(reader, optarg)) {
                 fprintf(stderr, "Unknown reader\n");
