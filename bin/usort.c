@@ -116,7 +116,7 @@ static int procfile(reader_t *reader, const char *filename)
                 ustring_ltrim(ustr);
             }
             if (uFlag) {
-                rbtree_insert(tree, ustr, NULL, 0, NULL);
+                rbtree_insert(tree, ustr, NULL, RBTREE_INSERT_ON_DUP_KEY_PRESERVE, NULL);
             } else {
                 int v;
                 int *p;
