@@ -31,12 +31,11 @@ typedef struct {
 
 static inline void add_match(DPtrArray *array, const UString *subject, int32_t l, int32_t u)
 {
-    match_t *m;
+    match_t m;
 
-    m = mem_new(*m);
-    m->ptr = subject->ptr + l;
-    m->len = u - l;
-    dptrarray_push(array, m);
+    m.ptr = subject->ptr + l;
+    m.len = u - l;
+    dptrarray_push(array, &m);
 }
 
 typedef struct {

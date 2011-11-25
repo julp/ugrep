@@ -320,7 +320,7 @@ int main(int argc, char **argv)
     }
     ustr = ustring_new();
     env_register_resource(ustr, (func_dtor_t) ustring_destroy);
-    pieces = dptrarray_new(free);
+    pieces = dptrarray_new(SIZE_TO_DUP_T(sizeof(match_t)), free);
     env_register_resource(pieces, (func_dtor_t) dptrarray_destroy);
 
     if (0 == argc) {

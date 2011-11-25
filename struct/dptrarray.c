@@ -5,6 +5,7 @@ struct _DPtrArray {
     void **data;
     size_t length;
     size_t allocated;
+    dup_t duper;
     func_dtor_t dtor_func;
 };
 
@@ -27,7 +28,7 @@ static void dptrarray_maybe_resize_of(DPtrArray *this, size_t additional_length)
     dptrarray_maybe_resize_to(this, this->length + additional_length);
 }
 
-DPtrArray *dptrarray_sized_new(size_t length, func_dtor_t dtor_func) /* WARN_UNUSED_RESULT */
+DPtrArray *dptrarray_sized_new(size_t length, dup_t duper, func_dtor_t dtor_func) /* WARN_UNUSED_RESULT */
 {
     DPtrArray *this;
 
@@ -35,14 +36,15 @@ DPtrArray *dptrarray_sized_new(size_t length, func_dtor_t dtor_func) /* WARN_UNU
     this->data = NULL;
     this->length = this->allocated = 0;
     dptrarray_maybe_resize_to(this, length);
+    this->duper = duper;
     this->dtor_func = dtor_func;
 
     return this;
 }
 
-DPtrArray *dptrarray_new(func_dtor_t dtor_func) /* WARN_UNUSED_RESULT */
+DPtrArray *dptrarray_new(dup_t duper, func_dtor_t dtor_func) /* WARN_UNUSED_RESULT */
 {
-    return dptrarray_sized_new(D_PTR_ARRAY_INCREMENT, dtor_func);
+    return dptrarray_sized_new(D_PTR_ARRAY_INCREMENT, duper, dtor_func);
 }
 
 void dptrarray_destroy(DPtrArray *this) /* NONNULL() */
@@ -99,7 +101,7 @@ void dptrarray_push(DPtrArray *this, void *data) /* NONNULL(1) */
     assert(NULL != this);
 
     dptrarray_maybe_resize_of(this, 1);
-    this->data[this->length++] = data;
+    this->data[this->length++] = clone(this->duper, data);
 }
 
 void dptrarray_unshift(DPtrArray *this, void *data) /* NONNULL(1) */
@@ -108,7 +110,7 @@ void dptrarray_unshift(DPtrArray *this, void *data) /* NONNULL(1) */
 
     dptrarray_maybe_resize_of(this, 1);
     memmove(this->data + 1, this->data, this->length * sizeof(*this->data));
-    this->data[0] = data;
+    this->data[0] = clone(this->duper, data);
     ++this->length;
 }
 
@@ -121,7 +123,7 @@ void dptrarray_insert(DPtrArray *this, size_t offset, void *data) /* NONNULL(1) 
     if (offset != this->length) {
         memmove(this->data + offset + 1, this->data + offset, (this->length - offset) * sizeof(*this->data));
     }
-    this->data[offset] = data;
+    this->data[offset] = clone(this->duper, data);
     ++this->length;
 }
 
