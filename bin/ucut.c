@@ -310,6 +310,7 @@ int main(int argc, char **argv)
             print_error(error);
         }
     }
+    env_register_resource(delim, (func_dtor_t) ustring_destroy);
     if (fFlag) {
         if (NULL == (pdata.pattern = pdata.engine->compile(&error, delim, 0))) {
             print_error(error);
