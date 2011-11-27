@@ -119,9 +119,6 @@ void report(int type, const char *format, ...)
     }
 }
 
-static const UChar _EMPTY_USTR[] = { 0 };
-#define EMPTY_USTR _EMPTY_USTR, 0
-
 void ubrk_unbindText(UBreakIterator *ubrk)
 {
     UErrorCode status;
@@ -132,15 +129,21 @@ void ubrk_unbindText(UBreakIterator *ubrk)
     assert(U_SUCCESS(status));
 }
 
+static const UChar _UREGEXP_FAKE_USTR[] = { 0 };
+#define UREGEXP_FAKE_USTR _UREGEXP_FAKE_USTR, 0
+
 void uregex_unbindText(URegularExpression *uregex)
 {
     UErrorCode status;
 
     assert(NULL != uregex);
     status = U_ZERO_ERROR;
-    uregex_setText(uregex, EMPTY_USTR, &status);
+    uregex_setText(uregex, UREGEXP_FAKE_USTR, &status);
     assert(U_SUCCESS(status));
 }
+
+static UChar _USEARCH_FAKE_USTR[] = { 0, 0 };
+#define USEARCH_FAKE_USTR _USEARCH_FAKE_USTR, 1
 
 void usearch_unbindText(UStringSearch *usearch)
 {
@@ -148,6 +151,6 @@ void usearch_unbindText(UStringSearch *usearch)
 
     assert(NULL != usearch);
     status = U_ZERO_ERROR;
-    usearch_setText(usearch, EMPTY_USTR, &status);
+    usearch_setText(usearch, USEARCH_FAKE_USTR, &status);
     assert(U_SUCCESS(status));
 }
