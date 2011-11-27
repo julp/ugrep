@@ -967,7 +967,7 @@ endfile:
         if (!_line_print) {
             if (cFlag) {
                 if (file_print) {
-                    print_file(reader->sourcename, arg_matches == 0, FALSE, TRUE, FALSE);
+                    print_file(reader->sourcename, arg_matches == 0, TRUE, TRUE, FALSE);
                 }
                 u_fprintf(ustdout, "%d\n", arg_matches);
             } else if (lFlag && arg_matches) {
