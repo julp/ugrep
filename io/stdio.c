@@ -10,6 +10,9 @@ static void *stdio_dopen(error_t **error, int fd, const char * const filename)
     errno = 0;
     if (STDIN_FILENO == fd) {
         fp = stdin;
+        if (feof(stdin)) {
+            clearerr(stdin);
+        }
     } else if (NULL == (fp = fdopen(fd, "r"))) {
         error_set(error, WARN, "fdopen failed on %s: %s", filename, strerror(errno));
     }
