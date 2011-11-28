@@ -5,11 +5,11 @@
 extern UFILE *ustdout;
 extern UFILE *ustderr;
 
-#ifdef NO_I18N
+#ifdef WITHOUT_NLS
 # define _(/*const char **/ ns, /*const char **/ id, /*const char **/ fallback) fallback
 #else
 UChar *_(const char *, const char *, const char *);
-#endif /* NO_I18N */
+#endif /* WITHOUT_NLS */
 void env_apply(void);
 void env_deinit(void);
 const char *env_get_inputs_encoding(void);

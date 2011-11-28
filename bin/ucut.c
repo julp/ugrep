@@ -396,6 +396,7 @@ int main(int argc, char **argv)
 #if 1
     debug("%S", _(NULL, "foo", "Ffoo"));
     debug("%S", _(NULL, "john", "Fjohn"));
+    debug("%S", _(NULL, "a/b/c/d", "e"));
 #endif
     if (cFlag && fFlag) {
         usage();

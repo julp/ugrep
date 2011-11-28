@@ -5,4 +5,11 @@ root:table {
     ucut:table {
         x:string { "list of fields, characters or bytes expected" }
     }
+    a:table {
+        b:table {
+            c:table {
+                d:string { "e (from root.txt)" }
+            }
+        }
+    }
 }

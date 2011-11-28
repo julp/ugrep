@@ -168,6 +168,8 @@ void env_apply(void)
 #endif /* DEBUG */
 }
 
+static char *binary_path(const char *, char *, size_t);
+
 void env_init(const char *argv0)
 {
     const char *tmp;
@@ -216,15 +218,16 @@ void env_init(const char *argv0)
         outputs_encoding = strdup(cp); // TODO: leak
     }
 #endif /* _MSC_VER */
-#ifndef NO_I18N
+#ifndef WITHOUT_NLS
     {
         char rbpath[MAXPATHLEN];
 
-        *rbpath = '\0';
+        strcpy(rbpath, "/home/julp/ugrep/ugrep");
+//         *rbpath = '\0';
 # ifdef _MSC_VER
         //
 # else
-        {
+        /*{ WRONG
 # include <errno.h>
 
             char bin[MAXPATHLEN];
@@ -241,11 +244,11 @@ void env_init(const char *argv0)
                         *rbpath = '\0';
                         stdio_debug("realpath failed: %s", strerror(errno));
                     } else {
-                        strncat(rbpath, "/ugrep", STR_SIZE(bin));
+                        strncat(rbpath, "/ugrep/ugrep", STR_SIZE(bin));
                     }
                 }
             }
-        }
+        }*/
         /*{
 # include <errno.h>
             int ret;
@@ -262,14 +265,21 @@ void env_init(const char *argv0)
                     stdio_debug("readlink failed: %s", strerror(errno));
                 } else {
                     rbpath[fill] = '\0';
+                    strncat(rbpath, "/ugrep/ugrep", STR_SIZE(rbpath));
                 }
             }
         }*/
 # endif /* _MSC_VER */
+        {
+            char binary[MAXPATHLEN];
+
+            binary_path(argv0, binary, MAXPATHLEN); // TODO: return value: test/leak
+        }
         if ('\0' != *rbpath) {
             UErrorCode status;
 
             status = U_ZERO_ERROR;
+stdio_debug("%s", rbpath);
             ures = ures_open(rbpath, NULL, &status);
             if (U_FAILURE(status)) {
                 fprintf(stderr, "translation disabled: %s\n", u_errorName(status));
@@ -285,7 +295,7 @@ void env_init(const char *argv0)
             }
         }
     }
-#endif /* !NO_I18N */
+#endif /* !WITHOUT_NLS */
 }
 
 void env_close(void)
@@ -295,7 +305,107 @@ void env_close(void)
     }
 }
 
-#ifndef NO_I18N
+#define URESOURCE_SEPARATOR '/'
+
+static char **str_split(char separator, const char *string)
+{
+    int count, i;
+    const char *p;
+    char *dup, **pieces;
+
+    p = string;
+    i = count = 0;
+    if (NULL == (dup = strdup(string))) {
+        return NULL;
+    }
+    for (p = string; '\0' != *p; p++) {
+        if (*p == separator) {
+            ++count;
+        }
+    }
+    pieces = mem_new_n(*pieces, count + 2);
+    pieces[i++] = dup;
+    while ('\0' != *dup) {
+        if (separator == *dup) {
+            *dup = '\0';
+            pieces[i++] = dup + 1;
+        }
+        ++dup;
+    }
+    pieces[i++] = NULL;
+
+    return pieces;
+}
+
+// we don't use readlink("/proc/%d/exe", getpid()) which is not portable
+static char *binary_path(const char *argv0, char *buffer, size_t buffer_size)
+{
+    size_t argv0_len;
+    char *retval, resolved[MAXPATHLEN];
+
+    retval = NULL;
+    argv0_len = strlen(argv0);
+    if ('.' == *argv0 || '/' == *argv0) { // path is relative or (seems) absolute
+        if (NULL != realpath(argv0, resolved)) {
+            if (NULL == buffer) {
+                retval = strdup(resolved);
+            } else {
+                size_t resolved_len;
+
+                resolved_len = strlen(resolved);
+                if (buffer_size > resolved_len) {
+                    strcpy(buffer, resolved);
+                    retval = buffer;
+                }
+            }
+        }
+    } else { // look in PATH
+        size_t p_len;
+        const char *PATH;
+        char **paths, **p;
+        char fullpath[MAXPATHLEN];
+
+        if (NULL == (PATH = getenv("PATH"))) {
+            return NULL;
+        }
+        if (NULL == (paths = str_split(':', PATH))) {
+            return NULL;
+        }
+        for (p = paths; NULL != *p; p++) {
+            p_len = strlen(*p);
+            if (p_len + STR_LEN("/") + argv0_len > sizeof(fullpath) - 1) {
+                break;
+            }
+            memcpy(fullpath, *p, p_len);
+            fullpath[p_len] = '/';
+            memcpy(fullpath + p_len + STR_LEN("/"), argv0, argv0_len);
+            fullpath[p_len + STR_LEN("/") + argv0_len] = '\0';
+            if (0 == access(fullpath, X_OK)) {
+                if (NULL != realpath(fullpath, resolved)) {
+                    if (NULL == buffer) {
+                        retval = strdup(resolved);
+                    } else {
+                        size_t resolved_len;
+
+                        resolved_len = strlen(resolved);
+                        if (buffer_size > resolved_len) {
+                            strcpy(buffer, resolved);
+                            retval = buffer;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        free(paths[0]);
+        free(paths);
+    }
+
+stdio_debug("resolved : %s", retval);
+    return retval;
+}
+
+#ifndef WITHOUT_NLS
 // _("icu", u_errorName(status), u_errorName(status))
 // _("ucut", "encodingIs", "encoding is: %s")
 // ns can be NULL, fallback too to indicate to use id?
@@ -303,16 +413,79 @@ UChar *_(const char *UNUSED(ns), const char *id, const char *fallback)
 {
     UErrorCode status;
     int32_t msg_len, result_len;
-    UChar *result, *msg, **msgptr, buf[256];
+    UChar *result, *msg, buf[256];
 
     status = U_ZERO_ERROR;
+#if 0
     if (NULL != ures) {
-        msgptr = NULL;
         msg = (UChar *) ures_getStringByKey(ures, id, &msg_len, &status);
         if (U_SUCCESS(status)) {
             return msg;
         }
     }
+#else
+    if (NULL != ures) {
+        char *p;
+        int subres;
+        UResourceBundle *to, *from;
+
+        to = ures;
+        if (URESOURCE_SEPARATOR == *id) {
+            // p = id + 1 or invalid
+        }
+        subres = 0;
+        for (p = (char *) id; '\0' != *p; p++) {
+            if (URESOURCE_SEPARATOR == *p) {
+                ++subres;
+            }
+        }
+        if (subres > 0) {
+            int i, j;
+            char *dup, **names;
+
+            i = 0;
+            dup = strdup(id);
+            names = mem_new_n(*names, subres + 2);
+            names[i++] = dup;
+            for (p = dup; '\0' != *p; p++) {
+                if (URESOURCE_SEPARATOR == *p) {
+                    *p = '\0';
+                    names[i++] = p + 1;
+                }
+            }
+            names[i++] = NULL;
+            from = ures;
+            to = NULL;
+debug("subres = %d", subres);
+            for (j = 0; j < subres/*NULL != names[i]*/; j++) {
+debug("%s", names[j]);
+                to = ures_getByKey(from, names[j], to, &status);
+                if (U_FAILURE(status)) {
+                    debug("%s", u_errorName(status));
+                    goto failed;
+                }
+                from = to;
+                //assert(U_SUCCESS(status));
+            }
+debug("%s", names[j]);
+            msg = (UChar *) ures_getStringByKey(to, names[j], &msg_len, &status);
+            free(names[0]);
+            free(names);
+            if (NULL != to) {
+                ures_close(to);
+            }
+            /*if (ures != from) { // don't close twice the same UResourceBundle
+                ures_close(from);
+            }*/
+        } else {
+            msg = (UChar *) ures_getStringByKey(ures, id, &msg_len, &status);
+        }
+        if (U_SUCCESS(status)) {
+            return msg;
+        }
+    }
+failed:
+#endif
     u_uastrncpy(buf, fallback, STR_LEN(buf));
     result_len = u_strlen(buf);
     result = mem_new_n(*result, result_len + 1);
@@ -322,4 +495,4 @@ UChar *_(const char *UNUSED(ns), const char *id, const char *fallback)
 
     return result;
 }
-#endif /* !NO_I18N */
+#endif /* !WITHOUT_NLS */
