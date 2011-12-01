@@ -1,3 +1,5 @@
+#include <sys/types.h>
+#include <unistd.h>
 #include <bzlib.h>
 #include <errno.h>
 
@@ -6,6 +8,7 @@
 typedef struct {
     UBool eof;
     FILE *f;
+//     int fd;
     BZFILE *fp;
 } BZIP2;
 
@@ -16,14 +19,22 @@ static void *bzip2_dopen(error_t **error, int fd, const char * const filename)
 
     this = mem_new(*this);
     this->eof = FALSE;
-    if (NULL == (this->f = fdopen(fd, "rb"))) {
-        error_set(error, WARN, "fdopen failed on %s: %s", filename, strerror(errno));
-        return NULL;
+//     this->fd = fd;
+    if (STDIN_FILENO == fd) {
+        if (feof(stdin)) {
+            clearerr(stdin);
+        }
+        this->f = stdin;
+    } else {
+        if (NULL == (this->f = fdopen(fd, "rb"))) {
+            error_set(error, WARN, "fdopen() failed on %s: %s", filename, strerror(errno));
+            return NULL;
+        }
     }
-    this->fp = BZ2_bzReadOpen(&bzerror, this->f, 0, 0, NULL, 0);
-    if (BZ_OK != bzerror) {
-        error_set(error, WARN, "bzip2 internal error from BZ2_bzReadOpen(): %s", BZ2_bzerror(this->fp, &bzerror));
-        BZ2_bzReadClose(&bzerror, this->fp);
+    if (NULL == (this->fp = BZ2_bzReadOpen(&bzerror, this->f, 0, 0, NULL, 0))) {
+//     if (NULL == (this->fp = BZ2_bzdopen(this->fd, "rb"))) {
+        error_set(error, WARN, "BZ2_bzReadOpen() failed on %s", filename);
+//         error_set(error, WARN, "bzdopen() failed on %s", filename);
         return NULL;
     }
 
@@ -37,7 +48,12 @@ static void bzip2_close(void *fp)
 
     this = (BZIP2 *) fp;
     BZ2_bzReadClose(&bzerror, this->fp);
-    fclose(this->f);
+//     BZ2_bzclose(this->fp);
+//     if (STDIN_FILENO != this->fd) {
+    if (fileno(this->f) != STDIN_FILENO) {
+        fclose(this->f);
+//         close(this->fd);
+    }
     free(this);
 }
 
@@ -60,15 +76,18 @@ static UBool bzip2_rewindTo(void *fp, error_t **error, int32_t signature_length)
 
     this = (BZIP2 *) fp;
     BZ2_bzReadClose(&bzerror, this->fp);
+//     BZ2_bzclose(this->fp);
     this->eof = FALSE;
     if (0 != fseek(this->f, (long) signature_length, SEEK_SET)) {
-        error_set(error, WARN, "fseek failed: %s", strerror(errno));
+//     if (lseek(this->fd, (long) signature_length, SEEK_SET) < 0) {
+        error_set(error, WARN, "fseek() failed: %s", strerror(errno));
+//         error_set(error, WARN, "lseek failed: %s", strerror(errno));
         return FALSE;
     }
-    this->fp = BZ2_bzReadOpen(&bzerror, this->f, 0, 0, NULL, 0);
-    if (BZ_OK != bzerror) {
-        error_set(error, WARN, "bzip2 internal error from BZ2_bzReadOpen(): %s", BZ2_bzerror(this->fp, &bzerror));
-        BZ2_bzReadClose(&bzerror, this->fp);
+    if (NULL == (this->fp = BZ2_bzReadOpen(&bzerror, this->f, 0, 0, NULL, 0))) {
+//     if (NULL == (this->fp = BZ2_bzdopen(this->fd, "rb"))) {
+        error_set(error, WARN, "bzip2 internal error from BZ2_bzReadOpen()");
+//         error_set(error, WARN, "bzip2 internal error from bzdopen()");
         return FALSE;
     }
     if (signature_length > 0) {
@@ -80,7 +99,7 @@ static UBool bzip2_rewindTo(void *fp, error_t **error, int32_t signature_length)
                 this->eof = TRUE;
                 break;
             default:
-                error_set(error, WARN, "bzip2 internal error from BZ2_bzread(): %s", BZ2_bzerror(this->fp, &bzerror));
+                error_set(error, WARN, "bzip2 internal error from BZ2_bzRead(): %s", BZ2_bzerror(this->fp, &bzerror));
                 return FALSE;
         }
     }
@@ -100,6 +119,7 @@ static int32_t bzip2_readBytes(void *fp, error_t **error, char *buffer, size_t m
         return 0;
     }
     ret = BZ2_bzRead(&bzerror, this->fp, buffer, max_len);
+//     ret = BZ2_bzread(this->fp, buffer, max_len);
     switch (bzerror) {
         case BZ_OK:
             break;
@@ -107,7 +127,7 @@ static int32_t bzip2_readBytes(void *fp, error_t **error, char *buffer, size_t m
             this->eof = TRUE;
             break;
         default:
-            error_set(error, WARN, "bzip2 internal error from BZ2_bzread(): %s", BZ2_bzerror(this->fp, &bzerror));
+            error_set(error, WARN, "bzip2 internal error from BZ2_bzRead(): %s", BZ2_bzerror(this->fp, &bzerror));
             return -1;
     }
 
