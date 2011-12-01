@@ -34,14 +34,6 @@
 #  define UNUSED
 # endif /* UNUSED */
 
-# if GCC_VERSION >= 2000
-#  define EXPECTED(condition) __builtin_expect(!!(condition), 1)
-#  define UNEXPECTED(condition) __builtin_expect(!!(condition), 0)
-# else
-#  define EXPECTED(condition) (condition)
-#  define UNEXPECTED(condition) (condition)
-# endif /* (UN)EXPECTED */
-
 # if GCC_VERSION >= 3004 || __has_attribute(warn_unused_result)
 #  define WARN_UNUSED_RESULT __attribute__((warn_unused_result))
 # else
@@ -86,7 +78,7 @@ extern char *__progname;
 
 # define ensure(expr)                                                                                           \
     do {                                                                                                        \
-        if (EXPECTED(expr)) {                                                                                   \
+        if (expr) {                                                                                             \
         } else {                                                                                                \
             fprintf(stderr, "[%s:%d]: assertion \"%s\" failed in %s()\n", __FILE__, __LINE__, #expr, __func__); \
             env_close();                                                                                        \
@@ -99,7 +91,7 @@ extern char *__progname;
 #  undef NDEBUG
 #  define require_else_return(expr)                                                                                        \
     do {                                                                                                                   \
-        if (EXPECTED(expr)) {                                                                                              \
+        if (expr) {                                                                                                        \
         } else {                                                                                                           \
             fprintf(stderr, "[%s:%d]: assertion \"%s\" failed in %s()\n", ubasename(__FILE__), __LINE__, #expr, __func__); \
             return;                                                                                                        \
@@ -108,7 +100,7 @@ extern char *__progname;
 
 #  define require_else_return_val(expr, val)                                                                               \
     do {                                                                                                                   \
-        if (EXPECTED(expr)) {                                                                                              \
+        if (expr) {                                                                                                        \
         } else {                                                                                                           \
             fprintf(stderr, "[%s:%d]: assertion \"%s\" failed in %s()\n", ubasename(__FILE__), __LINE__, #expr, __func__); \
             return (val);                                                                                                  \

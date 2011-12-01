@@ -48,13 +48,16 @@ static char optstr[] = "AEHTVbehnqstuv";
 static struct option long_options[] =
 {
     GETOPT_COMMON_OPTIONS,
+#ifndef WITHOUT_FTS
+    FTS_COMMON_OPTIONS,
+#endif /* !WITHOUT_FTS */
     {"binary-files",     required_argument, NULL, BINARY_OPT}, // grep
     {"show-all",         no_argument,       NULL, 'A'},
     {"show-ends",        no_argument,       NULL, 'E'},
     {"with-filename",    no_argument,       NULL, 'H'}, // grep
-#ifndef WITHOUT_FTS
-    {"recursive",        no_argument,       NULL, 'R'}, // grep
-#endif /* !WITHOUT_FTS */
+// #ifndef WITHOUT_FTS
+//     {"recursive",        no_argument,       NULL, 'R'}, // grep
+// #endif /* !WITHOUT_FTS */
     {"show-tabs",        no_argument,       NULL, 'T'},
     {"version",          no_argument,       NULL, 'V'},
     {"number-nonblank",  no_argument,       NULL, 'b'},
@@ -62,9 +65,9 @@ static struct option long_options[] =
     {"number",           no_argument,       NULL, 'n'},
     {"quiet",            no_argument,       NULL, 'q'}, // grep
     {"silent",           no_argument,       NULL, 'q'}, // grep
-#ifndef WITHOUT_FTS
-    {"recursive",        no_argument,       NULL, 'r'}, // grep
-#endif /* !WITHOUT_FTS */
+// #ifndef WITHOUT_FTS
+//     {"recursive",        no_argument,       NULL, 'r'}, // grep
+// #endif /* !WITHOUT_FTS */
     {"squeeze-blank",    no_argument,       NULL, 's'},
     {"show-no-printing", no_argument,       NULL, 'v'},
     {NULL,               no_argument,       NULL, 0}
@@ -81,10 +84,10 @@ static void usage(void)
     exit(UCAT_EXIT_USAGE);
 }
 
-static int procfile(reader_t *reader, const char *filename)
+static int procfile(reader_t *reader, const char *filename, void *UNUSED(userdata))
 {
-    UBool numbered, count, prev_was_blank;
     error_t *error;
+    UBool numbered, count, prev_was_blank;
 
     error = NULL;
     count = TRUE;
@@ -139,6 +142,7 @@ static int procfile(reader_t *reader, const char *filename)
     return 0;
 }
 
+#if 0
 #ifndef WITHOUT_FTS
 static int procdir(reader_t *reader, char **dirname)
 {
@@ -179,6 +183,7 @@ static int procdir(reader_t *reader, char **dirname)
     return ret;
 }
 #endif /* !WITHOUT_FTS */
+#endif
 
 /* ========== main ========== */
 
@@ -191,9 +196,8 @@ int main(int argc, char **argv)
 #endif /* !WITHOUT_FTS */
 
     ret = 0;
-    env_init();
+    env_init(UCAT_EXIT_FAILURE);
     reader_init(&reader, DEFAULT_READER_NAME);
-    exit_failure_value = UCAT_EXIT_FAILURE;
 
 #if defined(HAVE_BZIP2) || defined(HAVE_ZLIB)
     switch (__progname[1]) {
@@ -225,11 +229,11 @@ int main(int argc, char **argv)
             case 'H':
                 file_print = TRUE;
                 break;
-#ifndef WITHOUT_FTS
-            case 'R':
-                rFlag = TRUE;
-                break;
-#endif /* !WITHOUT_FTS */
+// #ifndef WITHOUT_FTS
+//             case 'R':
+//                 rFlag = TRUE;
+//                 break;
+// #endif /* !WITHOUT_FTS */
             case 'T':
                 vFlag = TRUE; // TODO?
                 TFlag = TRUE;
@@ -254,13 +258,13 @@ int main(int argc, char **argv)
                 nFlag = TRUE;
                 break;
             case 'q':
-                verbosity = FATAL;
+                env_set_verbosity(FATAL);
                 break;
-#ifndef WITHOUT_FTS
-            case 'r':
-                rFlag = TRUE;
-                break;
-#endif /* !WITHOUT_FTS */
+// #ifndef WITHOUT_FTS
+//             case 'r':
+//                 rFlag = TRUE;
+//                 break;
+// #endif /* !WITHOUT_FTS */
             case 's':
                 sFlag = TRUE;
                 break;
@@ -302,14 +306,18 @@ int main(int argc, char **argv)
     env_register_resource(ustr, (func_dtor_t) ustring_destroy);
 
     if (0 == argc) {
-        ret |= procfile(&reader, "-");
+        ret |= procfile(&reader, "-", NULL);
 #ifndef WITHOUT_FTS
-    } else if (rFlag) {
-        ret |= procdir(&reader, argv);
+    } else if (rFlag) { // TODO: } else if (DIR_RECURSE == dirbehave) {
+        ret |= procdir(&reader, argv, NULL, procfile);
 #endif /* !WITHOUT_FTS */
     } else {
         for ( ; argc--; ++argv) {
-            ret |= procfile(&reader, *argv);
+            // TODO:
+            /*if ((finclude || fexclude) && !file_matching(*aargv)) {
+                continue;
+            }*/
+            ret |= procfile(&reader, *argv, NULL);
         }
     }
 

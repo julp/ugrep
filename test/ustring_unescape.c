@@ -51,7 +51,7 @@ int main(void)
     };
 
     ret = 0;
-    env_init();
+    env_init(EXIT_FAILURE);
     env_apply();
     for (i = 0; i < ARRAY_SIZE(tests); i++) {
         r = ut(tests[i][0], tests[i][1]);

@@ -49,9 +49,8 @@ int main(int argc, char **argv)
     int c, ret;
     reader_t reader;
 
-    env_init();
+    env_init(EXIT_FAILURE);
     reader_init(&reader, DEFAULT_READER_NAME);
-    exit_failure_value = EXIT_FAILURE;
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         if (!util_opt_parse(c, optarg, &reader)) {

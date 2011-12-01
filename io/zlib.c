@@ -8,7 +8,7 @@ static void *zlib_dopen(error_t **error, int fd, const char * const filename)
     gzFile fp;
 
     if (NULL == (fp = gzdopen(fd, "rb"))) {
-        error_set(error, WARN, "gzdopen failed on %s", filename);
+        error_set(error, WARN, "gzdopen() failed on %s", filename);
     }
 
     return fp;

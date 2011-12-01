@@ -18,14 +18,6 @@ UFILE *ustderr = NULL;
  * 3 stdin as special input case (if absent, inherits from 1 if !stdin_is_tty, 2 if stdin_is_tty, else default)
  **/
 
-static const char *system_encoding = NULL;
-static const char *inputs_encoding = NULL;
-static const char *outputs_encoding = NULL;
-static const char *stdin_encoding = NULL;
-
-static int unit = UNIT_CODEPOINT;
-static UNormalizationMode normalization = UNORM_NONE;//UNORM_NFC;
-
 /**
  *                          SYSTEM
  *                          /    \
@@ -43,6 +35,87 @@ static UNormalizationMode normalization = UNORM_NONE;//UNORM_NFC;
  *                     \     /
  *                      stdin
  **/
+
+// inputs/outputs
+static const char *system_encoding = NULL;
+static const char *inputs_encoding = NULL;
+static const char *outputs_encoding = NULL;
+static const char *stdin_encoding = NULL;
+// unicode stuffs
+static int unit = UNIT_CODEPOINT;
+static UNormalizationMode normalization = UNORM_NONE;//UNORM_NFC;
+// error handling
+#ifdef DEBUG
+static int verbosity = INFO;
+#else
+static int verbosity = WARN;
+#endif /* DEBUG */
+static int exit_failure_value = 0;
+
+void env_set_verbosity(int type)
+{
+    switch (type) {
+        case INFO:
+        case WARN:
+        case FATAL:
+            verbosity = type;
+            break;
+        default:
+            fprintf(stderr, "Unknown error level (%d), skip\n", type);
+    }
+}
+
+void print_error(error_t *error)
+{
+    if (NULL != error && error->type >= verbosity) {
+        int type;
+
+        type = error->type;
+        switch (type) {
+            case WARN:
+                u_fprintf(ustderr, "[ " YELLOW("WARN") " ] ");
+                break;
+            case FATAL:
+                u_fprintf(ustderr, "[ " RED("ERR ") " ] ");
+                break;
+            default:
+                type = FATAL;
+                u_fprintf(ustderr, "[ " RED("BUG ") " ] Unknown error type for:\n");
+                break;
+        }
+        u_fputs(error->message, ustderr);
+        error_destroy(error);
+        if (FATAL == type) {
+            exit(exit_failure_value);
+        }
+    }
+}
+
+void report(int type, const char *format, ...)
+{
+    if (type >= verbosity) {
+        va_list args;
+
+        switch (type) {
+            case INFO:
+                fprintf(stderr, "[ " GREEN("INFO") " ] ");
+                break;
+            case WARN:
+                fprintf(stderr, "[ " YELLOW("WARN") " ] ");
+                break;
+            case FATAL:
+                fprintf(stderr, "[ " RED("ERR ") " ] ");
+                break;
+        }
+        va_start(args, format);
+        u_vfprintf(ustderr, format, args);
+        va_end(args);
+        if (FATAL == type) {
+            env_close();
+            exit(exit_failure_value);
+        }
+    }
+}
 
 int env_get_unit(void)
 {
@@ -182,10 +255,11 @@ void env_apply(void)
 #endif /* DEBUG */
 }
 
-void env_init(void)
+void env_init(int failure_value)
 {
     const char *tmp;
 
+    exit_failure_value = failure_value;
 #ifdef BSD
 {
 #include <sys/types.h>

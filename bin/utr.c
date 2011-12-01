@@ -556,11 +556,10 @@ int main(int argc, char **argv)
     status = U_ZERO_ERROR;
     set1_type = set2_type = NONE;
     set2 = set1 = in = out = NULL;
-    exit_failure_value = UTR_EXIT_FAILURE;
     set1_case_type = set2_case_type = UCASE_NONE;
     match = isError = set2_expected = cFlag = dFlag = sFlag = FALSE;
 
-    env_init();
+    env_init(UTR_EXIT_FAILURE);
     reader_init(&reader, DEFAULT_READER_NAME);
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
@@ -580,7 +579,7 @@ int main(int argc, char **argv)
                 break;
             case 'v':
                 fprintf(stderr, "BSD utr version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
-                exit(EXIT_SUCCESS);
+                exit(UTR_EXIT_SUCCESS);
                 break;
             default:
                 if (!util_opt_parse(c, optarg, &reader)) {

@@ -225,9 +225,8 @@ int main(int argc, char **argv)
     complement = FALSE;
     intervals = interval_list_new();
     intervals_arg = delim_arg = NULL;
-    env_init();
+    env_init(UCUT_EXIT_FAILURE);
     reader_init(&reader, DEFAULT_READER_NAME);
-    exit_failure_value = UCUT_EXIT_FAILURE;
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {

@@ -181,6 +181,9 @@ static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilnqsvwx";
 static struct option long_options[] =
 {
     GETOPT_COMMON_OPTIONS,
+#ifndef WITHOUT_FTS
+    FTS_COMMON_OPTIONS,
+#endif /* !WITHOUT_FTS */
 // #ifndef NO_COLOR
     {"color",               required_argument, NULL, COLOR_OPT},
     {"colour",              required_argument, NULL, COLOR_OPT},
@@ -236,7 +239,6 @@ static void usage(void)
         flags &= ~OPT_WORD_BOUND; \
     }
 
-// TODO: reject empty patterns
 UBool add_pattern(error_t **error, slist_t *l, UString *ustr, int pattern_type, uint32_t flags)
 {
     void *data;
@@ -733,8 +735,9 @@ void fixed_circular_list_print(fixed_circular_list_t *l) /* NONNULL() */
 }
 #endif /* DEBUG */
 
-static int procfile(reader_t *reader, const char *filename, int *matches)
+static int procfile(reader_t *reader, const char *filename, void *userdata)
 {
+    int *matches;
     UString *ustr;
     error_t *error;
 #ifndef NO_COLOR
@@ -751,6 +754,7 @@ static int procfile(reader_t *reader, const char *filename, int *matches)
     arg_matches = 0;
     _after_context = 0;
     last_line_print = 0;
+    matches = (int *) userdata;
 #ifndef NO_COLOR
     _colorize = colorize && (before_context || after_context || !vFlag);
 #endif /* !NO_COLOR */
@@ -988,6 +992,7 @@ endfile:
     return 0;
 }
 
+#if 0
 #ifndef WITHOUT_FTS
 static int procdir(reader_t *reader, char **dirname, int *matches)
 {
@@ -1028,6 +1033,7 @@ static int procdir(reader_t *reader, char **dirname, int *matches)
     return ret;
 }
 #endif /* !WITHOUT_FTS */
+#endif
 
 /* ========== main ========== */
 
@@ -1072,11 +1078,10 @@ int main(int argc, char **argv)
 #endif /* !NO_COLOR */
     pattern_type = PATTERN_AUTO;
 
-    env_init();
+    env_init(UGREP_EXIT_FAILURE);
     reader_init(&reader, DEFAULT_READER_NAME);
     patterns = slist_new(pattern_destroy);
     env_register_resource(patterns, (func_dtor_t) slist_destroy);
-    exit_failure_value = UGREP_EXIT_FAILURE;
 
     switch (__progname[1]) {
         case 'e':
@@ -1140,11 +1145,11 @@ int main(int argc, char **argv)
             case 'L':
                 LFlag = TRUE;
                 break;
-#ifndef WITHOUT_FTS
-            case 'R':
-                rFlag = TRUE;
-                break;
-#endif /* !WITHOUT_FTS */
+// #ifndef WITHOUT_FTS
+//             case 'R':
+//                 rFlag = TRUE;
+//                 break;
+// #endif /* !WITHOUT_FTS */
             case 'V':
                 fprintf(stderr, "BSD ugrep version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 return UGREP_EXIT_SUCCESS;
@@ -1180,13 +1185,13 @@ int main(int argc, char **argv)
             case 'n':
                 nFlag = TRUE;
                 break;
-#ifndef WITHOUT_FTS
-            case 'r':
-                rFlag = TRUE;
-                break;
-#endif /* !WITHOUT_FTS */
+// #ifndef WITHOUT_FTS
+//             case 'r':
+//                 rFlag = TRUE;
+//                 break;
+// #endif /* !WITHOUT_FTS */
             case 's':
-                verbosity = FATAL;
+                env_set_verbosity(FATAL);
                 break;
             case 'v':
                 vFlag = TRUE;
@@ -1296,11 +1301,15 @@ int main(int argc, char **argv)
     if (0 == argc) {
         ret |= procfile(&reader, "-", &matches);
 #ifndef WITHOUT_FTS
-    } else if (rFlag) {
-        ret |= procdir(&reader, argv, &matches);
+    } else if (rFlag) { // TODO: } else if (DIR_RECURSE == dirbehave) {
+        ret |= procdir(&reader, argv, &matches, procfile);
 #endif /* !WITHOUT_FTS */
     } else {
         for ( ; argc--; ++argv) {
+            // TODO:
+            /*if ((finclude || fexclude) && !file_matching(*aargv)) {
+                continue;
+            }*/
             ret |= procfile(&reader, *argv, &matches);
         }
     }

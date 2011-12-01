@@ -16,7 +16,7 @@ const char *env_get_inputs_encoding(void);
 UNormalizationMode env_get_normalization(void);
 const char *env_get_stdin_encoding(void);
 int env_get_unit(void);
-void env_init(void);
+void env_init(int);
 # ifdef DEBUG
 #  define env_register_resource(ptr, dtor) \
     _env_register_resource((ptr), (dtor), ubasename(__FILE__), __LINE__)
@@ -30,5 +30,8 @@ void env_set_outputs_encoding(const char *);
 void env_set_stdin_encoding(const char *);
 void env_set_system_encoding(const char *);
 void env_set_unit(int);
+void env_set_verbosity(int);
+void print_error(error_t *);
+void report(int, const char *, ...);
 
 #endif /* ENV_H */

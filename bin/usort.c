@@ -150,9 +150,8 @@ int main(int argc, char **argv)
     ret = 0;
     wanted = ALL;
     error = NULL;
-    env_init();
+    env_init(USORT_EXIT_FAILURE);
     reader_init(&reader, DEFAULT_READER_NAME);
-    exit_failure_value = USORT_EXIT_FAILURE;
 
     status = U_ZERO_ERROR;
     ucol = ucol_open(NULL, &status);

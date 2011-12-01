@@ -2,13 +2,156 @@
 
 #include "common.h"
 
-#ifdef DEBUG
-int verbosity = INFO;
-#else
-int verbosity = WARN;
-#endif /* DEBUG */
+#ifndef WITHOUT_FTS
+# include <errno.h>
+# include <libgen.h>
+# include <fts.h>
+# include <fnmatch.h>
+# include "struct/slist.h"
+#endif /* !WITHOUT_FTS */
 
-int exit_failure_value = 0;
+// fts stuffs
+#ifndef WITHOUT_FTS
+static int dirbehave = DIR_READ;
+static int linkbehave = LINK_READ;
+static int devbehave = DEV_READ;
+
+static slist_t *directory_patterns = NULL;
+static slist_t *file_patterns = NULL;
+static UBool have_directory_excluded = FALSE;
+static UBool have_directory_included = FALSE;
+static UBool have_file_excluded = FALSE;
+static UBool have_file_included = FALSE;
+
+typedef struct {
+    char *pattern;
+    int mode;
+} FTSPattern;
+
+static void fts_pattern_free(void *data)
+{
+    FTSPattern *p = (FTSPattern *) data;
+
+    free(p->pattern);
+}
+
+static void add_fts_pattern(const char *pattern, slist_t **l, int mode)
+{
+    FTSPattern *p;
+
+    if (NULL == *l) {
+        *l = slist_new(fts_pattern_free);
+        env_register_resource(*l, (func_dtor_t) slist_destroy);
+    }
+    p = mem_new(*p);
+    p->pattern = strdup(pattern); // TODO: NULL checking
+    p->mode = mode;
+    slist_append(*l, p);
+}
+
+UBool is_file_matching(char *fname)
+{
+    UBool ret;
+    char *fname_base;
+    slist_element_t *e;
+
+    ret = have_file_included ? FALSE : TRUE;
+    fname_base = basename(fname);
+    for (e = file_patterns->head; NULL != e; e = e->next) {
+        FETCH_DATA(e->data, p, FTSPattern);
+
+        if (fnmatch(p->pattern, fname, 0) == 0 || fnmatch(p->pattern, fname_base, 0) == 0) {
+            if (FTS_EXCLUDE == p->mode) {
+                return FALSE;
+            } else {
+                ret = TRUE;
+            }
+        }
+    }
+
+    return ret;
+}
+
+static inline UBool is_directory_matching(const char *dname)
+{
+    UBool ret;
+    slist_element_t *e;
+
+    ret = have_directory_included ? FALSE : TRUE;
+    for (e = directory_patterns->head; NULL != e; e = e->next) {
+        FETCH_DATA(e->data, p, FTSPattern);
+
+        if (NULL != dname && fnmatch(p->pattern, dname, 0) == 0) {
+            if (FTS_EXCLUDE == p->mode) {
+                return FALSE;
+            } else {
+                ret = TRUE;
+            }
+        }
+    }
+
+    return ret;
+}
+
+int procdir(reader_t *reader, char **argv, void *userdata, int (*procfile)(reader_t *reader, const char *filename, void *userdata))
+{
+    int ret;
+    FTS *fts;
+    FTSENT *p;
+    int ftsflags;
+
+    ret = 0;
+    switch(linkbehave) {
+        case LINK_EXPLICIT:
+            ftsflags = FTS_COMFOLLOW;
+            break;
+        case LINK_SKIP:
+            ftsflags = FTS_PHYSICAL;
+            break;
+        default:
+            ftsflags = FTS_LOGICAL;
+    }
+    ftsflags |= FTS_NOSTAT | FTS_NOCHDIR;
+    if (NULL == (fts = fts_open(argv, ftsflags, NULL))) {
+        msg(FATAL, "can't fts_open %s: %s", *dirname, strerror(errno));
+    }
+    while (NULL != (p = fts_read(fts))) {
+        switch (p->fts_info) {
+            case FTS_DNR:
+            case FTS_ERR:
+                msg(WARN, "fts_read failed on %s: %s", p->fts_path, strerror(p->fts_errno));
+                break;
+            case FTS_D:
+            case FTS_DP:
+                if (have_directory_excluded || have_directory_included) {
+                    if (!is_directory_matching(p->fts_name) || !is_directory_matching(p->fts_path)) {
+                        fts_set(fts, p, FTS_SKIP);
+                    }
+                }
+                break;
+            case FTS_DC:
+                msg(WARN, "recursive directory loop on %s", p->fts_path);
+                break;
+            default:
+            {
+                UBool ok;
+
+                ok = TRUE;
+                if (have_file_excluded || have_file_included) {
+                    ok &= is_file_matching(p->fts_path);
+                }
+                if (ok) {
+                    ret |= procfile(reader, p->fts_path, userdata);
+                }
+                break;
+            }
+        }
+    }
+    fts_close(fts);
+
+    return ret;
+}
+#endif /* !WITHOUT_FTS */
 
 UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
 {
@@ -52,6 +195,59 @@ UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
         case SYSTEM_OPT:
             env_set_system_encoding(optarg);
             return TRUE;
+#ifndef WITHOUT_FTS
+        case 'D':
+            if (!strcasecmp(optarg, "skip")) {
+                devbehave = DEV_SKIP;
+            } else if (!strcasecmp(optarg, "read")) {
+                devbehave = DEV_READ;
+            } else {
+                fprintf(stderr, "Invalid --devices option\n");
+                return FALSE;
+            }
+            return TRUE;
+        case 'd':
+            if (!strcasecmp("recurse", optarg)) {
+                dirbehave = DIR_RECURSE;
+            } else if (!strcasecmp("skip", optarg)) {
+                dirbehave = DIR_SKIP;
+            } else if (!strcasecmp("read", optarg)) {
+                dirbehave = DIR_READ;
+            } else {
+                fprintf(stderr, "Invalid --directories option\n");
+                return FALSE;
+            }
+            return TRUE;
+        case 'r':
+        case 'R':
+            dirbehave = DIR_RECURSE;
+            return TRUE;
+        case 'p':
+            linkbehave = LINK_SKIP;
+            return TRUE;
+        case 'O':
+            linkbehave = LINK_EXPLICIT;
+            return TRUE;
+        case 'S':
+            linkbehave = LINK_READ;
+            return TRUE;
+        case FTS_INCLUDE_DIR_OPT:
+            have_directory_included = TRUE;
+            add_fts_pattern(optarg, &directory_patterns, FTS_INCLUDE);
+            return TRUE;
+        case FTS_EXCLUDE_DIR_OPT:
+            have_directory_excluded = TRUE;
+            add_fts_pattern(optarg, &directory_patterns, FTS_EXCLUDE);
+            return TRUE;
+        case FTS_INCLUDE_FILE_OPT:
+            have_file_included = TRUE;
+            add_fts_pattern(optarg, &file_patterns, FTS_INCLUDE);
+            return TRUE;
+        case FTS_EXCLUDE_FILE_OPT:
+            have_file_excluded = TRUE;
+            add_fts_pattern(optarg, &file_patterns, FTS_EXCLUDE);
+            return TRUE;
+#endif /* !WITHOUT_FTS */
         default:
             return FALSE;
     }
@@ -65,58 +261,6 @@ UBool stdout_is_tty(void)
 UBool stdin_is_tty(void)
 {
     return (isatty(STDIN_FILENO));
-}
-
-void print_error(error_t *error)
-{
-    if (NULL != error && error->type >= verbosity) {
-        int type;
-
-        type = error->type;
-        switch (type) {
-            case WARN:
-                u_fprintf(ustderr, "[ " YELLOW("WARN") " ] ");
-                break;
-            case FATAL:
-                u_fprintf(ustderr, "[ " RED("ERR ") " ] ");
-                break;
-            default:
-                type = FATAL;
-                u_fprintf(ustderr, "[ " RED("BUG ") " ] Unknown error type for:\n");
-                break;
-        }
-        u_fputs(error->message, ustderr);
-        error_destroy(error);
-        if (type == FATAL) {
-            exit(exit_failure_value);
-        }
-    }
-}
-
-void report(int type, const char *format, ...)
-{
-    if (type >= verbosity) {
-        va_list args;
-
-        switch (type) {
-            case INFO:
-                fprintf(stderr, "[ " GREEN("INFO") " ] ");
-                break;
-            case WARN:
-                fprintf(stderr, "[ " YELLOW("WARN") " ] ");
-                break;
-            case FATAL:
-                fprintf(stderr, "[ " RED("ERR ") " ] ");
-                break;
-        }
-        va_start(args, format);
-        u_vfprintf(ustderr, format, args);
-        va_end(args);
-        if (FATAL == type) {
-            env_close();
-            exit(exit_failure_value);
-        }
-    }
 }
 
 void ubrk_unbindText(UBreakIterator *ubrk)
