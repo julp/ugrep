@@ -115,6 +115,8 @@ foreach (UgrepBinary ${UgrepBinaries})
     install(TARGETS ${UgrepBinary} DESTINATION bin)
 endforeach(UgrepBinary)
 
+set_target_properties(utr usort ucut PROPERTIES COMPILE_FLAGS "-DWITHOUT_FTS")
+
 #install(CODE "EXEC_PROGRAM(${CMAKE_COMMAND} ARGS -E create_symlink \"${CMAKE_INSTALL_PREFIX}/bin/ugrep\" \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
 #list(APPEND CMAKE_INSTALL_MANIFEST_FILES \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
 #")
