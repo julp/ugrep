@@ -1,9 +1,9 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
 # include <fts.h>
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
 #include <unistd.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -39,25 +39,25 @@ enum {
     BINARY_OPT = GETOPT_SPECIFIC
 };
 
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
 static char optstr[] = "AEHRTVbehnqrstuv";
 #else
 static char optstr[] = "AEHTVbehnqstuv";
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
 
 static struct option long_options[] =
 {
     GETOPT_COMMON_OPTIONS,
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
     FTS_COMMON_OPTIONS,
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
     {"binary-files",     required_argument, NULL, BINARY_OPT}, // grep
     {"show-all",         no_argument,       NULL, 'A'},
     {"show-ends",        no_argument,       NULL, 'E'},
     {"with-filename",    no_argument,       NULL, 'H'}, // grep
-// #ifndef WITHOUT_FTS
+// #ifdef WITH_FTS
 //     {"recursive",        no_argument,       NULL, 'R'}, // grep
-// #endif /* !WITHOUT_FTS */
+// #endif /* WITH_FTS */
     {"show-tabs",        no_argument,       NULL, 'T'},
     {"version",          no_argument,       NULL, 'V'},
     {"number-nonblank",  no_argument,       NULL, 'b'},
@@ -65,9 +65,9 @@ static struct option long_options[] =
     {"number",           no_argument,       NULL, 'n'},
     {"quiet",            no_argument,       NULL, 'q'}, // grep
     {"silent",           no_argument,       NULL, 'q'}, // grep
-// #ifndef WITHOUT_FTS
+// #ifdef WITH_FTS
 //     {"recursive",        no_argument,       NULL, 'r'}, // grep
-// #endif /* !WITHOUT_FTS */
+// #endif /* WITH_FTS */
     {"squeeze-blank",    no_argument,       NULL, 's'},
     {"show-no-printing", no_argument,       NULL, 'v'},
     {NULL,               no_argument,       NULL, 0}
@@ -143,7 +143,7 @@ static int procfile(reader_t *reader, const char *filename, void *UNUSED(userdat
 }
 
 #if 0
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
 static int procdir(reader_t *reader, char **dirname)
 {
     int ret;
@@ -182,7 +182,7 @@ static int procdir(reader_t *reader, char **dirname)
 
     return ret;
 }
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
 #endif
 
 /* ========== main ========== */
@@ -191,9 +191,9 @@ int main(int argc, char **argv)
 {
     int c, ret;
     reader_t reader;
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
     UBool rFlag = FALSE;
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
 
     ret = 0;
     env_init(UCAT_EXIT_FAILURE);
@@ -229,11 +229,11 @@ int main(int argc, char **argv)
             case 'H':
                 file_print = TRUE;
                 break;
-// #ifndef WITHOUT_FTS
+// #ifdef WITH_FTS
 //             case 'R':
 //                 rFlag = TRUE;
 //                 break;
-// #endif /* !WITHOUT_FTS */
+// #endif /* WITH_FTS */
             case 'T':
                 vFlag = TRUE; // TODO?
                 TFlag = TRUE;
@@ -260,11 +260,11 @@ int main(int argc, char **argv)
             case 'q':
                 env_set_verbosity(FATAL);
                 break;
-// #ifndef WITHOUT_FTS
+// #ifdef WITH_FTS
 //             case 'r':
 //                 rFlag = TRUE;
 //                 break;
-// #endif /* !WITHOUT_FTS */
+// #endif /* WITH_FTS */
             case 's':
                 sFlag = TRUE;
                 break;
@@ -307,10 +307,10 @@ int main(int argc, char **argv)
 
     if (0 == argc) {
         ret |= procfile(&reader, "-", NULL);
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
     } else if (rFlag) { // TODO: } else if (DIR_RECURSE == dirbehave) {
         ret |= procdir(&reader, argv, NULL, procfile);
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
     } else {
         for ( ; argc--; ++argv) {
             // TODO:

@@ -5,9 +5,9 @@
 # include <sys/param.h>
 # include <pwd.h>
 #endif /* _MSC_VER */
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
 # include <fts.h>
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -172,18 +172,18 @@ enum {
     //READER_OPT
 };
 
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
 static char optstr[] = "0123456789A:B:C:EFHLRVce:f:hilnqrsvwx";
 #else
 static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilnqsvwx";
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
 
 static struct option long_options[] =
 {
     GETOPT_COMMON_OPTIONS,
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
     FTS_COMMON_OPTIONS,
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
 // #ifndef NO_COLOR
     {"color",               required_argument, NULL, COLOR_OPT},
     {"colour",              required_argument, NULL, COLOR_OPT},
@@ -196,9 +196,9 @@ static struct option long_options[] =
     {"fixed-string",        no_argument,       NULL, 'F'}, // POSIX
     {"with-filename",       no_argument,       NULL, 'H'},
     {"files-without-match", no_argument,       NULL, 'L'},
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
     {"recursive",           no_argument,       NULL, 'R'},
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
     {"version",             no_argument,       NULL, 'V'},
     {"count",               no_argument,       NULL, 'c'}, // POSIX
     {"regexp",              required_argument, NULL, 'e'}, // POSIX
@@ -209,9 +209,9 @@ static struct option long_options[] =
     {"line-number",         no_argument,       NULL, 'n'}, // POSIX
     {"quiet",               no_argument,       NULL, 'q'}, // POSIX
     {"silent",              no_argument,       NULL, 'q'}, // POSIX
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
     {"recursive",           no_argument,       NULL, 'r'},
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
     {"no-messages",         no_argument,       NULL, 's'}, // POSIX
     {"revert-match",        no_argument,       NULL, 'v'}, // POSIX
     {"word-regexp",         no_argument,       NULL, 'w'},
@@ -993,7 +993,7 @@ endfile:
 }
 
 #if 0
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
 static int procdir(reader_t *reader, char **dirname, int *matches)
 {
     int ret;
@@ -1032,7 +1032,7 @@ static int procdir(reader_t *reader, char **dirname, int *matches)
 
     return ret;
 }
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
 #endif
 
 /* ========== main ========== */
@@ -1059,9 +1059,9 @@ int main(int argc, char **argv)
     int matches;
     UBool iFlag;
     UBool wFlag;
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
     UBool rFlag = FALSE;
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
     uint32_t flags;
     int strength;
     error_t *error;
@@ -1145,11 +1145,11 @@ int main(int argc, char **argv)
             case 'L':
                 LFlag = TRUE;
                 break;
-// #ifndef WITHOUT_FTS
+// #ifdef WITH_FTS
 //             case 'R':
 //                 rFlag = TRUE;
 //                 break;
-// #endif /* !WITHOUT_FTS */
+// #endif /* WITH_FTS */
             case 'V':
                 fprintf(stderr, "BSD ugrep version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 return UGREP_EXIT_SUCCESS;
@@ -1185,11 +1185,11 @@ int main(int argc, char **argv)
             case 'n':
                 nFlag = TRUE;
                 break;
-// #ifndef WITHOUT_FTS
+// #ifdef WITH_FTS
 //             case 'r':
 //                 rFlag = TRUE;
 //                 break;
-// #endif /* !WITHOUT_FTS */
+// #endif /* WITH_FTS */
             case 's':
                 env_set_verbosity(FATAL);
                 break;
@@ -1300,10 +1300,10 @@ int main(int argc, char **argv)
 
     if (0 == argc) {
         ret |= procfile(&reader, "-", &matches);
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
     } else if (rFlag) { // TODO: } else if (DIR_RECURSE == dirbehave) {
         ret |= procdir(&reader, argv, &matches, procfile);
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
     } else {
         for ( ; argc--; ++argv) {
             // TODO:

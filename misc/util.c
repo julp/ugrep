@@ -2,16 +2,13 @@
 
 #include "common.h"
 
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
 # include <errno.h>
 # include <libgen.h>
 # include <fts.h>
 # include <fnmatch.h>
 # include "struct/slist.h"
-#endif /* !WITHOUT_FTS */
 
-// fts stuffs
-#ifndef WITHOUT_FTS
 static int dirbehave = DIR_READ;
 static int linkbehave = LINK_READ;
 static int devbehave = DEV_READ;
@@ -151,7 +148,7 @@ int procdir(reader_t *reader, char **argv, void *userdata, int (*procfile)(reade
 
     return ret;
 }
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
 
 UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
 {
@@ -195,7 +192,7 @@ UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
         case SYSTEM_OPT:
             env_set_system_encoding(optarg);
             return TRUE;
-#ifndef WITHOUT_FTS
+#ifdef WITH_FTS
         case 'D':
             if (!strcasecmp(optarg, "skip")) {
                 devbehave = DEV_SKIP;
@@ -247,7 +244,7 @@ UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
             have_file_excluded = TRUE;
             add_fts_pattern(optarg, &file_patterns, FTS_EXCLUDE);
             return TRUE;
-#endif /* !WITHOUT_FTS */
+#endif /* WITH_FTS */
         default:
             return FALSE;
     }

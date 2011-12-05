@@ -18,7 +18,7 @@
     {"unit",   required_argument, NULL, UNIT_OPT},   \
     {"reader", required_argument, NULL, READER_OPT}
 
-# ifndef WITHOUT_FTS
+# ifdef WITH_FTS
 enum {
     FTS_DIRECTORY,
     FTS_FILE
@@ -51,27 +51,27 @@ enum {
     {"include",     required_argument, NULL, FTS_INCLUDE_FILE_OPT}, \
     {"exclude-dir", required_argument, NULL, FTS_EXCLUDE_DIR_OPT},  \
     {"include-dir", required_argument, NULL, FTS_INCLUDE_DIR_OPT}
-# endif /* !WITHOUT_FTS */
+# endif /* WITH_FTS */
 
 enum {
     INPUT_OPT = GETOPT_COMMON,
     STDIN_OPT,
     OUTPUT_OPT,
     SYSTEM_OPT,
-# ifndef WITHOUT_FTS
+# ifdef WITH_FTS
     FTS_INCLUDE_DIR_OPT,
     FTS_EXCLUDE_DIR_OPT,
     FTS_INCLUDE_FILE_OPT,
     FTS_EXCLUDE_FILE_OPT,
-# endif /* !WITHOUT_FTS */
+# endif /* WITH_FTS */
     FORM_OPT,
     UNIT_OPT,
     READER_OPT
 };
 
-# ifndef WITHOUT_FTS
+# ifdef WITH_FTS
 int procdir(reader_t *, char **, void *, int (*procfile)(reader_t *, const char *, void *));
-# endif /* !WITHOUT_FTS */
+# endif /* WITH_FTS */
 UBool stdin_is_tty(void);
 UBool stdout_is_tty(void);
 void ubrk_unbindText(UBreakIterator *);
