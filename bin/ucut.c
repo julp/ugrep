@@ -274,7 +274,7 @@ int main(int argc, char **argv)
     if (!cFlag && !fFlag) {
         usage();
     }
-    if (cFlag && UNORM_NONE != env_get_normalization()) {
+    if (cFlag && UNIT_GRAPHEME == env_get_unit()) {
         UErrorCode status;
 
         status = U_ZERO_ERROR;

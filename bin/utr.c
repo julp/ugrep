@@ -699,11 +699,11 @@ int main(int argc, char **argv)
         if (NULL == (set1 = ustring_convert_argv_from_local(argv[0], &error, TRUE))) {
             print_error(error);
         }
-        if (!cFlag && UNORM_NONE != env_get_normalization()) {
+        if (!cFlag && UNIT_GRAPHEME == env_get_unit()) {
             ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
             assert(U_SUCCESS(status));
         }
-        if ((UNORM_NONE == env_get_normalization() && u_strHasMoreChar32Than(set1->ptr, set1->len, 1)) || (UNORM_NONE != env_get_normalization() && grapheme_count(ubrk, set1) > 1)) {
+        if ((UNIT_CODEPOINT == env_get_unit() && u_strHasMoreChar32Than(set1->ptr, set1->len, 1)) || (UNIT_GRAPHEME == env_get_unit() && grapheme_count(ubrk, set1) > 1)) {
             if (cFlag) { // readjust
                 if (NULL == (uset = create_set_from_ustring(set1, cFlag, &error))) {
                     print_error(error);
@@ -726,10 +726,10 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Complement option cannot be applied when the both sets are defined as strings\n");
                 return UTR_EXIT_FAILURE;
             }
-            if (UNORM_NONE == env_get_normalization() && u_countChar32(set2->ptr, set2->len) != u_countChar32(set1->ptr, set1->len)) {
+            if (UNIT_CODEPOINT == env_get_unit() && u_countChar32(set2->ptr, set2->len) != u_countChar32(set1->ptr, set1->len)) {
                 fprintf(stderr, "Number of code points differs between sets\n");
                 return UTR_EXIT_FAILURE;
-            } else if (UNORM_NONE != env_get_normalization() && grapheme_count(ubrk, set2) != grapheme_count(ubrk, set1)) {
+            } else if (UNIT_GRAPHEME == env_get_unit() && grapheme_count(ubrk, set2) != grapheme_count(ubrk, set1)) {
                 fprintf(stderr, "Number of graphemes differs between sets\n");
                 return UTR_EXIT_FAILURE;
             }
@@ -756,7 +756,7 @@ int main(int argc, char **argv)
                 hashtable_put(ht, &k, &v);
                 last = i;
             }
-        } else if (UNORM_NONE == env_get_normalization()) {
+        } else if (UNIT_CODEPOINT == env_get_unit()) {
             cp_hashtable_put(ht, set1, set2, dFlag, FALSE);
         } else {
             grapheme_hashtable_put(ht, set1, set2, dFlag, FALSE);
@@ -774,7 +774,7 @@ int main(int argc, char **argv)
             "global translation function"
         };
 
-        debug("mode = %s, set1 = %s, set2 = %s", UNORM_NONE == env_get_normalization() ? "CP/as is" : "graphemes", typemap[set1_type], typemap[set2_type]);
+        debug("mode = %s, set1 = %s, set2 = %s", UNIT_CODEPOINT == env_get_unit() ? "CP/as is" : "graphemes", typemap[set1_type], typemap[set2_type]);
     }
 #endif /* DEBUG */
     while (!reader_eof(&reader)) {
@@ -814,7 +814,7 @@ int main(int argc, char **argv)
                 print_error(error);
             }
         } else {
-            if (UNORM_NONE == env_get_normalization()) {
+            if (UNIT_CODEPOINT == env_get_unit()) {
                 cp_process(ht, in, out, sFlag, dFlag);
             } else {
                 grapheme_process(ht, ubrk, in, out, sFlag, dFlag);

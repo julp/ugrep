@@ -23,7 +23,7 @@ ARGS='--complement -c 1-3,6-8'
 assertOutputCommand "-c complemented (simple)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
 
 INPUT="echo \"${E_ACUTE_NFD}l${RING_ABOVE}${E_GRAVE_NFD}v${RING_ABOVE}e${RING_ABOVE}\""
-ARGS='--form=d -c 4-'
+ARGS='--unit=grapheme --form=d -c 4-'
 assertOutputValue "-c (graphemes)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "v${RING_ABOVE}e${RING_ABOVE}"
 
 # Disabled: need to fix -E separator handling first
