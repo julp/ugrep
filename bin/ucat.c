@@ -191,9 +191,6 @@ int main(int argc, char **argv)
 {
     int c, ret;
     reader_t reader;
-#ifdef WITH_FTS
-    UBool rFlag = FALSE;
-#endif /* WITH_FTS */
 
     ret = 0;
     env_init(UCAT_EXIT_FAILURE);
@@ -229,11 +226,6 @@ int main(int argc, char **argv)
             case 'H':
                 file_print = TRUE;
                 break;
-// #ifdef WITH_FTS
-//             case 'R':
-//                 rFlag = TRUE;
-//                 break;
-// #endif /* WITH_FTS */
             case 'T':
                 vFlag = TRUE; // TODO?
                 TFlag = TRUE;
@@ -260,11 +252,6 @@ int main(int argc, char **argv)
             case 'q':
                 env_set_verbosity(FATAL);
                 break;
-// #ifdef WITH_FTS
-//             case 'r':
-//                 rFlag = TRUE;
-//                 break;
-// #endif /* WITH_FTS */
             case 's':
                 sFlag = TRUE;
                 break;
@@ -308,15 +295,16 @@ int main(int argc, char **argv)
     if (0 == argc) {
         ret |= procfile(&reader, "-", NULL);
 #ifdef WITH_FTS
-    } else if (rFlag) { // TODO: } else if (DIR_RECURSE == dirbehave) {
+    } else if (DIR_RECURSE == get_dirbehave()) {
         ret |= procdir(&reader, argv, NULL, procfile);
 #endif /* WITH_FTS */
     } else {
         for ( ; argc--; ++argv) {
-            // TODO:
-            /*if ((finclude || fexclude) && !file_matching(*aargv)) {
+#ifdef WITH_FTS
+            if (!is_file_matching(*argv)) {
                 continue;
-            }*/
+            }
+#endif /* WITH_FTS */
             ret |= procfile(&reader, *argv, NULL);
         }
     }

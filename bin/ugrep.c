@@ -1059,9 +1059,6 @@ int main(int argc, char **argv)
     int matches;
     UBool iFlag;
     UBool wFlag;
-#ifdef WITH_FTS
-    UBool rFlag = FALSE;
-#endif /* WITH_FTS */
     uint32_t flags;
     int strength;
     error_t *error;
@@ -1145,11 +1142,6 @@ int main(int argc, char **argv)
             case 'L':
                 LFlag = TRUE;
                 break;
-// #ifdef WITH_FTS
-//             case 'R':
-//                 rFlag = TRUE;
-//                 break;
-// #endif /* WITH_FTS */
             case 'V':
                 fprintf(stderr, "BSD ugrep version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 return UGREP_EXIT_SUCCESS;
@@ -1185,11 +1177,6 @@ int main(int argc, char **argv)
             case 'n':
                 nFlag = TRUE;
                 break;
-// #ifdef WITH_FTS
-//             case 'r':
-//                 rFlag = TRUE;
-//                 break;
-// #endif /* WITH_FTS */
             case 's':
                 env_set_verbosity(FATAL);
                 break;
@@ -1301,15 +1288,16 @@ int main(int argc, char **argv)
     if (0 == argc) {
         ret |= procfile(&reader, "-", &matches);
 #ifdef WITH_FTS
-    } else if (rFlag) { // TODO: } else if (DIR_RECURSE == dirbehave) {
+    } else if (DIR_RECURSE == get_dirbehave()) {
         ret |= procdir(&reader, argv, &matches, procfile);
 #endif /* WITH_FTS */
     } else {
         for ( ; argc--; ++argv) {
-            // TODO:
-            /*if ((finclude || fexclude) && !file_matching(*aargv)) {
+#ifdef WITH_FTS
+            if (!is_file_matching(*argv)) {
                 continue;
-            }*/
+            }
+#endif /* WITH_FTS */
             ret |= procfile(&reader, *argv, &matches);
         }
     }

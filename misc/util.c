@@ -20,6 +20,11 @@ static UBool have_directory_included = FALSE;
 static UBool have_file_excluded = FALSE;
 static UBool have_file_included = FALSE;
 
+int get_dirbehave(void)
+{
+    return dirbehave;
+}
+
 typedef struct {
     char *pattern;
     int mode;
@@ -51,6 +56,10 @@ UBool is_file_matching(char *fname)
     UBool ret;
     char *fname_base;
     slist_element_t *e;
+
+    if (!have_file_included && !have_file_excluded) {
+        return TRUE;
+    }
 
     ret = have_file_included ? FALSE : TRUE;
     fname_base = basename(fname);

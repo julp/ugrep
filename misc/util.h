@@ -70,6 +70,8 @@ enum {
 };
 
 # ifdef WITH_FTS
+int get_dirbehave(void);
+UBool is_file_matching(char *);
 int procdir(reader_t *, char **, void *, int (*procfile)(reader_t *, const char *, void *));
 # endif /* WITH_FTS */
 UBool stdin_is_tty(void);
