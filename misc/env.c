@@ -219,28 +219,21 @@ void env_set_stdin_encoding(const char *encoding)
 
 void env_apply(void)
 {
+    UErrorCode status;
+    status = U_ZERO_ERROR;
+
     if (NULL != system_encoding) {
         ucnv_setDefaultName(system_encoding);
     }
     ustdout = u_finit(stdout, NULL, outputs_encoding);
-    {
-        UErrorCode status;
-
-        status = U_ZERO_ERROR;
-        ucnv_setSubstChars(u_fgetConverter(ustdout), "?", 1, &status);
-        if (U_FAILURE(status)) {
-            icu_msg(FATAL, status, "ucnv_setSubstChars");
-        }
+    ucnv_setSubstChars(u_fgetConverter(ustdout), "?", 1, &status);
+    if (U_FAILURE(status)) {
+        icu_msg(FATAL, status, "ucnv_setSubstChars");
     }
     ustderr = u_finit(stderr, NULL, outputs_encoding);
-    {
-        UErrorCode status;
-
-        status = U_ZERO_ERROR;
-        ucnv_setSubstChars(u_fgetConverter(ustderr), "?", 1, &status);
-        if (U_FAILURE(status)) {
-            icu_msg(FATAL, status, "ucnv_setSubstChars");
-        }
+    ucnv_setSubstChars(u_fgetConverter(ustderr), "?", 1, &status);
+    if (U_FAILURE(status)) {
+        icu_msg(FATAL, status, "ucnv_setSubstChars");
     }
     if (NULL == stdin_encoding) {
         if (stdin_is_tty()) {
