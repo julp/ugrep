@@ -69,7 +69,11 @@ void print_error(error_t *error)
 {
     if (NULL != error && error->type >= verbosity) {
         int type;
+        UFILE *ustderrp;
 
+        if (NULL == (ustderrp = ustderr)) {
+            ustderrp = u_finit(stderr, NULL, NULL);
+        }
         type = error->type;
         switch (type) {
             case WARN:
@@ -83,7 +87,10 @@ void print_error(error_t *error)
                 u_fprintf(ustderr, "[ " RED("BUG ") " ] Unknown error type for:\n");
                 break;
         }
-        u_fputs(error->message, ustderr);
+        u_fputs(error->message, ustderrp);
+        if (NULL == ustderr) {
+            u_fclose(ustderrp);
+        }
         error_destroy(error);
         if (FATAL == type) {
             exit(exit_failure_value);
@@ -95,7 +102,11 @@ void report(int type, const char *format, ...)
 {
     if (type >= verbosity) {
         va_list args;
+        UFILE *ustderrp;
 
+        if (NULL == (ustderrp = ustderr)) {
+            ustderrp = u_finit(stderr, NULL, NULL);
+        }
         switch (type) {
             case INFO:
                 fprintf(stderr, "[ " GREEN("INFO") " ] ");
@@ -108,10 +119,12 @@ void report(int type, const char *format, ...)
                 break;
         }
         va_start(args, format);
-        u_vfprintf(ustderr, format, args);
+        u_vfprintf(ustderrp, format, args);
         va_end(args);
+        if (NULL == ustderr) {
+            u_fclose(ustderrp);
+        }
         if (FATAL == type) {
-            env_close();
             exit(exit_failure_value);
         }
     }
@@ -220,18 +233,21 @@ void env_set_stdin_encoding(const char *encoding)
 void env_apply(void)
 {
     UErrorCode status;
-    status = U_ZERO_ERROR;
 
+    status = U_ZERO_ERROR;
     if (NULL != system_encoding) {
         ucnv_setDefaultName(system_encoding);
     }
-    ustdout = u_finit(stdout, NULL, outputs_encoding);
-    ucnv_setSubstChars(u_fgetConverter(ustdout), "?", 1, &status);
+    ustderr = u_finit(stderr, NULL, outputs_encoding);
+    env_register_resource(ustderr, (func_dtor_t) u_fclose);
+//     u_fsetlocale(ustderr, outputs_encoding);
+    ucnv_setSubstChars(u_fgetConverter(ustderr), "?", 1, &status);
     if (U_FAILURE(status)) {
         icu_msg(FATAL, status, "ucnv_setSubstChars");
     }
-    ustderr = u_finit(stderr, NULL, outputs_encoding);
-    ucnv_setSubstChars(u_fgetConverter(ustderr), "?", 1, &status);
+    ustdout = u_finit(stdout, NULL, outputs_encoding);
+    env_register_resource(ustdout, (func_dtor_t) u_fclose);
+    ucnv_setSubstChars(u_fgetConverter(ustdout), "?", 1, &status);
     if (U_FAILURE(status)) {
         icu_msg(FATAL, status, "ucnv_setSubstChars");
     }
