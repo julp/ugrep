@@ -60,6 +60,9 @@ reader_imp_t stdio_reader_imp =
 {
     FALSE,
     "stdio",
+#ifdef DYNAMIC_READERS
+    NULL,
+#endif /* DYNAMIC_READERS */
     stdio_dopen,
     stdio_close,
     stdio_eof,

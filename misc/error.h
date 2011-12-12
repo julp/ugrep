@@ -21,6 +21,7 @@ const char *ubasename(const char *);
     report(type, format "\n", ## __VA_ARGS__)
 
 # define debug(format, ...) /* NOP */
+# define stdio_debug(format, ...) /* NOP */
 #endif /* DEBUG */
 
 # define icu_error_set(error, type, status, function) \

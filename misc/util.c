@@ -185,7 +185,7 @@ UBool util_opt_parse(int c, const char *optarg, reader_t *reader)
             return FALSE;
         case READER_OPT:
             if (!reader_set_imp_by_name(reader, optarg)) {
-                fprintf(stderr, "Unknown reader\n");
+                fprintf(stderr, "Unknown or unavailable reader\n");
                 return FALSE;
             }
             return TRUE;

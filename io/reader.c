@@ -14,22 +14,22 @@
 extern reader_imp_t mmap_reader_imp;
 extern reader_imp_t stdio_reader_imp;
 extern reader_imp_t string_reader_imp;
-#ifdef HAVE_ZLIB
+#if defined(HAVE_ZLIB) || defined(DYNAMIC_READERS)
 extern reader_imp_t zlib_reader_imp;
-#endif /* HAVE_ZLIB */
-#ifdef HAVE_BZIP2
+#endif /* HAVE_ZLIB || DYNAMIC_READERS */
+#if defined(HAVE_BZIP2) || defined(DYNAMIC_READERS)
 extern reader_imp_t bzip2_reader_imp;
-#endif /* HAVE_BZIP2 */
+#endif /* HAVE_BZIP2 || DYNAMIC_READERS */
 
 static const reader_imp_t *available_readers[] = {
     &mmap_reader_imp,
     &stdio_reader_imp,
-#ifdef HAVE_ZLIB
+#if defined(HAVE_ZLIB) || defined(DYNAMIC_READERS)
     &zlib_reader_imp,
-#endif /* HAVE_ZLIB */
-#ifdef HAVE_BZIP2
+#endif /* HAVE_ZLIB || DYNAMIC_READERS */
+#if defined(HAVE_BZIP2) || defined(DYNAMIC_READERS)
     &bzip2_reader_imp,
-#endif /* HAVE_BZIP2 */
+#endif /* HAVE_BZIP2 || DYNAMIC_READERS */
     NULL
 };
 
@@ -320,8 +320,16 @@ const reader_imp_t *reader_get_by_name(const char *name) /* NONNULL() */
     require_else_return_null(NULL != name);
 
     for (imp = available_readers; NULL != *imp; imp++) {
-        if (!(*imp)->internal && !strcmp((*imp)->name, name)) {
-            return *imp;
+        if (!strcmp((*imp)->name, name)) {
+#ifdef DYNAMIC_READERS
+            if ((*imp)->internal || (NULL != (*imp)->trydload && !(*imp)->trydload())) {
+#else
+            if ((*imp)->internal) {
+#endif /* DYNAMIC_READERS */
+                return NULL;
+            } else {
+                return *imp;
+            }
         }
     }
 
@@ -336,9 +344,17 @@ UBool reader_set_imp_by_name(reader_t *this, const char *name) /* NONNULL() */
     require_else_return_false(NULL != name);
 
     for (imp = available_readers; NULL != *imp; imp++) {
-        if (!(*imp)->internal && !strcmp((*imp)->name, name)) {
-            this->default_imp = this->imp = *imp;
-            return TRUE;
+        if (!strcmp((*imp)->name, name)) {
+#ifdef DYNAMIC_READERS
+            if ((*imp)->internal || (NULL != (*imp)->trydload && !(*imp)->trydload())) {
+#else
+            if ((*imp)->internal) {
+#endif /* DYNAMIC_READERS */
+                return FALSE;
+            } else {
+                this->default_imp = this->imp = *imp;
+                return TRUE;
+            }
         }
     }
 

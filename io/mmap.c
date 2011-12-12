@@ -144,6 +144,9 @@ reader_imp_t mmap_reader_imp =
 {
     FALSE,
     "mmap",
+#ifdef DYNAMIC_READERS
+    NULL,
+#endif /* DYNAMIC_READERS */
     mmap_dopen,
     mmap_close,
     mmap_eof,
