@@ -70,7 +70,7 @@ static void add_fts_pattern(const char *pattern, slist_t **l, int mode)
         env_register_resource(*l, (func_dtor_t) slist_destroy);
     }
     p = mem_new(*p);
-    p->pattern = strdup(pattern); // TODO: NULL checking
+    p->pattern = mem_dup(pattern);
     p->mode = mode;
     slist_append(*l, p);
 }

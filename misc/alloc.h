@@ -18,7 +18,8 @@
 # define mem_new_n(type, n)      _mem_alloc(sizeof(type) * (n))
 # define mem_renew(ptr, type, n) _mem_realloc(ptr, sizeof(type) * (n))
 
-void *_mem_alloc(size_t) MALLOC ALLOC_SIZE(1);
-void *_mem_realloc(void *, size_t) MALLOC ALLOC_SIZE(2);
+char *mem_dup(const char *) WARN_UNUSED_RESULT;
+void *_mem_alloc(size_t) MALLOC ALLOC_SIZE(1) WARN_UNUSED_RESULT;
+void *_mem_realloc(void *, size_t) MALLOC ALLOC_SIZE(2) WARN_UNUSED_RESULT;
 
 #endif /* !ALLOC_H */

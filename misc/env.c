@@ -310,7 +310,7 @@ void env_init(int failure_value)
         char cp[30] = { 0 };
 
         snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
-        outputs_encoding = strdup(cp);
+        outputs_encoding = mem_dup(cp);
         env_register_resource(outputs_encoding, free);
     }
 #endif /* _MSC_VER */
