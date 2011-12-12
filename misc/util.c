@@ -3,11 +3,35 @@
 #include "common.h"
 
 #ifdef WITH_FTS
+# include <sys/types.h>
+# include <sys/stat.h>
+# include <unistd.h>
 # include <errno.h>
 # include <libgen.h>
 # include <fts.h>
 # include <fnmatch.h>
 # include "struct/slist.h"
+
+enum {
+    FTS_DIRECTORY,
+    FTS_FILE
+};
+
+enum {
+    FTS_EXCLUDE,
+    FTS_INCLUDE
+};
+
+enum {
+    DEV_READ,
+    DEV_SKIP
+};
+
+enum {
+    LINK_READ,
+    LINK_EXPLICIT,
+    LINK_SKIP
+};
 
 static int dirbehave = DIR_READ;
 static int linkbehave = LINK_READ;
@@ -99,6 +123,26 @@ static inline UBool is_directory_matching(const char *dname)
     return ret;
 }
 
+UBool skip_file(int fd)
+{
+    mode_t s;
+    struct stat sb;
+
+    if (STDIN_FILENO == fd) {
+        return FALSE;
+    } else if (0 == fstat(fd, &sb)) {
+        s = sb.st_mode & S_IFMT;
+        if (S_IFDIR == s && DIR_SKIP == dirbehave) {
+            return TRUE;
+        }
+        if ((S_IFIFO == s || S_IFCHR == s || S_IFBLK == s || S_IFSOCK == s) && DEV_SKIP == devbehave) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
 int procdir(reader_t *reader, char **argv, void *userdata, int (*procfile)(reader_t *reader, const char *filename, void *userdata))
 {
     int ret;
@@ -107,7 +151,7 @@ int procdir(reader_t *reader, char **argv, void *userdata, int (*procfile)(reade
     int ftsflags;
 
     ret = 0;
-    switch(linkbehave) {
+    switch (linkbehave) {
         case LINK_EXPLICIT:
             ftsflags = FTS_COMFOLLOW;
             break;

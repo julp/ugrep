@@ -39,11 +39,7 @@ enum {
     BINARY_OPT = GETOPT_SPECIFIC
 };
 
-#ifdef WITH_FTS
-static char optstr[] = "AEHRTVbehnqrstuv";
-#else
-static char optstr[] = "AEHTVbehnqstuv";
-#endif /* WITH_FTS */
+static char optstr[] = "AEHTVbehnqstuv" FTS_COMMON_OPTIONS_STRING;
 
 static struct option long_options[] =
 {
@@ -55,9 +51,6 @@ static struct option long_options[] =
     {"show-all",         no_argument,       NULL, 'A'},
     {"show-ends",        no_argument,       NULL, 'E'},
     {"with-filename",    no_argument,       NULL, 'H'}, // grep
-// #ifdef WITH_FTS
-//     {"recursive",        no_argument,       NULL, 'R'}, // grep
-// #endif /* WITH_FTS */
     {"show-tabs",        no_argument,       NULL, 'T'},
     {"version",          no_argument,       NULL, 'V'},
     {"number-nonblank",  no_argument,       NULL, 'b'},
@@ -65,9 +58,6 @@ static struct option long_options[] =
     {"number",           no_argument,       NULL, 'n'},
     {"quiet",            no_argument,       NULL, 'q'}, // grep
     {"silent",           no_argument,       NULL, 'q'}, // grep
-// #ifdef WITH_FTS
-//     {"recursive",        no_argument,       NULL, 'r'}, // grep
-// #endif /* WITH_FTS */
     {"squeeze-blank",    no_argument,       NULL, 's'},
     {"show-no-printing", no_argument,       NULL, 'v'},
     {NULL,               no_argument,       NULL, 0}

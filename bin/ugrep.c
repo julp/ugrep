@@ -172,11 +172,7 @@ enum {
     //READER_OPT
 };
 
-#ifdef WITH_FTS
-static char optstr[] = "0123456789A:B:C:EFHLRVce:f:hilnqrsvwx";
-#else
-static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilnqsvwx";
-#endif /* WITH_FTS */
+static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilnqsvwx" FTS_COMMON_OPTIONS_STRING;
 
 static struct option long_options[] =
 {
@@ -196,9 +192,6 @@ static struct option long_options[] =
     {"fixed-string",        no_argument,       NULL, 'F'}, // POSIX
     {"with-filename",       no_argument,       NULL, 'H'},
     {"files-without-match", no_argument,       NULL, 'L'},
-#ifdef WITH_FTS
-    {"recursive",           no_argument,       NULL, 'R'},
-#endif /* WITH_FTS */
     {"version",             no_argument,       NULL, 'V'},
     {"count",               no_argument,       NULL, 'c'}, // POSIX
     {"regexp",              required_argument, NULL, 'e'}, // POSIX
@@ -209,9 +202,6 @@ static struct option long_options[] =
     {"line-number",         no_argument,       NULL, 'n'}, // POSIX
     {"quiet",               no_argument,       NULL, 'q'}, // POSIX
     {"silent",              no_argument,       NULL, 'q'}, // POSIX
-#ifdef WITH_FTS
-    {"recursive",           no_argument,       NULL, 'r'},
-#endif /* WITH_FTS */
     {"no-messages",         no_argument,       NULL, 's'}, // POSIX
     {"revert-match",        no_argument,       NULL, 'v'}, // POSIX
     {"word-regexp",         no_argument,       NULL, 'w'},

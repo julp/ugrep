@@ -20,37 +20,23 @@
 
 # ifdef WITH_FTS
 enum {
-    FTS_DIRECTORY,
-    FTS_FILE
-};
-
-enum {
-    FTS_EXCLUDE,
-    FTS_INCLUDE
-};
-
-enum {
-    DEV_READ,
-    DEV_SKIP
-};
-
-enum {
-    LINK_READ,
-    LINK_EXPLICIT,
-    LINK_SKIP
-};
-
-enum {
     DIR_READ,
     DIR_SKIP,
     DIR_RECURSE
 };
 
+#  define FTS_COMMON_OPTIONS_STRING "d:D:rRpOS"
+
 #  define FTS_COMMON_OPTIONS                                        \
     {"exclude",     required_argument, NULL, FTS_EXCLUDE_FILE_OPT}, \
     {"include",     required_argument, NULL, FTS_INCLUDE_FILE_OPT}, \
     {"exclude-dir", required_argument, NULL, FTS_EXCLUDE_DIR_OPT},  \
-    {"include-dir", required_argument, NULL, FTS_INCLUDE_DIR_OPT}
+    {"include-dir", required_argument, NULL, FTS_INCLUDE_DIR_OPT},  \
+    {"recursive",   no_argument,       NULL, 'r'},                  \
+    {"devices",     required_argument, NULL, 'D'},                  \
+    {"directories", required_argument, NULL, 'd'}
+# else
+#  define FTS_COMMON_OPTIONS_STRING ""
 # endif /* WITH_FTS */
 
 enum {
@@ -71,6 +57,7 @@ enum {
 
 # ifdef WITH_FTS
 int get_dirbehave(void);
+UBool skip_file(int);
 UBool is_file_matching(char *);
 int procdir(reader_t *, char **, void *, int (*procfile)(reader_t *, const char *, void *));
 # endif /* WITH_FTS */

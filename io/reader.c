@@ -533,6 +533,11 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
             error_set(error, WARN, "can't open %s: %s", filename, strerror(errno));
             goto failed;
         }
+#ifdef WITH_FTS
+        if (skip_file(this->fd)) {
+            goto failed;
+        }
+#endif /* WITH_FTS */
     }
 
     if (NULL == (this->fp = this->imp->dopen(error, this->fd, this->sourcename))) {
