@@ -136,6 +136,7 @@ void env_apply(void)
         ucnv_setDefaultName(system_encoding);
     }
     ustdout = u_finit(stdout, NULL, outputs_encoding);
+    env_register_resource(ustdout, (func_dtor_t) u_fclose);
     {
         UErrorCode status;
 
@@ -146,6 +147,7 @@ void env_apply(void)
         }
     }
     ustderr = u_finit(stderr, NULL, outputs_encoding);
+    env_register_resource(ustderr, (func_dtor_t) u_fclose);
     {
         UErrorCode status;
 
@@ -285,6 +287,7 @@ stdio_debug("%s", rbpath);
                 fprintf(stderr, "translation disabled: %s\n", u_errorName(status));
 # ifdef DEBUG
             } else {
+                env_register_resource(ures, (func_dtor_t) ures_close);
                 if (U_USING_DEFAULT_WARNING == status) {
                     fprintf(stderr, YELLOW("default") " translation enabled\n");
                 } else {
@@ -296,13 +299,64 @@ stdio_debug("%s", rbpath);
         }
     }
 #endif /* !WITHOUT_NLS */
+    if (0 != atexit(env_close)) {
+        fputs("can't register atexit() callback", stderr);
+        exit(EXIT_FAILURE);
+    }
 }
 
+typedef struct resource_t {
+    void *ptr;
+    func_dtor_t dtor_func;
+    struct resource_t *next;
+#ifdef DEBUG
+    int lineno;
+    const char *filename;
+#endif /* DEBUG */
+} resource_t;
+
+static resource_t *resources = NULL; /* LIFO */
+
+#ifdef DEBUG
+void _env_register_resource(void *ptr, func_dtor_t dtor_func, const char *filename, int lineno) /* NONNULL() */
+#else
+void env_register_resource(void *ptr, func_dtor_t dtor_func) /* NONNULL() */
+#endif /* DEBUG */
+{
+    resource_t *res;
+
+    require_else_return(NULL != ptr);
+    require_else_return(NULL != dtor_func);
+
+    res = mem_new(*res);
+    res->next = resources;
+    res->ptr = ptr;
+    res->dtor_func = dtor_func;
+#ifdef DEBUG
+    res->filename = filename; // no dup
+    res->lineno = lineno;
+#endif /* DEBUG */
+    resources = res;
+}
+
+#include <unicode/uclean.h>
 void env_close(void)
 {
-    if (NULL != ures) {
-        ures_close(ures);
+    if (NULL != resources) {
+        resource_t *current, *next;
+
+        current = resources;
+        while (NULL != current) {
+            next = current->next;
+//             if (NULL != current->ptr && NULL != current->dtor_func) {
+                current->dtor_func(current->ptr);
+//             }
+            free(current);
+            current = next;
+        }
+        resources = NULL;
     }
+    u_cleanup();
 }
 
 #define URESOURCE_SEPARATOR '/'
@@ -345,7 +399,7 @@ static char *binary_path(const char *argv0, char *buffer, size_t buffer_size)
 
     retval = NULL;
     argv0_len = strlen(argv0);
-    if ('.' == *argv0 || '/' == *argv0) { // path is relative or (seems) absolute
+    if ('.' == *argv0 || NULL != strchr(argv0, '/')) { // path is relative or (seems) absolute
         if (NULL != realpath(argv0, resolved)) {
             if (NULL == buffer) {
                 retval = strdup(resolved);
