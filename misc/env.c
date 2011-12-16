@@ -487,6 +487,7 @@ UChar *_(const char *UNUSED(ns), const char *id, const char *fallback)
         if (URESOURCE_SEPARATOR == *id) {
             // p = id + 1 or invalid
         }
+        /* TODO: use str_split instead */
         subres = 0;
         for (p = (char *) id; '\0' != *p; p++) {
             if (URESOURCE_SEPARATOR == *p) {
