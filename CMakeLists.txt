@@ -5,7 +5,8 @@ project(ugrep)
 if(MSVC)
     # http://msdn.microsoft.com/en-us/library/19z1t1wy%28v=VS.80%29.aspx
     # /GS /Wall
-    set(CMAKE_C_FLAGS_MAINTAINER "/D REPLACE_GETOPT /D DEBUG /Od" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
+    set(CMAKE_C_FLAGS_MAINTAINER "/MD /D DEBUG /Od" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
+    add_definitions(-DREPLACE_GETOPT)
 else(MSVC)
     set(CMAKE_C_FLAGS_MAINTAINER "-g -DDEBUG -O -Wall -Wextra -std=gnu99 -pedantic -Wwrite-strings -Wstrict-prototypes -Wuninitialized -Wunreachable-code -Wno-comment -Wnonnull" CACHE STRING "Flags used by the C compiler during maintainer builds." FORCE)
 endif(MSVC)

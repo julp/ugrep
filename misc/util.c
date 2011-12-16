@@ -7,7 +7,6 @@
 # include <sys/stat.h>
 # include <unistd.h>
 # include <errno.h>
-# include <libgen.h>
 # include <fts.h>
 # include <fnmatch.h>
 # include "struct/slist.h"
@@ -75,18 +74,58 @@ static void add_fts_pattern(const char *pattern, slist_t **l, int mode)
     slist_append(*l, p);
 }
 
+static char *fts_basename(const char *path, char *bname)
+{
+    size_t len;
+    const char *endp, *startp;
+
+    /* Empty or NULL string gets treated as "." */
+    if (NULL == path || '\0' == *path) {
+        bname[0] = '.';
+        bname[1] = '\0';
+        return bname;
+    }
+    /* Strip any trailing slashes */
+    endp = path + strlen(path) - 1;
+    while (endp > path && DIRECTORY_SEPARATOR == *endp) {
+        endp--;
+    }
+    /* All slashes becomes "/" */
+    if (endp == path && DIRECTORY_SEPARATOR == *endp) {
+        bname[0] = DIRECTORY_SEPARATOR;
+        bname[1] = '\0';
+        return bname;
+    }
+    /* Find the start of the base */
+    startp = endp;
+    while (startp > path && DIRECTORY_SEPARATOR != *(startp - 1)) {
+        startp--;
+    }
+    len = endp - startp + 1;
+    if (len >= MAXPATHLEN) {
+        errno = ENAMETOOLONG;
+        return NULL;
+    }
+    memcpy(bname, startp, len);
+    bname[len] = '\0';
+
+    return bname;
+}
+
 UBool is_file_matching(char *fname)
 {
     UBool ret;
-    char *fname_base;
     slist_element_t *e;
+    char fname_base[MAXPATHLEN];
 
     if (!have_file_included && !have_file_excluded) {
         return TRUE;
     }
 
     ret = have_file_included ? FALSE : TRUE;
-    fname_base = basename(fname);
+    if (NULL == fts_basename(fname, fname_base)) {
+        return FALSE;
+    }
     for (e = file_patterns->head; NULL != e; e = e->next) {
         FETCH_DATA(e->data, p, FTSPattern);
 
@@ -163,7 +202,7 @@ int procdir(reader_t *reader, char **argv, void *userdata, int (*procfile)(reade
     }
     ftsflags |= FTS_NOSTAT | FTS_NOCHDIR;
     if (NULL == (fts = fts_open(argv, ftsflags, NULL))) {
-        msg(FATAL, "can't fts_open %s: %s", *dirname, strerror(errno));
+        msg(FATAL, "can't fts_open: %s", strerror(errno));
     }
     while (NULL != (p = fts_read(fts))) {
         switch (p->fts_info) {

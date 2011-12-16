@@ -12,5 +12,5 @@ fi
 
 rm -f CMakeCache.txt
 touch *.c
-cmake . -G"Unix Makefiles" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" # -DDYNAMIC_READER=ON
+cmake . -G"Unix Makefiles" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" -DDYNAMIC_READER=ON
 LANG=C make # VERBOSE=1

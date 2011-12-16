@@ -72,6 +72,9 @@
 #  define DIRECTORY_SEPARATOR '\\'
 extern char __progname[];
 # else
+#  if !defined(MAXPATHLEN) && defined(PATH_MAX)
+#   define MAXPATHLEN PATH_MAX
+#  endif /* !MAXPATHLEN && PATH_MAX */
 #  define DIRECTORY_SEPARATOR '/'
 extern char *__progname;
 # endif /* _MSC_VER */

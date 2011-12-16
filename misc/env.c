@@ -363,9 +363,10 @@ void env_close(void)
         current = resources;
         while (NULL != current) {
             next = current->next;
-//             if (NULL != current->ptr && NULL != current->dtor_func) {
-                current->dtor_func(current->ptr);
-//             }
+#if defined(DEBUG) && 0
+            fprintf(stderr, "freeing %p, registered in %s at line %d\n", current->ptr, current->filename, current->lineno);
+#endif /* DEBUG */
+            current->dtor_func(current->ptr);
             free(current);
             current = next;
         }
