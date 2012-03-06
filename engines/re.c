@@ -231,6 +231,11 @@ static int32_t engine_re_split(error_t **error, void *data, const UString *subje
     return pieces;
 }
 
+static int32_t engine_re_split2(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
+{
+    debug("Not yet implemented");
+}
+
 static void engine_re_destroy(void *data)
 {
     FETCH_DATA(data, p, re_pattern_t);
@@ -244,5 +249,6 @@ engine_t re_engine = {
     engine_re_match_all,
     engine_re_whole_line_match,
     engine_re_split,
+    engine_re_split2,
     engine_re_destroy
 };

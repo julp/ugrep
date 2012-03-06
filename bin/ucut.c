@@ -74,7 +74,7 @@ static void usage(void)
 
 /* ========== cutter ========== */
 
-UBool ubrk_fwd_n(UBreakIterator *ubrk, size_t n, int32_t *r)
+static UBool ubrk_fwd_n(UBreakIterator *ubrk, size_t n, int32_t *r)
 {
     while (n > 0 && UBRK_DONE != (*r = ubrk_next(ubrk))) {
         --n;
@@ -97,7 +97,7 @@ static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *
                 U16_FWD_N(ustr->ptr, l, ustr->len, i->lower_limit - lastU);
                 u = l;
             }
-            U16_FWD_N(ustr->ptr, u, ustr->len, i->upper_limit - i->lower_limit);
+            U16_FWD_N(ustr->ptr, u, ustr->len, i->upper_limit - i->lower_limit); // TODO: il faut revenir en arrière
             add_match(array, ustr, l, u);
             ++pieces;
             lastU = i->upper_limit;
@@ -113,7 +113,7 @@ static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *
             return -1;
         }
         if (UBRK_DONE != (l = ubrk_first(ubrk))) {
-            for (el = intervals->head; NULL != el && u != UBRK_DONE; el = el->next) {
+            for (el = intervals->head; NULL != el && UBRK_DONE != u; el = el->next) {
                 FETCH_DATA(el->data, i, interval_t);
 
                 if (i->lower_limit > 0) {
@@ -121,7 +121,7 @@ static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *
                         break;
                     }
                 }
-                if (!ubrk_fwd_n(ubrk, i->upper_limit - i->lower_limit, &u)) {
+                if (!ubrk_fwd_n(ubrk, i->upper_limit - i->lower_limit, &u)) { // TODO: il faut revenir en arrière
                     break;
                 }
                 add_match(array, ustr, l, u);
@@ -153,15 +153,19 @@ static int procfile(reader_t *reader, const char *filename)
     dlist_element_t *el;
 
     error = NULL;
-    dptrarray_clear(pieces);
     if (reader_open(reader, &error, filename)) {
         while (!reader_eof(reader)) {
             if (!reader_readline(reader, &error, ustr)) {
                 print_error(error);
             }
             ustring_chomp(ustr);
+            dptrarray_clear(pieces);
             if (fFlag) {
+#if 0
                 count = pdata.engine->split(&error, pdata.pattern, ustr, pieces);
+#else
+                count = pdata.engine->split2(&error, pdata.pattern, ustr, pieces, intervals);
+#endif
             } else if (cFlag) {
                 count = split_on_indices(&error, ubrk, ustr, pieces, intervals);
             } else {
@@ -170,6 +174,7 @@ static int procfile(reader_t *reader, const char *filename)
             if (count < 0) {
                 print_error(error);
             } else if (count > 0) {
+#if 0
                 if (fFlag) {
                     for (el = intervals->head; NULL != el; el = el->next) {
                         FETCH_DATA(el->data, i, interval_t);
@@ -184,15 +189,22 @@ static int procfile(reader_t *reader, const char *filename)
                         }
                     }
                 } else if (cFlag) {
+#else
+//                 if (fFlag || cFlag) {
+#endif
+// debug("count = %d", count);
                     for (j = 0; j < count; j++) {
                         match_t *m;
 
                         m = dptrarray_at(pieces, j);
+// debug(">%.*S< (%d) >%S<", m->len, m->ptr, m->len, m->ptr);
                         u_file_write(m->ptr, m->len, ustdout);
                     }
+#if 0
                 } else {
                     assert(FALSE);
                 }
+#endif
                 u_file_write(EOL, EOL_LEN, ustdout);
             } else if (!sFlag && fFlag) {
                 u_file_write(ustr->ptr, ustr->len, ustdout);
@@ -268,7 +280,7 @@ int main(int argc, char **argv)
 
     env_apply();
 
-    if (cFlag && fFlag) {
+    if (cFlag && (fFlag || NULL != delim_arg)) {
         usage();
     }
     if (!cFlag && !fFlag) {
@@ -299,15 +311,15 @@ int main(int argc, char **argv)
     interval_list_debug(intervals);
 #endif
     env_register_resource(intervals, (func_dtor_t) interval_list_destroy);
-    if (NULL == delim_arg) {
-        delim = ustring_dup_string_len(DEFAULT_DELIM, STR_LEN(DEFAULT_DELIM));
-    } else {
-        if (NULL == (delim = ustring_convert_argv_from_local(delim_arg, &error, TRUE))) {
-            print_error(error);
-        }
-    }
-    env_register_resource(delim, (func_dtor_t) ustring_destroy);
     if (fFlag) {
+        if (NULL == delim_arg) {
+            delim = ustring_dup_string_len(DEFAULT_DELIM, STR_LEN(DEFAULT_DELIM));
+        } else {
+            if (NULL == (delim = ustring_convert_argv_from_local(delim_arg, &error, TRUE))) {
+                print_error(error);
+            }
+        }
+        //env_register_resource(delim, (func_dtor_t) ustring_destroy); // done by the engine?
         if (NULL == (pdata.pattern = pdata.engine->compile(&error, delim, 0))) {
             print_error(error);
         } else {

@@ -220,7 +220,7 @@ typedef struct {
     size_t len;
 } KVString;
 
-#ifdef DEBUG
+#if defined(DEBUG) && 0
 static const UChar NULL_UCHAR[] = { 0x28, 0x6E, 0x75, 0x6C, 0x6C, 0x29, 0 };
 
 static const KVString NULL_KVString = {
@@ -762,7 +762,7 @@ int main(int argc, char **argv)
             grapheme_hashtable_put(ht, set1, set2, dFlag, FALSE);
         }
     }
-#ifdef DEBUG
+#if defined(DEBUG) && 0
     {
         const char *typemap[] = {
             "none",
