@@ -9,6 +9,11 @@
 #include <unicode/uset.h>
 #include <unicode/ubrk.h>
 
+// #define UTRANS_EXP 1
+#ifdef UTRANS_EXP
+# include <unicode/utrans.h>
+#endif /* UTRANS_EXP */
+
 #include "common.h"
 #include "struct/hashtable.h"
 
@@ -547,11 +552,19 @@ int main(int argc, char **argv)
     UString *in, *out, *set1, *set2;
     UBool dFlag, cFlag, isError, sFlag;
     UCaseType set1_case_type, set2_case_type;
+#ifdef UTRANS_EXP
+    UString *id, *rules;
+    UTransliterator *utrans;
+#endif /* UTRANS_EXP */
 
     ht = NULL;
     ubrk = NULL;
     uset = NULL;
     error = NULL;
+#ifdef UTRANS_EXP
+    utrans = NULL;
+    id = rules = NULL;
+#endif /* UTRANS_EXP */
     filter_func = NULL;
     status = U_ZERO_ERROR;
     set1_type = set2_type = NONE;
@@ -716,7 +729,38 @@ int main(int argc, char **argv)
             set1_type = CHARACTER;
         }
     }
+#ifdef UTRANS_EXP
+    // r '[:lower:]' '[:upper:]' abc
+    if (SET == set1_type && (NONE == set2_type || (NONE != set2_type && '[' == set2->ptr[0]))) {
+        UParseError pe = { -1, -1, {0}, {0} };
 
+        if (NULL == set1) {
+            if (NULL == (set1 = ustring_convert_argv_from_local(argv[0], &error, TRUE))) {
+                print_error(error);
+            }
+        }
+        id = ustring_new();
+        ustring_append_string_len(id, set1->ptr + 2, set1->len - 4); /* ignore [: and :] */
+        ustring_append_char(id, 0x3B /* ';' */);
+        if (NONE == set2_type) {
+            UChar remove[] = {0x52, 0x65, 0x6D, 0x6F, 0x76, 0x65, 0}; /* "Remove" */
+
+            ustring_append_string_len(id, remove, STR_LEN(remove));
+        } else {
+            ustring_append_string_len(id, set2->ptr + 2, set2->len - 4); /* ignore [: and :] */
+        }
+        utrans = utrans_openU(id->ptr, id->len, UTRANS_FORWARD, NULL, 0, &pe, &status);
+        if (U_FAILURE(status)) {
+            // TODO: real error/memory handling
+            //if (-1 != pe.line) { /* rules is unused */
+                //u_fprintf(ustderr, "Invalid rule: error at offset %d\n\t%S\n\t%*c\n", pe.offset, rules->ptr, pe.offset, '^');
+            //} else {
+                u_fprintf(ustderr, "utrans_openU: %s\n", u_errorName(status));
+            //}
+            return UTR_EXIT_FAILURE;
+        }
+    } else
+#endif /* UTRANS_EXP */
     if (STRING == set2_type) {
         if (STRING != set1_type) {
             fprintf(stderr, "Using a string as a set have only sense if the first set is defined as a string too\n");
@@ -826,6 +870,17 @@ int main(int argc, char **argv)
     }
     reader_close(&reader);
 
+#ifdef UTRANS_EXP
+    if (NULL != utrans) {
+        utrans_close(utrans);
+    }
+    if (NULL != id) {
+        ustring_destroy(id);
+    }
+    if (NULL != rules) {
+        ustring_destroy(rules);
+    }
+#endif /* UTRANS_EXP */
     if (NULL != ubrk) {
         ubrk_close(ubrk);
     }
