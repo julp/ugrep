@@ -66,7 +66,6 @@
 #  define isblank isspace
 #  define snprintf sprintf_s
 #  define strcasecmp _stricmp
-#  define strdup _strdup
 #  define stat _stat
 #  define fstat _fstat
 #  define DIRECTORY_SEPARATOR '\\'

@@ -113,7 +113,7 @@ static int register_fd(void *x, int *fd, const char *path)
     if (NULL == _fullpath(full, path, _MAX_PATH)) {
         return 0;
     } else {
-        char *copy = _strdup(full);
+        char *copy = mem_dup(full);
         *fd = --FD_FROM_P(x);
         hashtable_put(HT_FROM_P(x), UINT_TO_POINTER(*fd), copy);
         return 1;
@@ -261,7 +261,7 @@ DIR *opendir(void *x, const char *filename)
         }
     }
     dp->fd = fd;
-    dp->dir = _strdup(filename);
+    dp->dir = mem_dup(filename);
     free(filespec);
 
     return dp;
