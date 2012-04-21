@@ -234,6 +234,8 @@ static int32_t engine_re_split(error_t **error, void *data, const UString *subje
 static int32_t engine_re_split2(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
 {
     debug("Not yet implemented");
+
+    return 0;
 }
 
 static void engine_re_destroy(void *data)

@@ -1,6 +1,7 @@
 #!/bin/sh
 
-#export CC="/usr/bin/clang"
+export CC="/usr/bin/clang"
+export CXX="/usr/bin/clang++"
 BUILD_TYPE="Maintainer"
 if [ $# -eq 1 ]; then
     case "$1" in
