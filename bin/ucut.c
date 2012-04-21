@@ -295,6 +295,7 @@ int main(int argc, char **argv)
             icu_error_set(&error, FATAL, status, "ubrk_open");
             print_error(error);
         }
+        env_register_resource(ubrk, (func_dtor_t) ubrk_close);
     }
     if (!parseIntervals(&error, intervals_arg, intervals, 1)) {
         print_error(error);
