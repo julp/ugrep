@@ -649,7 +649,7 @@ UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct,
         return TRUE;
     }
     len = unicode_case_mapping[ct].func(NULL, 0, src, src_len, NULL, &status);
-    if (U_BUFFER_OVERFLOW_ERROR != status) {
+    if (U_BUFFER_OVERFLOW_ERROR != status && U_STRING_NOT_TERMINATED_WARNING != status) {
         return FALSE;
     }
     status = U_ZERO_ERROR;
