@@ -517,7 +517,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
     UErrorCode status;
     size_t buffer_len;
     const char *encoding;
-    char buffer[MAX_ENC_REL_LEN + 1];
+    char buffer[MAX_ENC_REL_LEN + 1] = { 0 };
 
     require_else_return_false(NULL != this);
     require_else_return_false(NULL != filename);
@@ -577,6 +577,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
                     ucsdet_setText(csd, buffer, buffer_len, &status);
                     if (U_FAILURE(status)) {
                         icu_error_set(error, WARN, status, "ucsdet_setText");
+                        ucsdet_close(csd);
                         goto failed;
                     }
                     ucm = ucsdet_detect(csd, &status);
