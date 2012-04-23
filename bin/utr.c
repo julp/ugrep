@@ -665,6 +665,7 @@ int main(int argc, char **argv)
                 if (NULL == (set2 = ustring_convert_argv_from_local(argv[1], &error, TRUE))) {
                     print_error(error);
                 }
+                env_register_resource(set2, (func_dtor_t) ustring_destroy);
                 if (u_strHasMoreChar32Than(set2->ptr, set2->len, 1)) {
                     set2_type = STRING;
                 } else {
@@ -708,12 +709,15 @@ int main(int argc, char **argv)
         if (NULL == (uset = create_set_from_argv(argv[0], cFlag, &error))) {
             print_error(error);
         }
+        env_register_resource(uset, (func_dtor_t) uset_close);
     } else {
         if (NULL == (set1 = ustring_convert_argv_from_local(argv[0], &error, TRUE))) {
             print_error(error);
         }
+        env_register_resource(set1, (func_dtor_t) ustring_destroy);
         if (!cFlag && UNIT_GRAPHEME == env_get_unit()) {
             ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+            env_register_resource(ubrk, (func_dtor_t) ubrk_close);
             assert(U_SUCCESS(status));
         }
         if ((UNIT_CODEPOINT == env_get_unit() && u_strHasMoreChar32Than(set1->ptr, set1->len, 1)) || (UNIT_GRAPHEME == env_get_unit() && grapheme_count(ubrk, set1) > 1)) {
@@ -722,6 +726,7 @@ int main(int argc, char **argv)
                     print_error(error);
                 }
                 set1_type = SET;
+                env_register_resource(uset, (func_dtor_t) uset_close);
             } else {
                 set1_type = STRING;
             }
@@ -738,8 +743,10 @@ int main(int argc, char **argv)
             if (NULL == (set1 = ustring_convert_argv_from_local(argv[0], &error, TRUE))) {
                 print_error(error);
             }
+            env_register_resource(set1, (func_dtor_t) ustring_destroy);
         }
         id = ustring_new();
+        env_register_resource(id, (func_dtor_t) ustring_destroy);
         ustring_append_string_len(id, set1->ptr + 2, set1->len - 4); /* ignore [: and :] */
         ustring_append_char(id, 0x3B /* ';' */);
         if (NONE == set2_type) {
@@ -750,12 +757,13 @@ int main(int argc, char **argv)
             ustring_append_string_len(id, set2->ptr + 2, set2->len - 4); /* ignore [: and :] */
         }
         utrans = utrans_openU(id->ptr, id->len, UTRANS_FORWARD, NULL, 0, &pe, &status);
+        env_register_resource(utrans, (func_dtor_t) utrans_close);
         if (U_FAILURE(status)) {
             // TODO: real error/memory handling
             //if (-1 != pe.line) { /* rules is unused */
                 //u_fprintf(ustderr, "Invalid rule: error at offset %d\n\t%S\n\t%*c\n", pe.offset, rules->ptr, pe.offset, '^');
             //} else {
-                u_fprintf(ustderr, "utrans_openU: %s\n", u_errorName(status));
+                fprintf(stderr, "utrans_openU: %s\n", u_errorName(status));
             //}
             return UTR_EXIT_FAILURE;
         }
@@ -781,10 +789,13 @@ int main(int argc, char **argv)
     }
 
     in = ustring_new();
+    env_register_resource(in, (func_dtor_t) ustring_destroy);
     out = ustring_new();
+    env_register_resource(out, (func_dtor_t) ustring_destroy);
 
     if (STRING == set1_type) {
         ht = hashtable_standalone_dup_new(single_hash, single_equal, sizeof(KVString), dFlag ? 0 : sizeof(KVString));
+        env_register_resource(ht, (func_dtor_t) hashtable_destroy);
         if (SIMPLE_FUNCTION == set2_type) {
             UChar32 c;
             KVString k, v;
@@ -869,39 +880,6 @@ int main(int argc, char **argv)
         u_file_write(EOL, EOL_LEN, ustdout);
     }
     reader_close(&reader);
-
-#ifdef UTRANS_EXP
-    if (NULL != utrans) {
-        utrans_close(utrans);
-    }
-    if (NULL != id) {
-        ustring_destroy(id);
-    }
-    if (NULL != rules) {
-        ustring_destroy(rules);
-    }
-#endif /* UTRANS_EXP */
-    if (NULL != ubrk) {
-        ubrk_close(ubrk);
-    }
-    if (NULL != uset) {
-        uset_close(uset);
-    }
-    if (NULL != ht) {
-        hashtable_destroy(ht);
-    }
-    if (NULL != set1) {
-        ustring_destroy(set1);
-    }
-    if (NULL != set2) {
-        ustring_destroy(set2);
-    }
-    if (NULL != in) {
-        ustring_destroy(in);
-    }
-    if (NULL != out) {
-        ustring_destroy(out);
-    }
 
     return UTR_EXIT_SUCCESS;
 }
