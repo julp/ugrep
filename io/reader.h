@@ -125,6 +125,7 @@ UBool reader_eof(reader_t *) NONNULL();
 const reader_imp_t *reader_get_by_name(const char *) NONNULL();
 void *reader_get_user_data(reader_t *) NONNULL();
 void reader_init(reader_t *, const char *) NONNULL(1);
+reader_t *reader_new(const char *);
 UBool reader_open(reader_t *, error_t **, const char *) NONNULL(1, 3);
 UBool reader_open_stdin(reader_t *, error_t **) NONNULL(1);
 UBool reader_open_string(reader_t *, error_t **, const char *) NONNULL(1, 3);

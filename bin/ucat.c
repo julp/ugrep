@@ -180,24 +180,24 @@ static int procdir(reader_t *reader, char **dirname)
 int main(int argc, char **argv)
 {
     int c, ret;
-    reader_t reader;
+    reader_t *reader;
 
     ret = 0;
     env_init(UCAT_EXIT_FAILURE);
-    reader_init(&reader, DEFAULT_READER_NAME);
+    reader = reader_new(DEFAULT_READER_NAME);
 
 #if defined(HAVE_BZIP2) || defined(HAVE_ZLIB) || defined(DYNAMIC_READERS)
     switch (__progname[1]) {
 # if defined(HAVE_BZIP2) || defined(DYNAMIC_READERS)
         case 'b':
             if ('z' == __progname[2]) {
-                reader_set_imp_by_name(&reader, "bzip2");
+                reader_set_imp_by_name(reader, "bzip2");
             }
             break;
 # endif /* HAVE_BZIP2 || DYNAMIC_READERS */
 # if defined(HAVE_ZLIB) || defined(DYNAMIC_READERS)
         case 'z':
-            reader_set_imp_by_name(&reader, "gzip");
+            reader_set_imp_by_name(reader, "gzip");
             break;
 # endif /* HAVE_ZLIB || DYNAMIC_READERS */
     }
@@ -266,7 +266,7 @@ int main(int argc, char **argv)
                 }
                 break;
             default:
-                if (!util_opt_parse(c, optarg, &reader)) {
+                if (!util_opt_parse(c, optarg, reader)) {
                     usage();
                 }
                 break;
@@ -277,16 +277,16 @@ int main(int argc, char **argv)
 
     env_apply();
 
-    reader_set_binary_behavior(&reader, binbehave);
+    reader_set_binary_behavior(reader, binbehave);
 
     ustr = ustring_new();
     env_register_resource(ustr, (func_dtor_t) ustring_destroy);
 
     if (0 == argc) {
-        ret |= procfile(&reader, "-", NULL);
+        ret |= procfile(reader, "-", NULL);
 #ifdef WITH_FTS
     } else if (DIR_RECURSE == get_dirbehave()) {
-        ret |= procdir(&reader, argv, NULL, procfile);
+        ret |= procdir(reader, argv, NULL, procfile);
 #endif /* WITH_FTS */
     } else {
         for ( ; argc--; ++argv) {
@@ -295,7 +295,7 @@ int main(int argc, char **argv)
                 continue;
             }
 #endif /* WITH_FTS */
-            ret |= procfile(&reader, *argv, NULL);
+            ret |= procfile(reader, *argv, NULL);
         }
     }
 

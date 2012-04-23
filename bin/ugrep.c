@@ -1042,7 +1042,7 @@ int main(int argc, char **argv)
     int lastc;
     UBool newarg;
     int prevoptind;
-    reader_t reader;
+    reader_t *reader;
 #ifndef NO_COLOR
     int color;
 #endif /* !NO_COLOR */
@@ -1066,7 +1066,7 @@ int main(int argc, char **argv)
     pattern_type = PATTERN_AUTO;
 
     env_init(UGREP_EXIT_FAILURE);
-    reader_init(&reader, DEFAULT_READER_NAME);
+    reader = reader_new(DEFAULT_READER_NAME);
     patterns = slist_new(pattern_destroy);
     env_register_resource(patterns, (func_dtor_t) slist_destroy);
 
@@ -1206,7 +1206,7 @@ int main(int argc, char **argv)
                 }
                 break;
             default:
-                if (!util_opt_parse(c, optarg, &reader)) {
+                if (!util_opt_parse(c, optarg, reader)) {
                     usage();
                 }
                 break;
@@ -1220,7 +1220,7 @@ int main(int argc, char **argv)
 
     env_apply();
 
-    reader_set_binary_behavior(&reader, binbehave);
+    reader_set_binary_behavior(reader, binbehave);
 
     /* Options overrides, in case of incompatibility between them */
     if (cFlag || lFlag || LFlag) {
@@ -1276,10 +1276,10 @@ int main(int argc, char **argv)
 #endif /* !NO_COLOR */
 
     if (0 == argc) {
-        ret |= procfile(&reader, "-", &matches);
+        ret |= procfile(reader, "-", &matches);
 #ifdef WITH_FTS
     } else if (DIR_RECURSE == get_dirbehave()) {
-        ret |= procdir(&reader, argv, &matches, procfile);
+        ret |= procdir(reader, argv, &matches, procfile);
 #endif /* WITH_FTS */
     } else {
         for ( ; argc--; ++argv) {
@@ -1288,7 +1288,7 @@ int main(int argc, char **argv)
                 continue;
             }
 #endif /* WITH_FTS */
-            ret |= procfile(&reader, *argv, &matches);
+            ret |= procfile(reader, *argv, &matches);
         }
     }
 

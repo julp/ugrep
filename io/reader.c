@@ -429,9 +429,7 @@ UBool reader_open_stdin(reader_t *this, error_t **error) /* NONNULL(1) */
     if (!reader_set_encoding(this, error, env_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
         return FALSE;
     }
-#ifdef DEBUG
     debug("%s, file encoding = %s", this->sourcename, this->encoding);
-#endif /* DEBUG */
 
     return ret;
 }
@@ -451,9 +449,7 @@ UBool reader_open_string(reader_t *this, error_t **error, const char *string) /*
     if (!reader_set_encoding(this, error, env_get_stdin_encoding())) { /* NULL <=> inherit system encoding */
         return FALSE;
     }
-#ifdef DEBUG
     debug("%s, file encoding = %s", this->sourcename, this->encoding);
-#endif /* DEBUG */
 
     return TRUE;
 }
@@ -500,16 +496,35 @@ void reader_close(reader_t *this) /* NONNULL() */
 
     if (NULL != this->imp->close && NULL != this->fp) {
         this->imp->close(this->fp);
-        this->fp = NULL;
     }
+    this->fp = NULL;
     if (NULL != this->ucnv) {
         ucnv_close(this->ucnv);
         this->ucnv = NULL;
     }
-    if (0 > this->fd && STDIN_FILENO != this->fd) {
+    if (this->fd > 0 && STDIN_FILENO != this->fd) {
         close(this->fd);
     }
     this->fd = -1;
+}
+
+static void reader_destroy(reader_t *this) /* NONNULL() */
+{
+    require_else_return(NULL != this);
+
+    reader_close(this);
+    free(this);
+}
+
+reader_t *reader_new(const char *name)
+{
+    reader_t *this;
+
+    this = mem_new(*this);
+    reader_init(this, name);
+    env_register_resource(this, (func_dtor_t) reader_destroy);
+
+    return this;
 }
 
 UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONNULL(1, 3) */
@@ -614,9 +629,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
     if (!reader_set_encoding(this, error, encoding)) {
         goto failed;
     }
-#ifdef DEBUG
     debug("%s, file encoding = %s", this->sourcename, this->encoding);
-#endif /* DEBUG */
 #ifdef NO_PHYSICAL_REWIND
     {
         UChar *utf16Ptr;

@@ -543,7 +543,7 @@ int main(int argc, char **argv)
     UChar32 i32;
     Hashtable *ht;
     error_t *error;
-    reader_t reader;
+    reader_t *reader;
     UErrorCode status;
     UBool set2_expected;
     UBreakIterator *ubrk;
@@ -573,7 +573,7 @@ int main(int argc, char **argv)
     match = isError = set2_expected = cFlag = dFlag = sFlag = FALSE;
 
     env_init(UTR_EXIT_FAILURE);
-    reader_init(&reader, DEFAULT_READER_NAME);
+    reader = reader_new(DEFAULT_READER_NAME);
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
@@ -595,7 +595,7 @@ int main(int argc, char **argv)
                 exit(UTR_EXIT_SUCCESS);
                 break;
             default:
-                if (!util_opt_parse(c, optarg, &reader)) {
+                if (!util_opt_parse(c, optarg, reader)) {
                     usage();
                 }
                 break;
@@ -610,11 +610,11 @@ int main(int argc, char **argv)
         switch (argc) {
             case 1:
                 // set1 (argv[0]) + stdin
-                reader_open_stdin(&reader, &error);
+                reader_open_stdin(reader, &error);
                 break;
             case 2:
                 // set1 (argv[0]) + string (argv[1])
-                reader_open_string(&reader, &error, argv[1]);
+                reader_open_string(reader, &error, argv[1]);
                 break;
             default:
                 usage();
@@ -624,23 +624,23 @@ int main(int argc, char **argv)
         switch (argc) {
             case 1:
                 // set1 (argv[0]) + stdin
-                reader_open_stdin(&reader, &error);
+                reader_open_stdin(reader, &error);
                 break;
             case 2:
                 // set1 (argv[0]) as FUNC + string (argv[1])
                 // OR
                 // set1 (argv[0]) + set2 (argv[1]) + stdin
                 if (!strncmp("fn:", argv[0], STR_LEN("fn:"))) {
-                    reader_open_string(&reader,  &error, argv[1]);
+                    reader_open_string(reader,  &error, argv[1]);
                 } else {
                     set2_expected = TRUE;
-                    reader_open_stdin(&reader, &error);
+                    reader_open_stdin(reader, &error);
                 }
                 break;
             case 3:
                 // set1 (argv[0]) + set2 (argv[1]) + string (argv[2])
                 set2_expected = TRUE;
-                reader_open_string(&reader,  &error, argv[2]);
+                reader_open_string(reader,  &error, argv[2]);
                 break;
             default:
                 usage();
@@ -832,8 +832,8 @@ int main(int argc, char **argv)
         debug("mode = %s, set1 = %s, set2 = %s", UNIT_CODEPOINT == env_get_unit() ? "CP/as is" : "graphemes", typemap[set1_type], typemap[set2_type]);
     }
 #endif /* DEBUG */
-    while (!reader_eof(&reader)) {
-        if (!reader_readline(&reader, &error, in)) {
+    while (!reader_eof(reader)) {
+        if (!reader_readline(reader, &error, in)) {
             print_error(error);
         }
         ustring_chomp(in);
@@ -879,7 +879,7 @@ int main(int argc, char **argv)
         u_file_write(out->ptr, out->len, ustdout);
         u_file_write(EOL, EOL_LEN, ustdout);
     }
-    reader_close(&reader);
+    reader_close(reader);
 
     return UTR_EXIT_SUCCESS;
 }

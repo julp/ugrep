@@ -144,14 +144,14 @@ int main(int argc, char **argv)
     int wanted;
     int c, ret;
     error_t *error;
-    reader_t reader;
+    reader_t *reader;
     UErrorCode status;
 
     ret = 0;
     wanted = ALL;
     error = NULL;
     env_init(USORT_EXIT_FAILURE);
-    reader_init(&reader, DEFAULT_READER_NAME);
+    reader = reader_new(DEFAULT_READER_NAME);
 
     status = U_ZERO_ERROR;
     ucol = ucol_open(NULL, &status);
@@ -191,7 +191,7 @@ int main(int argc, char **argv)
                 wanted = MAX_ONLY;
                 break;
             default:
-                if (!util_opt_parse(c, optarg, &reader)) {
+                if (!util_opt_parse(c, optarg, reader)) {
                     usage();
                 }
                 break;
@@ -210,13 +210,13 @@ int main(int argc, char **argv)
     env_register_resource(ustr, (func_dtor_t) ustring_destroy);
 
     if (0 == argc) {
-        ret |= procfile(&reader, "-");
+        ret |= procfile(reader, "-");
     } else {
         for ( ; argc--; ++argv) {
             // for memory consumption, with wanted equal to MIN_ONLY/MAX_ONLY
             // clear btree by keeping only min/max (which becomes root)
             // (min/max heap)
-            ret |= procfile(&reader, *argv);
+            ret |= procfile(reader, *argv);
         }
     }
 

@@ -225,7 +225,7 @@ int main(int argc, char **argv)
 {
     int c, ret;
     error_t *error;
-    reader_t reader;
+    reader_t *reader;
     UBool complement;
     const char *intervals_arg, *delim_arg;
 
@@ -235,7 +235,7 @@ int main(int argc, char **argv)
     intervals = interval_list_new();
     intervals_arg = delim_arg = NULL;
     env_init(UCUT_EXIT_FAILURE);
-    reader_init(&reader, DEFAULT_READER_NAME);
+    reader = reader_new(DEFAULT_READER_NAME);
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
@@ -269,7 +269,7 @@ int main(int argc, char **argv)
                 complement = TRUE;
                 break;
             default:
-                if (!util_opt_parse(c, optarg, &reader)) {
+                if (!util_opt_parse(c, optarg, reader)) {
                     usage();
                 }
                 break;
@@ -333,10 +333,10 @@ int main(int argc, char **argv)
     env_register_resource(pieces, (func_dtor_t) dptrarray_destroy);
 
     if (0 == argc) {
-        ret |= procfile(&reader, "-");
+        ret |= procfile(reader, "-");
     } else {
         for ( ; argc--; ++argv) {
-            ret |= procfile(&reader, *argv);
+            ret |= procfile(reader, *argv);
         }
     }
 
