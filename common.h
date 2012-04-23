@@ -185,10 +185,7 @@ typedef func_dup_t func_cpy_t;             /* Alias */
 #  define OLD_RING     1
 # endif /* _MSC_VER */
 
-# define U16_32_NFC_MAX_EXPANSION_FACTOR 3
-# define U16_32_NFD_MAX_EXPANSION_FACTOR 4
-
-# define COPYRIGHT "\nCopyright (C) 2010-2011, julp\n"
+# define COPYRIGHT "\nCopyright (C) 2010-2012, julp\n"
 
 # include "alloc.h"
 
