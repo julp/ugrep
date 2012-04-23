@@ -204,6 +204,7 @@ int procdir(reader_t *reader, char **argv, void *userdata, int (*procfile)(reade
     if (NULL == (fts = fts_open(argv, ftsflags, NULL))) {
         msg(FATAL, "can't fts_open: %s", strerror(errno));
     }
+    env_register_resource(fts, (func_dtor_t) fts_close);
     while (NULL != (p = fts_read(fts))) {
         switch (p->fts_info) {
             case FTS_DNR:
@@ -236,7 +237,6 @@ int procdir(reader_t *reader, char **argv, void *userdata, int (*procfile)(reade
             }
         }
     }
-    fts_close(fts);
 
     return ret;
 }
