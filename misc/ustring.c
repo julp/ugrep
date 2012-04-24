@@ -14,6 +14,13 @@
 
 #define SIZE_MAX_2 (SIZE_MAX << (sizeof(size_t) * CHAR_BIT - 1))
 
+#define USTRING_INIT_LEN(/*UString **/ ustr, /*size_t*/ length) \
+    do {                                                        \
+        ustr = mem_new(*ustr);                                  \
+        ustr->ptr = NULL;                                       \
+        ustr->allocated = ustr->len = 0;                        \
+        _ustring_maybe_expand_to(ustr, (length));               \
+    } while (0);
 
 /* NOTE: /!\ all lengths are in code units not code point /!\ */
 
@@ -29,6 +36,7 @@ static inline size_t nearest_power(size_t requested_length)
         while ((1UL << i) < requested_length) {
             i++;
         }
+
         return (1UL << i);
     }
 }
@@ -81,10 +89,7 @@ UString *ustring_sized_new(size_t requested) /* WARN_UNUSED_RESULT */
 {
     UString *ustr;
 
-    ustr = mem_new(*ustr);
-    ustr->len = 0;
-    ustr->allocated = nearest_power(requested);
-    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
+    USTRING_INIT_LEN(ustr, requested);
     *ustr->ptr = 0;
 
     return ustr;
@@ -96,10 +101,8 @@ UString *ustring_dup_string_len(const UChar *from, size_t length) /* NONNULL() *
 
     require_else_return_null(NULL != from);
 
-    ustr = mem_new(*ustr);
+    USTRING_INIT_LEN(ustr, length);
     ustr->len = length;
-    ustr->allocated = nearest_power(ustr->len);
-    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
     u_memcpy(ustr->ptr, from, ustr->len);
     ustr->ptr[ustr->len] = 0;
 
@@ -322,9 +325,7 @@ UString *ustring_convert_argv_from_local(const char *cargv, error_t **error, UBo
         return NULL;
     }
     cargv_length = strlen(cargv);
-    ustr = mem_new(*ustr);
-    ustr->allocated = nearest_power(cargv_length * ucnv_getMaxCharSize(ucnv));
-    ustr->ptr = mem_new_n(*ustr->ptr, ustr->allocated + 1);
+    USTRING_INIT_LEN(ustr, cargv_length * ucnv_getMaxCharSize(ucnv));
     ustr->len = ucnv_toUChars(ucnv, ustr->ptr, ustr->allocated, cargv, cargv_length, &status);
     ucnv_close(ucnv);
     if (U_FAILURE(status)) {
