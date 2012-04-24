@@ -309,7 +309,7 @@ void env_init(int failure_value)
     if (NULL == outputs_encoding && stdout_is_tty()) {
         char cp[30] = { 0 };
 
-        snprintf(cp, sizeof(cp), "CP%d", GetConsoleOutputCP());
+        snprintf(cp, ARRAY_SIZE(cp), "CP%d", GetConsoleOutputCP());
         outputs_encoding = mem_dup(cp);
         env_register_resource(outputs_encoding, free);
     }

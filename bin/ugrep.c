@@ -503,7 +503,7 @@ static void parse_userpref(void)
     if (NULL != home) {
         char preffile[MAXPATHLEN];
 
-        if (snprintf(preffile, sizeof(preffile), "%s%c%s", home, DIRECTORY_SEPARATOR, ".ugrep") < (int) sizeof(preffile)) {
+        if (snprintf(preffile, ARRAY_SIZE(preffile), "%s%c%s", home, DIRECTORY_SEPARATOR, ".ugrep") < (int) ARRAY_SIZE(preffile)) {
             struct stat st;
 
             if ((-1 != (stat(preffile, &st))) && S_ISREG(st.st_mode)) {
@@ -512,7 +512,7 @@ static void parse_userpref(void)
                 if (NULL != (fp = fopen(preffile, "r"))) {
                     char line[4096];
 
-                    while (NULL != fgets(line, sizeof(line), fp)) {
+                    while (NULL != fgets(line, ARRAY_SIZE(line), fp)) {
                         color_t *c;
 
                         if ('\n' == *line || '#' == *line) {
@@ -612,7 +612,7 @@ static void parse_userpref(void)
 
                                     ptr = c->value;
                                     u_strcpy(defval, c->value);
-                                    if (NULL != (ufp = u_fstropen(buf, sizeof(buf), NULL))) {
+                                    if (NULL != (ufp = u_fstropen(buf, ARRAY_SIZE(buf), NULL))) {
                                         if (NULL == (ptr = u_stpncpy(c->value, prefix, MAX_SEQ_LEN - (ptr - c->value)))) {
                                             u_strcpy(c->value, defval); // restore default color
                                             u_fclose(ufp);
