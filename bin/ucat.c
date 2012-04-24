@@ -223,7 +223,6 @@ int main(int argc, char **argv)
             case 'V':
                 fprintf(stderr, "BSD ucat version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 return UCAT_EXIT_SUCCESS;
-                break;
             case 'b':
                 bFlag = TRUE;
                 nFlag = FALSE;

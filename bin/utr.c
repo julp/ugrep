@@ -592,8 +592,7 @@ int main(int argc, char **argv)
                 break;
             case 'v':
                 fprintf(stderr, "BSD utr version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
-                exit(UTR_EXIT_SUCCESS);
-                break;
+                return UTR_EXIT_SUCCESS;
             default:
                 if (!util_opt_parse(c, optarg, reader)) {
                     usage();

@@ -182,8 +182,7 @@ int main(int argc, char **argv)
                 break;
             case 'V':
                 fprintf(stderr, "BSD usort version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
-                exit(EXIT_SUCCESS);
-                break;
+                return EXIT_SUCCESS;
             case MIN_OPT:
                 wanted = MIN_ONLY;
                 break;
