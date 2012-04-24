@@ -31,6 +31,7 @@ void env_set_stdin_encoding(const char *);
 void env_set_system_encoding(const char *);
 void env_set_unit(int);
 void env_set_verbosity(int);
+void env_unregister_resource(void *) NONNULL();
 void print_error(error_t *);
 void report(int, const char *, ...);
 

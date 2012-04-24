@@ -305,7 +305,7 @@ void env_init(int failure_value)
         env_set_outputs_encoding(tmp);
     }
 #ifdef _MSC_VER
-    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
+    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  ARRAY_SIZE(__progname));
     if (NULL == outputs_encoding && stdout_is_tty()) {
         char cp[30] = { 0 };
 
@@ -352,6 +352,31 @@ void env_register_resource(void *ptr, func_dtor_t dtor_func) /* NONNULL() */
     res->lineno = lineno;
 #endif /* DEBUG */
     resources = res;
+}
+
+void env_unregister_resource(void *ptr) /* NONNULL() */
+{
+    resource_t *current, *prev;
+
+    prev = NULL;
+    current = resources;
+    while (NULL != current) {
+        if (current->ptr == ptr) {
+            if (NULL == prev) {
+                resources = current->next;
+            } else {
+                prev->next = current->next;
+            }
+            current->dtor_func(current->ptr);
+            free(current);
+            break;
+        }
+#if defined(DEBUG) && 0
+        fprintf(stderr, "freeing %p, registered in %s at line %d\n", current->ptr, current->filename, current->lineno);
+#endif /* DEBUG */
+        prev = current;
+        current = current->next;
+    }
 }
 
 #include <unicode/uclean.h>

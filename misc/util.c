@@ -237,7 +237,7 @@ int procdir(reader_t *reader, char **argv, void *userdata, int (*procfile)(reade
             }
         }
     }
-    /* TODO: may be better to call fts_close here and env_unregister_resource? */
+    env_unregister_resource(fts);
 
     return ret;
 }
