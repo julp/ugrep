@@ -212,7 +212,7 @@ void env_init(const char *argv0)
         env_set_outputs_encoding(tmp);
     }
 #ifdef _MSC_VER
-    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  sizeof(__progname)/sizeof(char));
+    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  ARRAY_SIZE(__progname));
     if (NULL == outputs_encoding && stdout_is_tty()) {
         char cp[30] = { 0 };
 
@@ -224,64 +224,24 @@ void env_init(const char *argv0)
     {
         char rbpath[MAXPATHLEN];
 
+        // TODO: default value should be cmake installation path
         strcpy(rbpath, "/home/julp/ugrep/ugrep");
 //         *rbpath = '\0';
 # ifdef _MSC_VER
-        //
-# else
-        /*{ WRONG
-# include <errno.h>
-
-            char bin[MAXPATHLEN];
-
-            if (NULL == realpath(argv0, bin)) {
-                stdio_debug("realpath failed: %s", strerror(errno));
-            } else {
-                char *c;
-
-                if (NULL != (c = strrchr(bin, DIRECTORY_SEPARATOR))) {
-                    c[1] = '\0';
-                    strncat(bin, "../share/", STR_SIZE(bin));
-                    if (NULL == realpath(bin, rbpath)) {
-                        *rbpath = '\0';
-                        stdio_debug("realpath failed: %s", strerror(errno));
-                    } else {
-                        strncat(rbpath, "/ugrep/ugrep", STR_SIZE(bin));
-                    }
-                }
-            }
-        }*/
-        /*{
-# include <errno.h>
-            int ret;
-            char proc[MAXPATHLEN];
-
-            ret = snprintf(proc, STR_SIZE(proc), "/proc/%d/exe", getpid());
-            if (ret < 0 || ret >= (int) STR_SIZE(proc)) {
-                *rbpath = '\0';
-            } else {
-                ssize_t fill;
-
-                if (-1 == (fill = readlink(proc, rbpath, STR_SIZE(rbpath)))) {
-                    *rbpath = '\0';
-                    stdio_debug("readlink failed: %s", strerror(errno));
-                } else {
-                    rbpath[fill] = '\0';
-                    strncat(rbpath, "/ugrep/ugrep", STR_SIZE(rbpath));
-                }
-            }
-        }*/
-# endif /* _MSC_VER */
-        {
-            char binary[MAXPATHLEN];
-
-            binary_path(argv0, binary, MAXPATHLEN); // TODO: return value: test/leak
+        if (0 == GetModuleFileNameA(NULL, rbpath, ARRAY_SIZE(rbpath))) {
+            *rbpath = '\0';
         }
+# else
+        if (NULL == binary_path(argv0, rbpath, ARRAY_SIZE(rbpath))) {
+            *rbpath = '\0';
+        }
+# endif /* _MSC_VER */
         if ('\0' != *rbpath) {
             UErrorCode status;
 
             status = U_ZERO_ERROR;
 stdio_debug("%s", rbpath);
+            // TODO: transformer rbpath en ../share/.../ugrep.dat ?
             ures = ures_open(rbpath, NULL, &status);
             if (U_FAILURE(status)) {
                 fprintf(stderr, "translation disabled: %s\n", u_errorName(status));
@@ -391,25 +351,60 @@ static char **str_split(char separator, const char *string)
     return pieces;
 }
 
-// we don't use readlink("/proc/%d/exe", getpid()) which is not portable
+#include <errno.h>
+char *mydirname(const char *path, char *buffer, size_t buffer_len) /* NONNULL() */
+{
+    const char *base;
+    size_t resolved_len;
+
+    require_else_return_null(NULL != path);
+    require_else_return_null(NULL != buffer);
+
+    if (NULL == (base = strrchr(path, DIRECTORY_SEPARATOR))) {
+        resolved_len = STR_SIZE(".");
+        if (buffer_len < resolved_len) {
+            errno = ENAMETOOLONG;
+            return NULL;
+        }
+        buffer[0] = '.';
+        buffer[1] = '\0';
+        return buffer;
+    } else {
+        while (base > path && DIRECTORY_SEPARATOR == *base) {
+            --base;
+        }
+        resolved_len = 1 + base - path;
+        if (buffer_len < resolved_len) {
+            errno = ENAMETOOLONG;
+            return NULL;
+        }
+        memcpy(buffer, path, resolved_len);
+        buffer[resolved_len] = '\0';
+        return buffer;
+    }
+}
+
+/* we don't use readlink("/proc/%d/exe", getpid()) which is not portable */
 static char *binary_path(const char *argv0, char *buffer, size_t buffer_size)
 {
     size_t argv0_len;
-    char *retval, resolved[MAXPATHLEN];
+    char *retval, resolved[MAXPATHLEN], dirname[MAXPATHLEN];
 
     retval = NULL;
     argv0_len = strlen(argv0);
     if ('.' == *argv0 || NULL != strchr(argv0, '/')) { // path is relative or (seems) absolute
         if (NULL != realpath(argv0, resolved)) {
-            if (NULL == buffer) {
-                retval = strdup(resolved);
-            } else {
-                size_t resolved_len;
+            if (NULL != mydirname(resolved, dirname, ARRAY_SIZE(dirname))) {
+                if (NULL == buffer) {
+                    retval = strdup(dirname);
+                } else {
+                    size_t dirname_len;
 
-                resolved_len = strlen(resolved);
-                if (buffer_size > resolved_len) {
-                    strcpy(buffer, resolved);
-                    retval = buffer;
+                    dirname_len = strlen(dirname);
+                    if (buffer_size > dirname_len) {
+                        strcpy(buffer, dirname);
+                        retval = buffer;
+                    }
                 }
             }
         }
@@ -427,7 +422,7 @@ static char *binary_path(const char *argv0, char *buffer, size_t buffer_size)
         }
         for (p = paths; NULL != *p; p++) {
             p_len = strlen(*p);
-            if (p_len + STR_LEN("/") + argv0_len > sizeof(fullpath) - 1) {
+            if (p_len + STR_LEN("/") + argv0_len > ARRAY_SIZE(fullpath) - 1) {
                 break;
             }
             memcpy(fullpath, *p, p_len);
@@ -436,15 +431,17 @@ static char *binary_path(const char *argv0, char *buffer, size_t buffer_size)
             fullpath[p_len + STR_LEN("/") + argv0_len] = '\0';
             if (0 == access(fullpath, X_OK)) {
                 if (NULL != realpath(fullpath, resolved)) {
-                    if (NULL == buffer) {
-                        retval = strdup(resolved);
-                    } else {
-                        size_t resolved_len;
+                    if (NULL != mydirname(resolved, fullpath, ARRAY_SIZE(fullpath))) {
+                        if (NULL == buffer) {
+                            retval = strdup(fullpath);
+                        } else {
+                            size_t dirname_len;
 
-                        resolved_len = strlen(resolved);
-                        if (buffer_size > resolved_len) {
-                            strcpy(buffer, resolved);
-                            retval = buffer;
+                            dirname_len = strlen(dirname);
+                            if (buffer_size > dirname_len) {
+                                strcpy(buffer, dirname);
+                                retval = buffer;
+                            }
                         }
                     }
                 }

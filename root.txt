@@ -15,7 +15,6 @@ root:table {
     icu {
         // warnings
         U_USING_FALLBACK_WARNING            { "a resource bundle lookup returned a fallback result" }
-        U_ERROR_WARNING_START               { "start of information results" }
         U_USING_DEFAULT_WARNING             { "a resource bundle lookup returned a result from the root locale" }
         U_SAFECLONE_ALLOCATED_WARNING       { "a safeclone operation required allocating memory" }
         U_STATE_OLD_WARNING                 { "ICU has to use compatibility layer to construct the service. Expect performance/memory usage degradation. Consider upgrading" }
@@ -24,7 +23,6 @@ root:table {
         U_AMBIGUOUS_ALIAS_WARNING           { "this converter alias can go to different converter implementations" }
         U_DIFFERENT_UCA_VERSION             { "ucol_open encountered a mismatch between UCA version and collator image version, so the collator was constructed from rules. No impact to further function" }
         U_PLUGIN_CHANGED_LEVEL_WARNING      { "a plugin caused a level change. May not be an error, but later plugins may not load" }
-        //U_ERROR_WARNING_LIMIT             { "" }
         // standard errors
         U_ZERO_ERROR                        { "no error, no warning" }
         U_ILLEGAL_ARGUMENT_ERROR            { "illegal or inappropriate argument" }
@@ -57,10 +55,8 @@ root:table {
         U_COLLATOR_VERSION_MISMATCH         { "collator version is not compatible with the base version" }
         U_USELESS_COLLATOR_ERROR            { "collator is options only and no base is specified" }
         U_NO_WRITE_PERMISSION               { "attempt to modify read-only or constant data" }
-        //U_STANDARD_ERROR_LIMIT            { "" }
         // Transliterator
         U_BAD_VARIABLE_DEFINITION           { "missing '$' or duplicate variable name" }
-        U_PARSE_ERROR_START                 { "Start of Transliterator errors" }
         U_MALFORMED_RULE                    { "elements of a rule are misplaced" }
         U_MALFORMED_SET                     { "a UnicodeSet pattern is invalid" }
         U_MALFORMED_SYMBOL_REFERENCE        { "UNUSED as of ICU 2.4" }
@@ -94,11 +90,9 @@ root:table {
         U_ILLEGAL_CHARACTER                 { "a special character is outside its allowed context" }
         U_INTERNAL_TRANSLITERATOR_ERROR     { "internal transliterator system error" }
         U_INVALID_ID                        { "a \"::id\" rule specifies an unknown transliterator" }
-        U_INVALID_FUNCTION                  { "a "&fn()" rule specifies an unknown transliterator" }
-        //U_PARSE_ERROR_LIMIT               { "" }
+        U_INVALID_FUNCTION                  { "a \"&fn()\" rule specifies an unknown transliterator" }
         // parsing error
         U_UNEXPECTED_TOKEN                  { "syntax error in format pattern" }
-        U_FMT_PARSE_ERROR_START             { "start of format library errors" }
         U_MULTIPLE_DECIMAL_SEPARATORS       { "more than one decimal separator in number pattern" }
         U_MULTIPLE_DECIMAL_SEPERATORS:alias { "/icu/U_MULTIPLE_DECIMAL_SEPARATORS" }
         U_MULTIPLE_EXPONENTIAL_SYMBOLS      { "more than one exponent symbol in number pattern" }
@@ -116,10 +110,8 @@ root:table {
         U_UNDEFINED_KEYWORD                 { "undefined Plural keyword" }
         U_DEFAULT_KEYWORD_MISSING           { "missing DEFAULT rule in plural rules" }
         U_DECIMAL_NUMBER_SYNTAX_ERROR       { "decimal number syntax error" }
-        U_FMT_PARSE_ERROR_LIMIT             { "the limit for format library errors" }
         // UBreakIterator
         U_BRK_INTERNAL_ERROR                { "an internal error (bug) was detected" }
-        U_BRK_ERROR_START                   { "start of codes indicating Break Iterator failures" }
         U_BRK_HEX_DIGITS_EXPECTED           { "hex digits expected as part of a escaped char in a rule" }
         U_BRK_SEMICOLON_EXPECTED            { "missing ';' at the end of a RBBI rule" }
         U_BRK_RULE_SYNTAX                   { "syntax error in RBBI rule" }
@@ -133,10 +125,8 @@ root:table {
         U_BRK_RULE_EMPTY_SET                { "rule contains an empty Unicode Set" }
         U_BRK_UNRECOGNIZED_OPTION           { "!!option in RBBI rules not recognized" }
         U_BRK_MALFORMED_RULE_TAG            { "the {nnn} tag on a rule is mal formed" }
-        U_BRK_ERROR_LIMIT                   { "this must always be the last value to indicate the limit for Break Iterator failures" }
         // URegularExpression
         U_REGEX_INTERNAL_ERROR              { "an internal error (bug) was detected" }
-        U_REGEX_ERROR_START                 { "start of codes indicating Regexp failures" }
         U_REGEX_RULE_SYNTAX                 { "syntax error in regexp pattern" }
         U_REGEX_INVALID_STATE               { "regexMatcher in invalid state for requested operation" }
         U_REGEX_BAD_ESCAPE_SEQUENCE         { "unrecognized backslash escape sequence in pattern" }
@@ -156,10 +146,8 @@ root:table {
         U_REGEX_STACK_OVERFLOW              { "regular expression backtrack stack overflow" }
         U_REGEX_TIME_OUT                    { "maximum allowed match time exceeded" }
         U_REGEX_STOPPED_BY_CALLER           { "matching operation aborted by user callback fn" }
-        //U_REGEX_ERROR_LIMIT               { "" }
         // IDNA
         U_IDNA_PROHIBITED_ERROR             { "" }
-        U_IDNA_ERROR_START                  { "" }
         U_IDNA_UNASSIGNED_ERROR             { "" }
         U_IDNA_CHECK_BIDI_ERROR             { "" }
         U_IDNA_STD3_ASCII_RULES_ERROR       { "" }
@@ -168,16 +156,12 @@ root:table {
         U_IDNA_LABEL_TOO_LONG_ERROR         { "" }
         U_IDNA_ZERO_LENGTH_LABEL_ERROR      { "" }
         U_IDNA_DOMAIN_NAME_TOO_LONG_ERROR   { "" }
-        //U_IDNA_ERROR_LIMIT                { "" }
         // Aliases for StringPrep
         U_STRINGPREP_PROHIBITED_ERROR:alias { "/icu/U_IDNA_PROHIBITED_ERROR" }
         U_STRINGPREP_UNASSIGNED_ERROR:alias { "/icu/U_IDNA_UNASSIGNED_ERROR" }
         U_STRINGPREP_CHECK_BIDI_ERROR:alias { "/icu/U_IDNA_CHECK_BIDI_ERROR" }
         // Plugins
-        U_PLUGIN_ERROR_START                { "start of codes indicating plugin failures" }
         U_PLUGIN_TOO_HIGH                   { "the plugin's level is too high to be loaded right now" }
         U_PLUGIN_DIDNT_SET_LEVEL            { "the plugin didn't call uplug_setPlugLevel in response to a QUERY" }
-        U_PLUGIN_ERROR_LIMIT                { "this must always be the last value to indicate the limit for plugin errors" }
-        U_ERROR_LIMIT=U_PLUGIN_ERROR_LIMIT  { "this must always be the last value to indicate the limit for UErrorCode (last error code +1)" }
     }
 }
