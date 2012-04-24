@@ -11,6 +11,7 @@
 
 #include "common.h"
 #include "engine.h"
+#include <unicode/ubrk.h>
 
 enum {
     UCUT_EXIT_SUCCESS = 0,
@@ -90,16 +91,97 @@ static int /*pieces_length*/ split_on_length(void/*?*/ *positions, void/*?*/ *pi
 
 static int32_t split_at_indices(UBreakIterator *ubrk, DPtrArray *pieces, interval_list_t *intervals)
 {
-    int32_t count;
+    int32_t i, count;
+    UErrorCode status;
 
     count = 0;
-    if (NULL == ubrk) {
-        //
-    } else {
-        //
+    status = U_ZERO_ERROR;
+    ubrk_setText(ubrk, ustr->ptr, ustr->len, &status);
+    if (U_FAILURE(status)) {
+        return -1;
     }
+    if (UBRK_DONE != (i = ubrk_first(ubrk))) {
+        while (UBRK_DONE != (i = ubrk_next(ubrk))) {
+            ++count;
+        }
+    }
+    ubrk_setText(ubrk, NULL, 0, &status);
+    assert(U_SUCCESS(status));
 
     return count;
+}
+
+UBool ubrk_fwd_n(UBreakIterator *ubrk, size_t n, int32_t *r)
+{
+    while (n > 0 && UBRK_DONE != (*r = ubrk_next(ubrk))) {
+        --n;
+    }
+
+    return (0 == n);
+}
+
+static int32_t split_on_indices(UBreakIterator *ubrk, UString *ustr, DPtrArray *array, interval_list_t *intervals) // TODO: add error_t **error
+{
+    dlist_element_t *el;
+    int32_t pieces, l, u;
+
+    pieces = l = u = 0;
+    if (0 && NULL == ubrk) {
+        int32_t lastU = 0;
+
+        for (el = intervals->head; NULL != el && (size_t) u < ustr->len; el = el->next) {
+            FETCH_DATA(el->data, i, interval_t);
+
+            if (i->lower_limit > 0) {
+                U16_FWD_N(ustr->ptr, l, ustr->len, i->lower_limit - lastU);
+                u = l;
+            }
+            U16_FWD_N(ustr->ptr, u, ustr->len, i->upper_limit - i->lower_limit);
+            add_match(array, ustr, l, u);
+            ++pieces;
+            lastU = i->upper_limit;
+            l = u;
+        }
+    } else {
+        int32_t lastU = 0;
+        UErrorCode status;
+
+        status = U_ZERO_ERROR;
+        ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+        ubrk_setText(ubrk, ustr->ptr, ustr->len, &status);
+        if (U_FAILURE(status)) {
+            // TODO: error
+            return -1;
+        }
+        if (UBRK_DONE != (l = ubrk_first(ubrk))) {
+            for (el = intervals->head; NULL != el && (size_t) u < ustr->len; el = el->next) {
+                FETCH_DATA(el->data, i, interval_t);
+
+                if (i->lower_limit > 0) {
+                    ubrk_fwd_n(ubrk, i->lower_limit - lastU, &l);
+                }
+                ubrk_fwd_n(ubrk, i->upper_limit - i->lower_limit, &u);
+                add_match(array, ustr, l, u);
+                ++pieces;
+                lastU = i->upper_limit;
+                l = u;
+            }
+//             while (UBRK_DONE != (u = ubrk_next(ubrk))) {
+//                 l = u;
+//             }
+        }
+        if (!pieces) {
+//         add_match(array, ustr, 0, ustr->len);
+//         ++pieces;
+        } else if (UBRK_DONE == u && (size_t) l < ustr->len) {
+            add_match(array, ustr, l, ustr->len);
+            ++pieces;
+        }
+        ubrk_setText(ubrk, NULL, 0, &status);
+        assert(U_SUCCESS(status));
+    }
+
+    return pieces;
 }
 
 /* ========== main ========== */
