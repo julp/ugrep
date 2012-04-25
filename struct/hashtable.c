@@ -115,9 +115,7 @@ static void maybe_rehash(Hashtable *this)
             }
         }
         free(oldBuckets);
-#ifdef DEBUG
         assert(this->count == oldCount);
-#endif /* DEBUG */
     }
 }
 
