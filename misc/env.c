@@ -228,8 +228,15 @@ void env_init(const char *argv0)
         strcpy(rbpath, "/home/julp/ugrep/ugrep");
 //         *rbpath = '\0';
 # ifdef _MSC_VER
-        if (0 == GetModuleFileNameA(NULL, rbpath, ARRAY_SIZE(rbpath))) {
-            *rbpath = '\0';
+        {
+            char buffer[MAXPATHLEN];
+
+            if (0 == GetModuleFileNameA(NULL, buffer, ARRAY_SIZE(buffer))) {
+                *rbpath = '\0';
+            }
+            if (NULL == mydirname(rbpath, buffer, ARRAY_SIZE(buffer))) {
+                *rbpath = '\0';
+            }
         }
 # else
         if (NULL == binary_path(argv0, rbpath, ARRAY_SIZE(rbpath))) {
