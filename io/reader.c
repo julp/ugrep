@@ -104,7 +104,7 @@ static void copy_buffer_until_into_ustring(reader_t *this, UString *ustr, UChar 
  * - TRUE: read can continue (no error, no EOF)
  * - FALSE: read should be stopped (error or EOF - check error == NULL if passed)
  **/
-UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
+UBool reader_readline(reader_t *this, error_t **error, UString *ustr) /* NONNULL(1, 3) */
 {
     UChar *p;
     int32_t available;
@@ -194,7 +194,7 @@ UChar32 reader_readuchar32(reader_t *this, error_t **error) /* NONNULL(1) */
     }
 }
 
-int32_t reader_readuchars32(reader_t *this, error_t **error, UChar32 *buffer, int32_t maxLen)
+int32_t reader_readuchars32(reader_t *this, error_t **error, UChar32 *buffer, int32_t maxLen) /* NONNULL(1, 3) */
 {
     int32_t i, available;
 
