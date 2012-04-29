@@ -154,10 +154,7 @@ static int procfile(reader_t *reader, const char *filename)
 
     error = NULL;
     if (reader_open(reader, &error, filename)) {
-        while (!reader_eof(reader)) {
-            if (!reader_readline(reader, &error, ustr)) {
-                print_error(error);
-            }
+        while (NULL != reader_readline(reader, &error, ustr)) {
             ustring_chomp(ustr);
             dptrarray_clear(pieces);
             if (fFlag) {

@@ -831,10 +831,7 @@ int main(int argc, char **argv)
         debug("mode = %s, set1 = %s, set2 = %s", UNIT_CODEPOINT == env_get_unit() ? "CP/as is" : "graphemes", typemap[set1_type], typemap[set2_type]);
     }
 #endif /* DEBUG */
-    while (!reader_eof(reader)) {
-        if (!reader_readline(reader, &error, in)) {
-            print_error(error);
-        }
+    while (NULL != reader_readline(reader, &error, in)) {
         ustring_chomp(in);
         ustring_truncate(out);
 

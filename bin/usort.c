@@ -103,14 +103,13 @@ static void usort_toustring(UString *ustr, const void *key, void *value)
 // echo -en "1\n10\n12\n100\n101\n1" | ./usort
 static int procfile(reader_t *reader, const char *filename)
 {
+    UString *ustr;
     error_t *error;
 
+    ustr = NULL;
     error = NULL;
     if (reader_open(reader, &error, filename)) {
-        while (!reader_eof(reader)) {
-            if (!reader_readline(reader, &error, ustr)) {
-                print_error(error);
-            }
+        while (NULL != (ustr = reader_readline(reader, &error, NULL))) {
             ustring_chomp(ustr);
             if (bFlag) {
                 ustring_ltrim(ustr);

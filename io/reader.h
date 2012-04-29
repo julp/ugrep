@@ -129,7 +129,7 @@ reader_t *reader_new(const char *);
 UBool reader_open(reader_t *, error_t **, const char *) NONNULL(1, 3);
 UBool reader_open_stdin(reader_t *, error_t **) NONNULL(1);
 UBool reader_open_string(reader_t *, error_t **, const char *) NONNULL(1, 3);
-UBool reader_readline(reader_t *, error_t **, UString *) NONNULL(1, 3);
+UString *reader_readline(reader_t *, error_t **, UString *) NONNULL(1);
 UChar32 reader_readuchar32(reader_t *, error_t **) NONNULL(1);
 int32_t reader_readuchars(reader_t *, error_t **, UChar *, int32_t) NONNULL(1, 3);
 int32_t reader_readuchars32(reader_t *, error_t **, UChar32 *, int32_t) NONNULL(1, 3);

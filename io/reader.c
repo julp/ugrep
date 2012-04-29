@@ -101,23 +101,31 @@ static void copy_buffer_until_into_ustring(reader_t *this, UString *ustr, UChar 
 
 /**
  * Return:
- * - TRUE: read can continue (no error, no EOF)
- * - FALSE: read should be stopped (error or EOF - check error == NULL if passed)
+ * - != NULL: read can continue (no error, no EOF)
+ * - == NULL: read should be stopped (error or EOF - check error == NULL if passed)
  **/
-UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
+UString *reader_readline(reader_t *this, error_t **error, UString *ustr) /* NONNULL(1) */
 {
     UChar *p;
+    UString *ret;
     int32_t available;
 
     require_else_return_false(NULL != this);
-    require_else_return_false(NULL != ustr);
 
-    ustring_truncate(ustr);
+    if (NULL != ustr) {
+        ret = ustr;
+        ustring_truncate(ret);
+    } else {
+        ret = ustring_new();
+    }
     available = this->utf16.end - this->utf16.ptr;
     if (0 == available) {
         //if (-1 == (available = fill_buffer(this, error))) {
         if ((available = fill_buffer(this, error)) < 1) {
-            return FALSE;
+            if (NULL == ustr) {
+                ustring_destroy(ret);
+            }
+            return NULL;
         }
     }
     while (available > 0) {
@@ -128,7 +136,10 @@ UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
                     if ((p + 1) >= this->utf16.end) {
                         copy_full_buffer_into_ustring(this, ustr);
                         if (-1 == fill_buffer(this, error)) {
-                            return FALSE;
+                            if (NULL == ustr) {
+                                ustring_destroy(ret);
+                            }
+                            return NULL;
                         }
                         p = this->utf16.ptr;
                         if (U_LF == *p) {
@@ -157,15 +168,11 @@ UBool reader_readline(reader_t *this, error_t **error, UString *ustr)
         available = fill_buffer(this, error);
     }
 
-    if (FALSE) {
 eol:
-        available = 1;
-    }
     ++this->lineno;
     ustring_normalize(ustr, env_get_normalization());
 
-    //return available >= 0;
-    return available > 0;
+    return ret;
 }
 
 UChar32 reader_readuchar32(reader_t *this, error_t **error) /* NONNULL(1) */
@@ -194,7 +201,7 @@ UChar32 reader_readuchar32(reader_t *this, error_t **error) /* NONNULL(1) */
     }
 }
 
-int32_t reader_readuchars32(reader_t *this, error_t **error, UChar32 *buffer, int32_t maxLen)
+int32_t reader_readuchars32(reader_t *this, error_t **error, UChar32 *buffer, int32_t maxLen) /* NONNULL(1, 3) */
 {
     int32_t i, available;
 

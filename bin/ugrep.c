@@ -294,14 +294,11 @@ UBool source_patterns(error_t **error, const char *filename, slist_t *l, int pat
         return FALSE;
     }
     ustr = ustring_new();
-    while (retval && !reader_eof(&reader)) {
-        if (!reader_readline(&reader, error, ustr)) {
+    while (NULL != reader_readline(&reader, error, ustr)) {
+        ustring_chomp(ustr);
+        if (!add_pattern(error, l, ustr, pattern_type, flags)) {
             retval = FALSE;
-        } else {
-            ustring_chomp(ustr);
-            if (!add_pattern(error, l, ustr, pattern_type, flags)) {
-                retval = FALSE;
-            }
+            break;
         }
     }
     reader_close(&reader);
@@ -754,7 +751,7 @@ static int procfile(reader_t *reader, const char *filename, void *userdata)
         UBool _line_print; /* line_print local override */
 
         _line_print = line_print && (!reader->binary || (reader->binary && BIN_FILE_BIN != binbehave));
-        while (!reader_eof(reader)) {
+        while (1) {
             int pattern_matches; // matches (for the current line) against pattern(s), doesn't take care of arguments (-v)
             slist_element_t *p;
             engine_return_t ret;
@@ -762,8 +759,9 @@ static int procfile(reader_t *reader, const char *filename, void *userdata)
 
             ustr = line->ustr;
             ret = ENGINE_FAILURE;
-            if (!reader_readline(reader, &error, ustr)/* && NULL != error*/) {
+            if (NULL == reader_readline(reader, &error, ustr)/* && NULL != error*/) {
                 print_error(error);
+                break;
             }
             pattern_matches = 0;
             ustring_chomp(ustr);

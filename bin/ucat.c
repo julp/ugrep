@@ -90,10 +90,7 @@ static int procfile(reader_t *reader, const char *filename, void *UNUSED(userdat
             u_fprintf(ustdout, "%s:\n", filename);
         }
         /* !fd->binary || (fd->binary && BIN_FILE_BIN != binbehave) */
-        while (!reader_eof(reader)) {
-            if (!reader_readline(reader, &error, ustr)) {
-                print_error(error);
-            }
+        while (NULL != reader_readline(reader, &error, ustr)) {
             ustring_chomp(ustr);
             if (bFlag || sFlag) {
                 UBool blank;
