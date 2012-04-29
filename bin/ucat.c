@@ -132,49 +132,6 @@ static int procfile(reader_t *reader, const char *filename, void *UNUSED(userdat
     return 0;
 }
 
-#if 0
-#ifdef WITH_FTS
-static int procdir(reader_t *reader, char **dirname)
-{
-    int ret;
-    FTS *fts;
-    FTSENT *p;
-    int ftsflags;
-
-    ret = 0;
-    /*ftsflags = 0;
-    if (Hflag)
-        ftsflags = FTS_COMFOLLOW;
-    if (Pflag)
-        ftsflags = FTS_PHYSICAL;
-    if (Sflag)*/
-        ftsflags = FTS_LOGICAL;
-    ftsflags |= FTS_NOSTAT | FTS_NOCHDIR;
-
-    if (NULL == (fts = fts_open(dirname, ftsflags, NULL))) {
-        msg(FATAL, "can't fts_open %s: %s", *dirname, strerror(errno));
-    }
-    while (NULL != (p = fts_read(fts))) {
-        switch (p->fts_info) {
-            case FTS_DNR:
-            case FTS_ERR:
-                msg(WARN, "fts_read failed on %s: %s", p->fts_path, strerror(p->fts_errno));
-                break;
-            case FTS_D:
-            case FTS_DP:
-                break;
-            default:
-                ret |= procfile(reader, p->fts_path);
-                break;
-        }
-    }
-    fts_close(fts);
-
-    return ret;
-}
-#endif /* WITH_FTS */
-#endif
-
 /* ========== main ========== */
 
 int main(int argc, char **argv)
