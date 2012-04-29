@@ -3,6 +3,8 @@
 
 #include "common.h"
 
+#define DEBUG_READS 1
+
 #ifdef DYNAMIC_READERS
 static const char *(*DRNS(gzerror))(gzFile, int *) = NULL;
 #if 0
@@ -79,7 +81,9 @@ static void zlib_close(void *fp)
 
 static UBool zlib_eof(void *fp)
 {
-// debug("eof = %d", gzeof((gzFile) fp));
+#ifdef DEBUG_READS
+    debug("eof = %d", gzeof((gzFile) fp));
+#endif
     return DRNS(gzeof)((gzFile) fp);
 }
 
@@ -118,7 +122,9 @@ static int32_t zlib_readBytes(void *fp, error_t **error, char *buffer, size_t ma
             error_set(error, WARN, "zlib internal error from gzread(): %s", zerrstr);
         }
     }
-// debug("asked = %d, get = %d", max_len, ret);
+#ifdef DEBUG_READS
+    debug("asked = %d, get = %d", max_len, ret);
+#endif
 
     return ret;
 }
