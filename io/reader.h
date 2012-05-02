@@ -20,9 +20,9 @@ enum {
 #  define UCHAR_BUFFER_SIZE BUFSIZ
 # endif /* DEBUG */
 
-// # if (CHAR_BUFFER_SIZE > MAX_ENC_REL_LEN) && (UCHAR_BUFFER_SIZE > (4 * MAX_BIN_REL_LEN))
-// #  define NO_PHYSICAL_REWIND 1
-// # endif
+# if (CHAR_BUFFER_SIZE > MAX_ENC_REL_LEN) && (UCHAR_BUFFER_SIZE > (4 * MAX_BIN_REL_LEN))
+#  define NO_PHYSICAL_REWIND 1
+# endif
 
 # ifdef DYNAMIC_READERS
 #  define DRNS(name) dl##name

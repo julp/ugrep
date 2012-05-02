@@ -164,7 +164,6 @@ eol:
     ++this->lineno;
     ustring_normalize(ustr, env_get_normalization());
 
-    //return available >= 0;
     return available > 0;
 }
 
@@ -202,14 +201,26 @@ int32_t reader_readuchars32(reader_t *this, error_t **error, UChar32 *buffer, in
     require_else_return_val(NULL != buffer, -1);
     require_else_return_val(maxLen >= 1, -1);
 
+#if NO_PHYSICAL_REWIND
+    available = this->utf16.end - this->utf16.ptr;
+    if (0 == available) {
+        if ((available = fill_buffer(this, error)) < 1) {
+            return -1;
+        }
+    }
+#endif /* NO_PHYSICAL_REWIND */
     for (i = 0; i < maxLen; i++) {
         if ((this->utf16.end - this->utf16.ptr) < 2) {
+#ifndef NO_PHYSICAL_REWIND
             if ((available = fill_buffer(this, error)) < 1) {
                 if (-1 == available) {
                     i = -1;
                 }
                 break;
             }
+#else
+            break;
+#endif /* !NO_PHYSICAL_REWIND */
         }
         buffer[i] = *this->utf16.ptr++;
         if (U_IS_LEAD(buffer[i])) {
@@ -297,14 +308,27 @@ static UBool reader_rewind(reader_t *this, error_t **UNUSED(error))
 
     require_else_return_false(NULL != this);
 
-    this->byte.ptr = this->byte.buffer + this->signature_length;
-//     ucnv_reset(this->ucnv);
-//     ucnv_resetToUnicode(this->ucnv);
 #ifndef NO_PHYSICAL_REWIND
+    this->byte.ptr = this->byte.buffer + this->signature_length;
     this->utf16.end = this->utf16.ptr = this->utf16.buffer;
     ret = this->imp->rewindTo(this->fp, error, this->signature_length);
 #else
+//     ucnv_reset(this->ucnv);
+//     ucnv_resetToUnicode(this->ucnv);
     this->utf16.ptr = this->utf16.buffer;
+    /**
+     * ucnv_detectUnicodeSignature() documentation says:
+     *
+     * The caller can ucnv_open() a converter using the charset name. The first code unit (UChar) from the start of the stream will
+     * be U+FEFF (the Unicode BOM/signature character) and can usually be ignored.
+     *
+     * For most Unicode charsets it is also possible to ignore the indicated number of initial stream bytes and start converting after
+     * them. However,there are stateful Unicode charsets (UTF-7 and BOCU-1) for which this will not work. Therefore, it is best to
+     * ignore the first output UChar instead of the input signature bytes.
+     **/
+    if (0 != this->signature_length) {
+        ++this->utf16.ptr;
+    }
     ret = TRUE;
 #endif /* !NO_PHYSICAL_REWIND */
 
@@ -561,6 +585,7 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
 
     //this->ucnv = NULL;
     //encoding = NULL;
+    buffer_len = 0;
     encoding = env_get_inputs_encoding();
     status = U_ZERO_ERROR;
     this->lineno = 0;
@@ -630,27 +655,27 @@ UBool reader_open(reader_t *this, error_t **error, const char *filename) /* NONN
         goto failed;
     }
     debug("%s, file encoding = %s", this->sourcename, this->encoding);
-#ifdef NO_PHYSICAL_REWIND
-    {
-        UChar *utf16Ptr;
-
-        utf16Ptr = this->utf16.buffer;
-        ucnv_toUnicode(
-            this->ucnv,
-            &utf16Ptr, this->utf16.limit,
-            (const char **) &this->byte.ptr, this->byte.end,
-            NULL,
-            this->imp->eof(this->fp),
-            &status
-        );
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "ucnv_toUnicode");
-            return FALSE;
-        }
-        this->utf16.end = utf16Ptr;
-    }
-#endif /* NO_PHYSICAL_REWIND */
     if (reader_is_seekable(this)) {
+#ifdef NO_PHYSICAL_REWIND
+        {
+            UChar *utf16Ptr;
+
+            utf16Ptr = this->utf16.buffer;
+            ucnv_toUnicode(
+                this->ucnv,
+                &utf16Ptr, this->utf16.limit,
+                (const char **) &this->byte.ptr, this->byte.end,
+                NULL,
+                this->imp->eof(this->fp),
+                &status
+            );
+            if (U_FAILURE(status)) {
+                icu_error_set(error, FATAL, status, "ucnv_toUnicode");
+                return FALSE;
+            }
+            this->utf16.end = utf16Ptr;
+        }
+#endif /* NO_PHYSICAL_REWIND */
         if (!reader_rewind(this, error)) {
             goto failed;
         }
