@@ -97,7 +97,7 @@ static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *
                 U16_FWD_N(ustr->ptr, l, ustr->len, i->lower_limit - lastU);
                 u = l;
             }
-            U16_FWD_N(ustr->ptr, u, ustr->len, i->upper_limit - i->lower_limit); // TODO: il faut revenir en arrière
+            U16_FWD_N(ustr->ptr, u, ustr->len, i->upper_limit - i->lower_limit);
             add_match(array, ustr, l, u);
             ++pieces;
             lastU = i->upper_limit;
@@ -121,7 +121,7 @@ static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *
                         break;
                     }
                 }
-                if (!ubrk_fwd_n(ubrk, i->upper_limit - i->lower_limit, &u)) { // TODO: il faut revenir en arrière
+                if (!ubrk_fwd_n(ubrk, i->upper_limit - i->lower_limit, &u)) {
                     break;
                 }
                 add_match(array, ustr, l, u);
@@ -130,10 +130,7 @@ static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *
                 l = u;
             }
         }
-        /*if (!pieces) {
-//         add_match(array, ustr, 0, ustr->len);
-//         ++pieces;
-        } else */if (UBRK_DONE != l && UBRK_DONE == u && (size_t) l < ustr->len) {
+        if (UBRK_DONE != l && UBRK_DONE == u && (size_t) l < ustr->len) {
             add_match(array, ustr, l, ustr->len);
             ++pieces;
         }

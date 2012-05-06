@@ -34,6 +34,10 @@ INPUT="echo \"1:2:3:4:5:6:7:8:9\""
 ARGS='-d: -f 3-6'
 assertOutputValue "-f (fields)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "3:4:5:6"
 
+# TODO: without -s, whole line is printed (GNU doesn't)
+ARGS='-sd: -f 10'
+assertOutputValue "-f (field out of range)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" ""
+
 # Disabled: need to fix -E separator handling first
 # INPUT='echo "0,1,2,3,4,5,6,7,8,9"'
 # ARGS='-d , -f 1-3,6-8'

@@ -353,11 +353,9 @@ static UBool binary_fwd_n(UBreakIterator *ubrk, const UString *pattern, const US
     }
     if (0 == n) {
         *r = pos;
-// debug("*r = %d", *r);
         return TRUE;
     } else {
         *r = USEARCH_DONE;
-// debug("*r = -1");
         return FALSE;
     }
 }
@@ -369,8 +367,9 @@ static int32_t engine_fixed_split2(error_t **error, void *data, const UString *s
     int32_t l, u, lastU, pieces;
     FETCH_DATA(data, p, fixed_pattern_t);
 
-    lastU = pieces = l = u = 0;
+    u = USEARCH_DONE;
     status = U_ZERO_ERROR;
+    lastU = pieces = l = 0;
     if (NULL != p->usearch) {
         usearch_setText(p->usearch, subject->ptr, subject->len, &status);
         if (U_FAILURE(status)) {
@@ -419,60 +418,35 @@ static int32_t engine_fixed_split2(error_t **error, void *data, const UString *s
 #endif
         usearch_unbindText(p->usearch);
     } else {
-#if 0
-        UChar *m;
-#endif
-
         ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
         if (U_FAILURE(status)) {
             icu_error_set(error, FATAL, status, "ubrk_setText");
             return ENGINE_FAILURE;
         }
-#if 0
-        while (NULL != (m = u_strFindFirst(subject->ptr + u, subject->len - u, p->pattern->ptr, p->pattern->len))) {
-            u = m - subject->ptr;
-            if (ubrk_isBoundary(p->ubrk, u) && ubrk_isBoundary(p->ubrk, u + p->pattern->len)) {
-                ++pieces;
-                add_match(array, subject, l, u);
-            }
-            l = u = u + p->pattern->len;
-        }
-#else
-        for (el = intervals->head; NULL != el && USEARCH_DONE != u; el = el->next) {
+        for (el = intervals->head; NULL != el; el = el->next) {
             FETCH_DATA(el->data, i, interval_t);
 
-//             if (i->lower_limit > 0) {
+            if (i->lower_limit > 0) {
                 if (!binary_fwd_n(p->ubrk, p->pattern, subject, i->lower_limit - lastU, &l)) {
-debug("break");
                     break;
                 }
-//             }
+            }
+            u = l;
             if (!binary_fwd_n(p->ubrk, p->pattern, subject, i->upper_limit - i->lower_limit, &u)) {
                 break;
             }
+            u -= p->pattern->len;
             add_match(array, subject, l, u);
             ++pieces;
             lastU = i->upper_limit;
             l = u;
         }
-#endif
         ubrk_unbindText(p->ubrk);
     }
-#if 0
-    if (!pieces) {
-//         add_match(array, subject, 0, subject->len);
-//         ++pieces;
-    } else if ((size_t) u < subject->len) {
-        add_match(array, subject, u, subject->len);
-        ++pieces;
-    }
-#else
     if (USEARCH_DONE != l && USEARCH_DONE == u && (size_t) l < subject->len) {
-debug("l = %d, u = %d", l, u);
         add_match(array, subject, l, subject->len);
         ++pieces;
     }
-#endif
 
     return pieces;
 }
