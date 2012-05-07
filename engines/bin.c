@@ -283,15 +283,17 @@ static UBool binary_fwd_n(UBreakIterator *ubrk, const UString *pattern, const US
     }
     if (0 == n) {
         *r = pos;
-// debug("*r = %d", *r);
         return TRUE;
     } else {
         *r = USEARCH_DONE;
-// debug("*r = -1");
         return FALSE;
     }
 }
 
+/**
+ * Note: body of engine_bin_split2 is out of sync with fixed engine.
+ * Don't modify this function!
+ **/
 static int32_t engine_bin_split2(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
 {
 #if 0

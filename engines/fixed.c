@@ -399,7 +399,7 @@ static int32_t engine_fixed_split2(error_t **error, void *data, const UString *s
                         icu_error_set(error, FATAL, status, "usearch_[first|next]");
                         return ENGINE_FAILURE;
                     }
-                    l -= p->pattern->len;
+                    l -= p->pattern->len; // TODO: wrong => usearch_getMatchedLength?
                 }
                 if (!usearch_fwd_n(p->usearch, i->upper_limit - i->lower_limit, &u, &status)) {
                     break;
@@ -408,7 +408,7 @@ static int32_t engine_fixed_split2(error_t **error, void *data, const UString *s
                     icu_error_set(error, FATAL, status, "usearch_[first|next]");
                     return ENGINE_FAILURE;
                 }
-                u += p->pattern->len;
+                u += p->pattern->len; // TODO: wrong => usearch_getMatchedLength?
                 add_match(array, subject, l, u);
                 ++pieces;
                 lastU = i->upper_limit;

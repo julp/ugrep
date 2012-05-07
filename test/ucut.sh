@@ -38,7 +38,13 @@ assertOutputValue "-f (fields)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "3:4:5:6
 ARGS='-sd: -f 10'
 assertOutputValue "-f (field out of range)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" ""
 
+INPUT="echo \"abc1def2ghi3jkl4mno5pqr\""
+ARGS="-Ed '\d' -f 2-4"
+assertOutputValue "-Ef (fields + RE)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "def2ghi3jkl"
+
 # Disabled: need to fix -E separator handling first
-# INPUT='echo "0,1,2,3,4,5,6,7,8,9"'
-# ARGS='-d , -f 1-3,6-8'
-# assertOutputCommand "-f (simple)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
+INPUT='echo "0,1,2,3,4,5,6,7,8,9"'
+ARGS='-d , -f 1-3,6-8'
+assertOutputCommand "-f (simple)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
+ARGS='-Ed , -f 1-3,6-8'
+assertOutputCommand "-Ef (simple)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
