@@ -258,6 +258,10 @@ void env_apply(void)
             stdin_encoding = inputs_encoding;
         }
     }
+    if (UNIT_GRAPHEME == unit && UNORM_NONE == normalization) {
+        report(INFO, "Working at grapheme level implies a normalization for consistency. Switch on NFC normalization.\n");
+        normalization = UNORM_NFC;
+    }
     debug("system encoding = " YELLOW("%s"), ucnv_getDefaultName());
     debug("outputs encoding = " YELLOW("%s"), u_fgetcodepage(ustdout));
 }
