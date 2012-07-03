@@ -89,6 +89,16 @@ typedef struct {
 
 /* ========== global variables ========== */
 
+static UChar REMOVE[] = { 0x52, 0x65, 0x6D, 0x6F, 0x76, 0x65, 0 }; /* "Remove" */
+
+// static UChar METACHARACTERS[] = { 0x3A, 0x3C, 0x3E, 0 }; /* ":<>" */
+
+static UChar LEFT_BRACKET[] = { 0x5B, 0x3A, 0 }; /* "[:" */
+
+static UChar RIGHT_BRACKET[] = { 0x3A, 0x5D, 0 }; /* ":]" */
+
+static UChar UTR[] = { 0x75, 0x74, 0x72, 0 }; /* "utr" */
+
 filter_func_decl_t filter_functions[] = {
     {"isupper",         u_isupper},
     {"islower",         u_islower},
@@ -552,19 +562,15 @@ int main(int argc, char **argv)
     UString *in, *out, *set1, *set2;
     UBool dFlag, cFlag, isError, sFlag;
     UCaseType set1_case_type, set2_case_type;
-#ifdef UTRANS_EXP
     UString *id, *rules;
     UTransliterator *utrans;
-#endif /* UTRANS_EXP */
 
     ht = NULL;
     ubrk = NULL;
     uset = NULL;
     error = NULL;
-#ifdef UTRANS_EXP
     utrans = NULL;
     id = rules = NULL;
-#endif /* UTRANS_EXP */
     filter_func = NULL;
     status = U_ZERO_ERROR;
     set1_type = set2_type = NONE;
@@ -733,8 +739,16 @@ int main(int argc, char **argv)
             set1_type = CHARACTER;
         }
     }
-#ifdef UTRANS_EXP
-    // r '[:lower:]' '[:upper:]' abc
+
+    // '[:lower:]' '[:upper:]' abc
+    /* workaround for now for sets as both args */
+#if 0
+    if (NULL != /*u_*/strpbrk(argv[0], ":<>" /* metacharacters */)) {
+        // rules based
+    } else {
+        // id based (predefined rules)
+    }
+#endif
     if (SET == set1_type && (NONE == set2_type || (NONE != set2_type && '[' == set2->ptr[0]))) {
         UParseError pe = { -1, -1, {0}, {0} };
 
@@ -744,31 +758,41 @@ int main(int argc, char **argv)
             }
             env_register_resource(set1, (func_dtor_t) ustring_destroy);
         }
-        id = ustring_new();
-        env_register_resource(id, (func_dtor_t) ustring_destroy);
-        ustring_append_string_len(id, set1->ptr + 2, set1->len - 4); /* ignore [: and :] */
-        ustring_append_char(id, 0x3B /* ';' */);
-        if (NONE == set2_type) {
-            UChar remove[] = {0x52, 0x65, 0x6D, 0x6F, 0x76, 0x65, 0}; /* "Remove" */
-
-            ustring_append_string_len(id, remove, STR_LEN(remove));
+        if (ustring_startswith(set1, LEFT_BRACKET, STR_LEN(LEFT_BRACKET)) && ustring_endswith(set1, RIGHT_BRACKET, STR_LEN(RIGHT_BRACKET))) {
+            id = ustring_new();
+            env_register_resource(id, (func_dtor_t) ustring_destroy);
+            ustring_append_string_len(id, set1->ptr + 2, set1->len - 4); /* ignore [: and :] */
+            ustring_append_char(id, 0x3B /* ';' */);
+            if (NONE == set2_type) {
+                ustring_append_string_len(id, REMOVE, STR_LEN(REMOVE));
+            } else if (ustring_startswith(set2, LEFT_BRACKET, STR_LEN(LEFT_BRACKET)) && ustring_endswith(set2, RIGHT_BRACKET, STR_LEN(RIGHT_BRACKET))) {
+                ustring_append_string_len(id, set2->ptr + 2, set2->len - 4); /* ignore [: and :] */
+            } else {
+                /* invalid id, handle later ? */
+            }
+            utrans = utrans_openU(id->ptr, id->len, UTRANS_FORWARD, NULL, 0, &pe, &status);
         } else {
-            ustring_append_string_len(id, set2->ptr + 2, set2->len - 4); /* ignore [: and :] */
+            rules = ustring_dup(set1);
+            env_register_resource(rules, (func_dtor_t) ustring_destroy);
+            /* invalid id, handle later ? */
+            ustring_append_char(rules, 0x3E /* '>' */);
+            if (NONE != set2_type) {
+                ustring_append_string_len(rules, set1->ptr, set1->len);
+            }
+            ustring_append_char(rules, 0x3B /* ';' */);
+            utrans = utrans_openU(UTR, STR_LEN(UTR), UTRANS_FORWARD, rules->ptr, rules->len, &pe, &status);
         }
-        utrans = utrans_openU(id->ptr, id->len, UTRANS_FORWARD, NULL, 0, &pe, &status);
-        env_register_resource(utrans, (func_dtor_t) utrans_close);
         if (U_FAILURE(status)) {
             // TODO: real error/memory handling
-            //if (-1 != pe.line) { /* rules is unused */
-                //u_fprintf(ustderr, "Invalid rule: error at offset %d\n\t%S\n\t%*c\n", pe.offset, rules->ptr, pe.offset, '^');
-            //} else {
+            if (NULL != rules && -1 != pe.line) {
+                u_fprintf(ustderr, "Invalid rule: error at offset %d\n\t%S\n\t%*c\n", pe.offset, rules->ptr, pe.offset, '^');
+            } else {
                 fprintf(stderr, "utrans_openU: %s\n", u_errorName(status));
-            //}
+            }
             return UTR_EXIT_FAILURE;
         }
-    } else
-#endif /* UTRANS_EXP */
-    if (STRING == set2_type) {
+        env_register_resource(utrans, (func_dtor_t) utrans_close);
+    } else if (STRING == set2_type) {
         if (STRING != set1_type) {
             fprintf(stderr, "Using a string as a set have only sense if the first set is defined as a string too\n");
             return UTR_EXIT_FAILURE;
@@ -836,49 +860,57 @@ int main(int argc, char **argv)
             print_error(error);
         }
         ustring_chomp(in);
-        ustring_truncate(out);
 
-        if (SET == set1_type || FILTER_FUNCTION == set1_type) {
-            size_t i;
-
-            for (i = 0; i < in->len; /* none: incrementation done by U16_NEXT */) {
-                U16_NEXT(in->ptr, i, in->len, i32);
-                if (SET == set1_type) {
-                    match = uset_contains(uset, i32);
-                } else if (FILTER_FUNCTION == set1_type) {
-                    match = filter_func(i32) ^ cFlag;
-                } /*else { BUG }*/
-                if (match) {
-                    if (dFlag) {
-                        continue;
-                    } else if (CHARACTER == set2_type) {
-                        U16_GET_UNSAFE(set2->ptr, 0, i32); // TODO: compute it once, *before* loop
-                    } else if (SIMPLE_FUNCTION == set2_type) {
-                        i32 = simple_case_mapping[set2_case_type](i32);
-                    }
-                }
-                ustring_append_char32(out, i32);
-            }
-        } else if (SIMPLE_FUNCTION == set2_type) {
-            cp_process(ht, in, out, sFlag, FALSE);
-        } else if (CHARACTER == set1_type/* && CHARACTER == set2_type*/) {
-            single_process(ubrk, set1, set2, in, out, sFlag, dFlag);
-        } else if (GLOBAL_FUNCTION == set1_type/* && set2_type == NONE*/) {
-            if (!ustring_fullcase(out, in->ptr, in->len, set1_case_type, &error)) {
+        if (NULL != utrans) { /* TODO: handle squeeze */
+            if (!ustring_transliterate(in, utrans, &error)) {
                 print_error(error);
             }
+            u_file_write(in->ptr, in->len, ustdout);
+            u_file_write(EOL, EOL_LEN, ustdout);
         } else {
-            if (UNIT_CODEPOINT == env_get_unit()) {
-                cp_process(ht, in, out, sFlag, dFlag);
-            } else {
-                grapheme_process(ht, ubrk, in, out, sFlag, dFlag);
-            }
-        }
+            ustring_truncate(out);
 
-        u_file_write(out->ptr, out->len, ustdout);
-        u_file_write(EOL, EOL_LEN, ustdout);
+            if (SET == set1_type || FILTER_FUNCTION == set1_type) {
+                size_t i;
+
+                for (i = 0; i < in->len; /* none: incrementation done by U16_NEXT */) {
+                    U16_NEXT(in->ptr, i, in->len, i32);
+                    if (SET == set1_type) {
+                        match = uset_contains(uset, i32);
+                    } else if (FILTER_FUNCTION == set1_type) {
+                        match = filter_func(i32) ^ cFlag;
+                    } /*else { BUG }*/
+                    if (match) {
+                        if (dFlag) {
+                            continue;
+                        } else if (CHARACTER == set2_type) {
+                            U16_GET_UNSAFE(set2->ptr, 0, i32); // TODO: compute it once, *before* loop
+                        } else if (SIMPLE_FUNCTION == set2_type) {
+                            i32 = simple_case_mapping[set2_case_type](i32);
+                        }
+                    }
+                    ustring_append_char32(out, i32);
+                }
+            } else if (SIMPLE_FUNCTION == set2_type) {
+                cp_process(ht, in, out, sFlag, FALSE);
+            } else if (CHARACTER == set1_type/* && CHARACTER == set2_type*/) {
+                single_process(ubrk, set1, set2, in, out, sFlag, dFlag);
+            } else if (GLOBAL_FUNCTION == set1_type/* && set2_type == NONE*/) {
+                if (!ustring_fullcase(out, in->ptr, in->len, set1_case_type, &error)) {
+                    print_error(error);
+                }
+            } else {
+                if (UNIT_CODEPOINT == env_get_unit()) {
+                    cp_process(ht, in, out, sFlag, dFlag);
+                } else {
+                    grapheme_process(ht, ubrk, in, out, sFlag, dFlag);
+                }
+            }
+
+            u_file_write(out->ptr, out->len, ustdout);
+            u_file_write(EOL, EOL_LEN, ustdout);
+        }
     }
-    reader_close(reader);
 
     return UTR_EXIT_SUCCESS;
 }

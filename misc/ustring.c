@@ -333,6 +333,7 @@ UString *ustring_convert_argv_from_local(const char *cargv, error_t **error, UBo
         icu_error_set(error, FATAL, status, "ucnv_toUChars");
         return NULL;
     }
+    assert(U_ZERO_ERROR == status);
     ustr->ptr[ustr->len] = 0;
     if (unescape) {
         ustring_unescape(ustr);
@@ -660,6 +661,7 @@ UBool ustring_fullcase(UString *ustr, UChar *src, int32_t src_len, UCaseType ct,
         error_set(error, FATAL, "ICU Error \"%s\" from %s()", u_errorName(status), unicode_case_mapping[ct].name);
         return FALSE;
     } else {
+        assert(U_ZERO_ERROR == status);
         ustr->ptr[ustr->len] = 0;
         return TRUE;
     }
@@ -805,6 +807,33 @@ void ustring_sprintf(UString *ustr, const char *format, ...) /* NONNULL(1, 2) */
     ustr->len = ret;
 }
 
+UBool ustring_transliterate(UString *ustr, UTransliterator *utrans, error_t **error) /* NONNULL(1, 2) */
+{
+    int32_t limit;
+    UErrorCode status;
+
+    require_else_return_false(NULL != ustr);
+    require_else_return_false(NULL != utrans);
+
+    limit = ustr->len;
+    do {
+        status = U_ZERO_ERROR;
+        utrans_transUChars(utrans, ustr->ptr, &ustr->len, ustr->allocated, 0, &limit, &status);
+        if (U_BUFFER_OVERFLOW_ERROR == status) {
+            _ustring_maybe_expand_of(ustr, ustr->len);
+            continue;
+        }
+    } while (FALSE);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "utrans_transUChars");
+        return FALSE;
+    }
+    ustr->ptr[ustr->len] = 0;
+    assert(U_ZERO_ERROR == status);
+
+    return TRUE;
+}
+
 /* ==================== normalization ==================== */
 
 static UChar *u_strdup(UChar *src, int32_t len)
@@ -837,8 +866,9 @@ UBool ustring_normalize(UString *ustr, UNormalizationMode mode)
         if (U_BUFFER_OVERFLOW_ERROR == status) {
             status = U_ZERO_ERROR;
             _ustring_maybe_expand_to(ustr, res_len);
-            ustr->len = unorm_normalize(tmp, ustr->len, mode, 0, ustr->ptr, ustr->allocated, &status);
+            ustr->len = unorm_normalize(tmp, ustr->len, mode, 0, ustr->ptr, ustr->allocated + 1, &status);
         }
+        assert(U_ZERO_ERROR == status);
         free(tmp);
     }
 
