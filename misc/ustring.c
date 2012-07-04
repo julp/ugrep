@@ -737,6 +737,7 @@ void ustring_dump(UString *ustr) /* NONNULL() */
 
     require_else_return(NULL != ustr);
 
+    /* Same as transliterate with "([\p{Cn}\p{Cc}\p{Cf}\p{Co}\p{Cs}]) > &Any-Hex($1)" as rules */
     len = 0;
     for (i = 0; i < ustr->len; ) {
         U16_NEXT(ustr->ptr, i, ustr->len, c);
@@ -768,6 +769,7 @@ void ustring_dump(UString *ustr) /* NONNULL() */
                     *--p = 0x5C;
                     break;
                 default:
+                {
                     if (!u_isprint(c)) {
                         p -= replacement_len;
                         u_snprintf(p, replacement_len, replacement, c);
@@ -779,6 +781,7 @@ void ustring_dump(UString *ustr) /* NONNULL() */
                             *--p = U16_TRAIL(c);
                         }
                     }
+                }
             }
         }
     }
