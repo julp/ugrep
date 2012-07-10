@@ -20,11 +20,13 @@ const char *ubasename(const char *);
 # define stdio_debug(format, ...) \
     fprintf(stderr, "%s:%d:" format " in %s()\n", ubasename(__FILE__), __LINE__, ## __VA_ARGS__, __func__)
 
-# define u_printf(...)                                \
+# if U_ICU_VERSION_MAJOR_NUM < 49
+#  define u_printf(...)                               \
     do {                                              \
         UFILE *ustdout = u_finit(stdout, NULL, NULL); \
         u_fprintf(ustdout, ## __VA_ARGS__);           \
     } while (0);
+# endif /* ICU >= 4.9.1 */
 #else
 # define msg(type, format, ...) \
     report(type, format "\n", ## __VA_ARGS__)

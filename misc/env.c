@@ -170,6 +170,7 @@ void env_apply(void)
 #endif /* DEBUG */
 }
 
+static int32_t path_join(char *, size_t, ...);
 static char *binary_path(const char *, char *, size_t);
 
 void env_init(const char *argv0)
@@ -212,7 +213,7 @@ void env_init(const char *argv0)
         env_set_outputs_encoding(tmp);
     }
 #ifdef _MSC_VER
-    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  ARRAY_SIZE(__progname));
+    GetModuleBaseNameA(GetCurrentProcess(), NULL, __progname,  STR_SIZE(__progname));
     if (NULL == outputs_encoding && stdout_is_tty()) {
         char cp[30] = { 0 };
 
@@ -222,47 +223,51 @@ void env_init(const char *argv0)
 #endif /* _MSC_VER */
 #ifndef WITHOUT_NLS
     {
+        UErrorCode status;
         char rbpath[MAXPATHLEN];
 
-        // TODO: default value should be cmake installation path
-        strcpy(rbpath, "/home/julp/ugrep/ugrep");
-//         *rbpath = '\0';
-# ifdef _MSC_VER
-        {
-            char buffer[MAXPATHLEN];
-
-            if (0 == GetModuleFileNameA(NULL, buffer, ARRAY_SIZE(buffer))) {
-                *rbpath = '\0';
-            }
-            if (NULL == mydirname(rbpath, buffer, ARRAY_SIZE(buffer))) {
-                *rbpath = '\0';
-            }
+        status = U_ZERO_ERROR;
+        if (-1 == path_join(rbpath, STR_SIZE(rbpath), UGREP_RESOURCE_BUNDLE_DIR, "ugrep")) {
+            assert(FALSE); /* TODO */
         }
-# else
-        if (NULL == binary_path(argv0, rbpath, ARRAY_SIZE(rbpath))) {
+        ures = ures_open(rbpath, NULL, &status);
+stdio_debug("loading rbpath failed: %s", rbpath); /* TODO */
+stdio_debug("translation disabled: %s", u_errorName(status)); /* TODO */
+        if (U_FAILURE(status)) { /* try with a relative path from executable directory */
             *rbpath = '\0';
-        }
-# endif /* _MSC_VER */
-        if ('\0' != *rbpath) {
-            UErrorCode status;
-
             status = U_ZERO_ERROR;
-stdio_debug("%s", rbpath);
-            // TODO: transformer rbpath en ../share/.../ugrep.dat ?
-            ures = ures_open(rbpath, NULL, &status);
-            if (U_FAILURE(status)) {
-                fprintf(stderr, "translation disabled: %s\n", u_errorName(status));
-# ifdef DEBUG
-            } else {
-                env_register_resource(ures, (func_dtor_t) ures_close);
-                if (U_USING_DEFAULT_WARNING == status) {
-                    fprintf(stderr, YELLOW("default") " translation enabled\n");
-                } else {
-                    fprintf(stderr, "translation enabled: " GREEN("%s") "\n", ures_getLocaleByType(ures, ULOC_ACTUAL_LOCALE, &status));
-                    assert(U_SUCCESS(status));
+# ifdef _MSC_VER
+            {
+                char buffer[MAXPATHLEN];
+
+                if (0 == GetModuleFileNameA(NULL, buffer, STR_SIZE(buffer))) {
+                    *rbpath = '\0';
                 }
-# endif /* DEBUG */
+                if (NULL == mydirname(rbpath, buffer, STR_SIZE(buffer))) {
+                    *rbpath = '\0';
+                }
             }
+# else
+            if (NULL == binary_path(argv0, rbpath, STR_SIZE(rbpath))) {
+                *rbpath = '\0';
+            }
+# endif /* _MSC_VER */
+            // TODO: append (/)../share/ugrep.dat to rbpath ?
+            ures = ures_open(rbpath, NULL, &status);
+stdio_debug("%s", rbpath);
+        }
+        if (U_FAILURE(status)) {
+            fprintf(stderr, "translation disabled: %s\n", u_errorName(status));
+# ifdef DEBUG
+        } else {
+            env_register_resource(ures, (func_dtor_t) ures_close);
+            if (U_USING_DEFAULT_WARNING == status) {
+                fprintf(stderr, YELLOW("default") " translation enabled\n");
+            } else {
+                fprintf(stderr, "translation enabled: " GREEN("%s") "\n", ures_getLocaleByType(ures, ULOC_ACTUAL_LOCALE, &status));
+                assert(U_SUCCESS(status));
+            }
+# endif /* DEBUG */
         }
     }
 #endif /* !WITHOUT_NLS */
@@ -358,6 +363,35 @@ static char **str_split(char separator, const char *string)
     return pieces;
 }
 
+static int32_t path_join(char *buffer, size_t size, ...)
+{
+    va_list ap;
+    size_t len;
+    char *s, *ptr;
+
+    len = 0;
+    va_start(ap, size);
+    while (NULL != (s = va_arg(ap, char *))) {
+        len += 1 + strlen(s);
+    }
+    va_end(ap);
+
+    if (len >= size) {
+        return -1;
+    }
+
+    va_start(ap, size);
+    s = va_arg(ap, char *);
+    ptr = stpcpy(buffer, s);
+    while (NULL != (s = va_arg(ap, char *))) {
+        *ptr++ = DIRECTORY_SEPARATOR;
+        ptr = stpcpy(ptr, s);
+    }
+    va_end(ap);
+
+    return len;
+}
+
 #include <errno.h>
 char *mydirname(const char *path, char *buffer, size_t buffer_len) /* NONNULL() */
 {
@@ -401,7 +435,7 @@ static char *binary_path(const char *argv0, char *buffer, size_t buffer_size)
     argv0_len = strlen(argv0);
     if ('.' == *argv0 || NULL != strchr(argv0, '/')) { // path is relative or (seems) absolute
         if (NULL != realpath(argv0, resolved)) {
-            if (NULL != mydirname(resolved, dirname, ARRAY_SIZE(dirname))) {
+            if (NULL != mydirname(resolved, dirname, STR_SIZE(dirname))) {
                 if (NULL == buffer) {
                     retval = strdup(dirname);
                 } else {
@@ -429,7 +463,7 @@ static char *binary_path(const char *argv0, char *buffer, size_t buffer_size)
         }
         for (p = paths; NULL != *p; p++) {
             p_len = strlen(*p);
-            if (p_len + STR_LEN("/") + argv0_len > ARRAY_SIZE(fullpath) - 1) {
+            if (p_len + STR_LEN("/") + argv0_len > STR_SIZE(fullpath) - 1) {
                 break;
             }
             memcpy(fullpath, *p, p_len);
@@ -438,7 +472,7 @@ static char *binary_path(const char *argv0, char *buffer, size_t buffer_size)
             fullpath[p_len + STR_LEN("/") + argv0_len] = '\0';
             if (0 == access(fullpath, X_OK)) {
                 if (NULL != realpath(fullpath, resolved)) {
-                    if (NULL != mydirname(resolved, fullpath, ARRAY_SIZE(fullpath))) {
+                    if (NULL != mydirname(resolved, fullpath, STR_SIZE(fullpath))) {
                         if (NULL == buffer) {
                             retval = strdup(fullpath);
                         } else {
@@ -459,7 +493,7 @@ static char *binary_path(const char *argv0, char *buffer, size_t buffer_size)
         free(paths);
     }
 
-stdio_debug("resolved : %s", retval);
+stdio_debug("resolved : %s", retval); /* TODO */
     return retval;
 }
 
@@ -474,6 +508,7 @@ UChar *_(const char *UNUSED(ns), const char *id, const char *fallback)
     UChar *result, *msg, buf[256];
 
     status = U_ZERO_ERROR;
+    /* TODO: cleanup */
 #if 0
     if (NULL != ures) {
         msg = (UChar *) ures_getStringByKey(ures, id, &msg_len, &status);

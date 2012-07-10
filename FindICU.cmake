@@ -30,13 +30,15 @@
 #   endif()
 
 #=============================================================================
-# Copyright (c) 2011, julp
+# Copyright (c) 2011-2012, julp
 #
 # Distributed under the OSI-approved BSD License
 #
 # This software is distributed WITHOUT ANY WARRANTY; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #=============================================================================
+
+cmake_minimum_required(VERSION 2.8.3 FATAL_ERROR)
 
 find_package(PkgConfig)
 
@@ -46,6 +48,14 @@ function(icudebug _varname)
         message("${_varname} = ${${_varname}}")
     endif(ICU_DEBUG)
 endfunction(icudebug)
+
+set(IcuRoot "")
+if(DEFINED ENV{ICU_ROOT})
+    set(IcuRoot "$ENV{ICU_ROOT}")
+endif(DEFINED ENV{ICU_ROOT})
+if (DEFINED ICU_ROOT)
+    set(IcuRoot "${ICU_ROOT}")
+endif(DEFINED ICU_ROOT)
 
 set(IcuComponents )
 # <icu component name> <library name 1> ... <library name N>
@@ -88,6 +98,8 @@ endif()
 find_path(
     ICU_INCLUDE_DIRS
     NAMES unicode/utypes.h
+    HINTS ${IcuRoot}
+    PATH_SUFFIXES "include"
     DOC "Include directories for ICU"
 )
 
@@ -112,6 +124,8 @@ foreach(_icu_component ${ICU_FIND_COMPONENTS})
     find_library(
         _icu_lib
         NAMES ${IcuComponents_${_icu_component}}
+        HINTS ${IcuRoot}
+        PATH_SUFFIXES "bin" "lib"
         DOC "Libraries for ICU"
     )
 
@@ -138,8 +152,19 @@ if(ICU_FOUND)
     endif()
 
     string(REGEX REPLACE ".*# *define *U_ICU_VERSION_MAJOR_NUM *([0-9]+).*" "\\1" ICU_MAJOR_VERSION "${_icu_contents}")
-    string(REGEX REPLACE ".*# *define *U_ICU_VERSION_MINOR_NUM *([0-9]+).*" "\\1" ICU_MINOR_VERSION "${_icu_contents}")
-    string(REGEX REPLACE ".*# *define *U_ICU_VERSION_PATCHLEVEL_NUM *([0-9]+).*" "\\1" ICU_PATCH_VERSION "${_icu_contents}")
+    #
+    # From 4.9.1, ICU release version numbering was totaly changed, see:
+    # - http://site.icu-project.org/download/49
+    # - http://userguide.icu-project.org/design#TOC-Version-Numbers-in-ICU
+    #
+    if(ICU_MAJOR_VERSION LESS 49)
+        string(REGEX REPLACE ".*# *define *U_ICU_VERSION_MINOR_NUM *([0-9]+).*" "\\1" ICU_MINOR_VERSION "${_icu_contents}")
+        string(REGEX REPLACE ".*# *define *U_ICU_VERSION_PATCHLEVEL_NUM *([0-9]+).*" "\\1" ICU_PATCH_VERSION "${_icu_contents}")
+    else(ICU_MAJOR_VERSION LESS 49)
+        string(REGEX MATCH [0-9]$ ICU_MINOR_VERSION "${ICU_MAJOR_VERSION}")
+        string(REGEX REPLACE [0-9]$ "" ICU_MAJOR_VERSION "${ICU_MAJOR_VERSION}")
+        string(REGEX REPLACE ".*# *define *U_ICU_VERSION_MINOR_NUM *([0-9]+).*" "\\1" ICU_PATCH_VERSION "${_icu_contents}")
+    endif(ICU_MAJOR_VERSION LESS 49)
     set(ICU_VERSION "${ICU_MAJOR_VERSION}.${ICU_MINOR_VERSION}.${ICU_PATCH_VERSION}")
 endif(ICU_FOUND)
 
@@ -168,76 +193,132 @@ if(NOT ICU_PKGDATA_EXECUTABLE)
     message(FATAL_ERROR "pkgdata not found")
 endif(NOT ICU_PKGDATA_EXECUTABLE)
 
-# genrb([PACKAGE <name>] [pattern or list of files])
-function(genrb _arg1)
-    set(IcuRb )
-    if (${_arg1} STREQUAL "PACKAGE")
-        #set(_pkg_name ${ARGV1})
-        get_filename_component(_pkg_name ${ARGV1} NAME_WE)
-        get_filename_component(_pkg_dir ${ARGV1} PATH)
-# message("name = ${_pkg_name}; dir = ${_pkg_dir} ; ")
-        set(_list_index 2)
-    else(${_arg1} STREQUAL "PACKAGE")
-        set(_list_index 0)
-    endif(${_arg1} STREQUAL "PACKAGE")
-    list(GET ARGV ${_list_index} -1 _sources)
-    foreach(_source ${_sources})
-        get_filename_component(_outputwe ${_source} NAME_WE)
-        set(_output "${_outputwe}.res")
-        add_custom_command(
-            OUTPUT ${_output}
-            COMMAND ${ICU_GENRB_EXECUTABLE} ${_source}
-            DEPENDS ${_source}
-        )
-        add_custom_target(
-            rb-${_outputwe}
-            COMMENT "Generate/Update ICU ResourceBundles for ${_outputwe}"
-            DEPENDS ${_source}
-        )
-        list(APPEND IcuRb ${_output})
-# message(":${_source}: => :${_output}:")
-#         if(NOT _pkg_name)
-#             install(FILES ${output} DESTINATION ???)
-#         endif(NOT _pkg_name)
-    endforeach(_source)
-    if(_pkg_name)
-        set(_pkg_list_file "${_pkg_name}.dat.txt")
-        add_custom_target(
-            rb ALL
-            COMMENT "Generate/Update ICU ResourceBundles"
-            DEPENDS ${IcuRb}
-        )
-        file(WRITE ${_pkg_list_file} "")
-        foreach(_rb ${IcuRb})
-            file(APPEND ${_pkg_list_file} "${_rb}\n")
-        endforeach(_rb)
-        add_custom_command(
-            OUTPUT "${_pkg_name}.dat" # ${_pkg_dir}
-            COMMAND ${ICU_PKGDATA_EXECUTABLE} -F -p ${_pkg_name} -T ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY} -m common ${_pkg_list_file} # ${_pkg_dir}
-            DEPENDS ${IcuRb}
-        )
-        add_custom_target(
-            pkg ALL
-            COMMENT "Packaging data"
-            DEPENDS "${_pkg_name}.dat" # ${_pkg_dir}
-        )
-#     install(FILES ${output} DESTINATION ???)
-    endif(_pkg_name)
-endfunction(genrb)
+# generate_icu_resource_bundle([PACKAGE <name>] [DESTINATION <destination>] [pattern or list of files])
+function(generate_icu_resource_bundle)
+    cmake_parse_arguments(ICU_RES "" "PACKAGE;DESTINATION" "" ${ARGN})
 
-icudebug("ICU_GENRB_EXECUTABLE")
-icudebug("ICU_PKGDATA_EXECUTABLE")
+    icudebug("ICU_RES_DESTINATION")
+    icudebug("ICU_RES_PACKAGE")
+    icudebug("ICU_RES_UNPARSED_ARGUMENTS")
+
+    # Variables:
+    # - prefixes:
+    #   + "_txt"   = input file (.txt)
+    #   + "_res"   = output file (.res)
+    #   + "_genrb" = genrb argument
+    #   + "_pkg"   = ouput packaged file (.dat)
+    # - suffixes:
+    #   + "abs"  = absolute
+    #   + "rel"  = relative
+    #   + "dir"  = path part (dirname)
+    #   + "base" = filename part (basename)
+
+    if(ICU_RES_PACKAGE)
+        get_filename_component(_pkg_name ${ICU_RES_PACKAGE} NAME_WE)
+    endif(ICU_RES_PACKAGE)
+
+    set(_all_res )
+    foreach(_txt ${ICU_RES_UNPARSED_ARGUMENTS})
+        get_filename_component(_locale ${_txt} NAME_WE)
+        get_filename_component(_txt_base ${_txt} NAME)
+        get_filename_component(_txt_abspath ${_txt} ABSOLUTE)
+        file(RELATIVE_PATH _txt_relpath ${CMAKE_CURRENT_SOURCE_DIR} ${_txt_abspath})
+        set(_res_base "${_locale}.res")
+        # Default values
+        set(_res_relpath "${_res_base}")
+        set(_txt_dir ${CMAKE_CURRENT_SOURCE_DIR})
+
+        if(_txt_relpath MATCHES "/")
+            get_filename_component(_txt_dir ${_txt_relpath} PATH)
+            set(_res_relpath "${_txt_dir}/${_res_base}")
+        endif(_txt_relpath MATCHES "/")
+
+        if(NOT ICU_RES_PACKAGE)
+            file(MD5 ${_txt} _pkg_name) # find better?
+        endif(NOT ICU_RES_PACKAGE)
+
+        icudebug("_txt")
+        icudebug("_txt_dir")
+        icudebug("_locale")
+        icudebug("_txt_abspath")
+        icudebug("_txt_relpath")
+        icudebug("_res_base")
+        icudebug("_res_relpath")
+
+        # cmake wait an absolute or relative path while genrb wait a filename only (basename), path(s) should be specified with its options -s and -d
+
+        # 1) add_custom_command(OUTPUT <output file> DEPENDS <input file> [...])
+        # 2) add_custom_target([...] DEPENDS <previous ouput file from add_custom_command>)
+
+        add_custom_command(
+            OUTPUT ${_res_relpath}
+            COMMAND ${CMAKE_COMMAND} -E chdir ${_txt_dir} ${ICU_GENRB_EXECUTABLE} ${_txt_base}
+            DEPENDS ${_txt}
+        )
+        add_custom_target(
+            "rb_${_pkg_name}_${_locale}" ALL
+            COMMENT "Generate or update ICU ResourceBundles for ${_locale}"
+            DEPENDS ${_res_relpath}
+        )
+
+        if(ICU_RES_DESTINATION AND NOT ICU_RES_PACKAGE)
+            install(FILES ${_res_relpath} DESTINATION ${ICU_RES_DESTINATION} PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
+        endif(ICU_RES_DESTINATION AND NOT ICU_RES_PACKAGE)
+
+        list(APPEND _all_res ${_res_relpath})
+    endforeach(_txt)
+
+    icudebug("_all_res")
+
+    if(ICU_RES_PACKAGE)
+        get_filename_component(_pkg_dir ${ICU_RES_PACKAGE} PATH)
+        get_filename_component(_pkg_abspath ${ICU_RES_PACKAGE} ABSOLUTE)
+        file(RELATIVE_PATH _pkg_relpath ${CMAKE_CURRENT_SOURCE_DIR} ${_pkg_abspath})
+        set(_pkg_base "${_pkg_name}.dat")
+        set(_pkg_dir ${CMAKE_CURRENT_SOURCE_DIR})
+        if(_pkg_relpath MATCHES "/")
+            get_filename_component(_pkg_dir ${_pkg_relpath} PATH)
+            set(_pkgdata_args "-d${CMAKE_CURRENT_SOURCE_DIR}/${_pkg_dir}") # no space after -d else it will be escaped so becomes a space in path
+        endif(_pkg_relpath MATCHES "/")
+        set(_tmp "${_pkg_dir}/${_pkg_base}.txt")
+
+        icudebug("_pkg_name")
+        icudebug("_pkg_base")
+        icudebug("_pkg_dir")
+        icudebug("_pkg_abspath")
+        icudebug("_pkg_relpath")
+        icudebug("_tmp")
+        icudebug("_pkgdata_args")
+
+        file(WRITE ${_tmp} "")
+        foreach(_res ${_all_res})
+            file(APPEND ${_tmp} "${_res}\n")
+        endforeach(_res)
+
+        add_custom_command(
+            OUTPUT "${_pkg_dir}/${_pkg_base}"
+            COMMAND ${ICU_PKGDATA_EXECUTABLE} -v -F -s ${PROJECT_SOURCE_DIR} ${_pkgdata_args} -p ${_pkg_name} -T ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY} -m common ${_tmp}
+            DEPENDS ${_all_res}
+        )
+        add_custom_target(
+            "pkg_${_pkg_name}" ALL
+            COMMENT "Generate or update all ICU ResourceBundles for ${_pkg_name}"
+            DEPENDS "${_pkg_dir}/${_pkg_base}"
+        )
+
+        if(ICU_RES_DESTINATION)
+            install(FILES "${_pkg_dir}/${_pkg_base}" DESTINATION ${ICU_RES_DESTINATION} PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
+        endif(ICU_RES_DESTINATION)
+
+    endif(ICU_RES_PACKAGE)
+
+endfunction(generate_icu_resource_bundle)
 
 ############################################################
 
 mark_as_advanced(
     ICU_INCLUDE_DIRS
     ICU_LIBRARIES
-    ICU_DEFINITIONS
-    ICU_VERSION
-    ICU_MAJOR_VERSION
-    ICU_MINOR_VERSION
-    ICU_PATCH_VERSION
 )
 
 # IN (args)
@@ -256,6 +337,9 @@ icudebug("ICU_LX_FOUND")
 # Linking
 icudebug("ICU_INCLUDE_DIRS")
 icudebug("ICU_LIBRARIES")
+# Binaries
+icudebug("ICU_GENRB_EXECUTABLE")
+icudebug("ICU_PKGDATA_EXECUTABLE")
 # Version
 icudebug("ICU_MAJOR_VERSION")
 icudebug("ICU_MINOR_VERSION")

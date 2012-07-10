@@ -64,9 +64,12 @@ if(MSVC)
     include_directories(${CMAKE_SOURCE_DIR}/win32/)
 endif(MSVC)
 
+set(UGREP_RESOURCE_BUNDLE_DIR "${CMAKE_INSTALL_PREFIX}/share/ugrep")
+
 configure_file(
     "config.h.in"
     "config.h"
+    @ONLY
 )
 
 message("==> CMAKE_BUILD_TYPE : ${CMAKE_BUILD_TYPE}")
@@ -111,8 +114,7 @@ foreach (UgrepBinary ${UgrepBinaries})
     install(TARGETS ${UgrepBinary} DESTINATION bin)
 endforeach(UgrepBinary)
 
-genrb(PACKAGE ugrep root.txt fr.txt)
-install(FILES ugrep.dat DESTINATION share/ugrep/)
+generate_icu_resource_bundle(PACKAGE ugrep DESTINATION ${UGREP_RESOURCE_BUNDLE_DIR} rb/root.txt rb/fr.txt)
 
 #install(CODE "EXEC_PROGRAM(${CMAKE_COMMAND} ARGS -E create_symlink \"${CMAKE_INSTALL_PREFIX}/bin/ugrep\" \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
 #list(APPEND CMAKE_INSTALL_MANIFEST_FILES \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
