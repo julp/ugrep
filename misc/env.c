@@ -178,9 +178,9 @@ void env_init(const char *argv0)
 
 #ifdef BSD
 {
-#include <sys/types.h>
-#include <pwd.h>
-#include <login_cap.h>
+# include <sys/types.h>
+# include <pwd.h>
+# include <login_cap.h>
 
     login_cap_t *lc;
     struct passwd *pwd;
