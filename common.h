@@ -88,7 +88,6 @@ extern char *__progname;
         }                                                                                                       \
     } while (0);
 
-# include <assert.h>
 # ifdef DEBUG
 #  undef NDEBUG
 #  define require_else_return(expr)                                                                                        \
@@ -124,6 +123,7 @@ extern char *__progname;
 #  define require_else_return_true(expr)
 #  define require_else_return_false(expr)
 # endif /* DEBUG */
+# include <assert.h>
 
 # define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 # define STR_LEN(str)      (ARRAY_SIZE(str) - 1)
