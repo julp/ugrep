@@ -55,7 +55,7 @@ int main(void)
     env_apply();
     for (i = 0; i < ARRAY_SIZE(tests); i++) {
         r = ut(tests[i][0], tests[i][1]);
-        printf("Test %d: %s\n", i + 1, r ? RED("KO") : GREEN("OK"));
+        printf("Test %" PRIszu ": %s\n", i + 1, r ? RED("KO") : GREEN("OK"));
         ret |= r;
     }
 

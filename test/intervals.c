@@ -104,7 +104,7 @@ int main(void)
             }
         }
         r = ut(l, results[i]);
-        printf("Test %02d: %s\n", i + 1, r ? RED("KO") : GREEN("OK"));
+        printf("Test %02" PRIszu ": %s\n", i + 1, r ? RED("KO") : GREEN("OK"));
         ret |= r;
     }
     interval_list_destroy(l);
