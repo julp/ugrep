@@ -46,5 +46,5 @@ assertOutputValue "-Ef (fields + RE)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "d
 INPUT='echo "0,1,2,3,4,5,6,7,8,9"'
 ARGS='-d , -f 1-3,6-8'
 assertOutputCommand "-f (simple)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
-ARGS='-Ed , -f 1-3,6-8'
-assertOutputCommand "-Ef (simple)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
+ARGS='-d , -f 1-3,6-8'
+assertOutputCommand "-Ef (simple)" "${INPUT} | ./ucut -E ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
