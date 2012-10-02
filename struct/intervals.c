@@ -326,6 +326,28 @@ void interval_list_complement(interval_list_t *intervals, int32_t min, int32_t m
     }
 }
 
+UBool interval_list_is_bounded(interval_list_t *intervals) /* NONNULL() */
+{
+    require_else_return_false(NULL != intervals);
+
+    if (NULL == intervals->tail) {
+        return TRUE;
+    } else {
+        FETCH_DATA(intervals->tail->data, i, interval_t);
+
+        return INT32_MAX != i->upper_limit;
+    }
+}
+
+int32_t interval_list_length(interval_list_t *intervals) /* NONNULL() */
+{
+    require_else_return_val(NULL != intervals, -1);
+
+    /* TODO */
+
+    return -1;
+}
+
 #ifdef DEBUG
 void interval_list_debug(interval_list_t *intervals) /* NONNULL() */
 {
