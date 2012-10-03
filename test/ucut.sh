@@ -38,13 +38,20 @@ assertOutputValue "-f (fields)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "3:4:5:6
 ARGS='-sd: -f 10'
 assertOutputValue "-f (field out of range)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" ""
 
-INPUT="echo \"abc1def2ghi3jkl4mno5pqr\""
-ARGS="-Ed '\d' -f 2-4"
-assertOutputValue "-Ef (fields + RE)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "def2ghi3jkl"
+INPUT='echo "abc1def2ghi3jkl4mno5pqr"'
+ARGS="--output-delimiter=. -Ed '\d' -f 2-4"
+assertOutputValue "-Ef (fields + RE)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "def.ghi.jkl"
 
-# Disabled: need to fix -E separator handling first
 INPUT='echo "0,1,2,3,4,5,6,7,8,9"'
 ARGS='-d , -f 1-3,6-8'
 assertOutputCommand "-f (simple)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
-ARGS='-d , -f 1-3,6-8'
-assertOutputCommand "-Ef (simple)" "${INPUT} | ./ucut -E ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
+ARGS='--output-delimiter=";" -f 1-3,6-8' # \P{Nd} <=> [^\d]
+assertOutputCommand "-Ef (simple, bounded)" "${INPUT} | ./ucut -E -d '\P{Nd}' ${ARGS} 2>/dev/null" "${INPUT} | cut -d , ${ARGS}"
+ARGS='--output-delimiter=";" -f 1-3,6-' # \p{P} <=> [[:punct:]]
+assertOutputCommand "-Ef (simple, unbounded)" "${INPUT} | ./ucut -E -d '\p{P}' ${ARGS} 2>/dev/null" "${INPUT} | cut -d , ${ARGS}"
+
+INPUT='echo "0a,1b,2c,3d,4e,5f,6g,7h,8i,9j"'
+ARGS='--output-delimiter=";" -d, -f 1-3,6-8'
+assertOutputCommand "change delimiter (bounded)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"
+ARGS='--output-delimiter=";" -d, -f 1-3,6-'
+assertOutputCommand "change delimiter (unbounded)" "${INPUT} | ./ucut ${ARGS} 2>/dev/null" "${INPUT} | cut ${ARGS}"

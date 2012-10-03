@@ -44,8 +44,7 @@ typedef struct {
     engine_return_t (*match)(error_t **, void *, const UString *);
     engine_return_t (*match_all)(error_t **, void *, const UString *, interval_list_t *);
     engine_return_t (*whole_line_match)(error_t **, void *, const UString *);
-    int32_t (*split)(error_t **, void *, const UString *, DPtrArray *);
-    int32_t (*split2)(error_t **, void *, const UString *, DPtrArray *, interval_list_t *);
+    UBool (*split)(error_t **, void *, const UString *, DPtrArray *, interval_list_t *);
     void (*destroy)(void *);
 } engine_t;
 

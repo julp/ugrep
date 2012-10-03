@@ -41,7 +41,7 @@ find_package(BZip2 QUIET)
 
 set(COMMON_BASE_SOURCES io/mmap.c io/stdio.c io/string.c io/reader.c struct/slist.c)
 file(GLOB MISC_SOURCES ${CMAKE_SOURCE_DIR}/misc/*.c)
-set(ENGINES_SOURCES engines/fixed.c engines/re.c struct/intervals.c struct/dptrarray.c)
+set(ENGINES_SOURCES engines/fixed.c engines/re.c engines/bin.c struct/intervals.c struct/dptrarray.c)
 list(APPEND COMMON_BASE_SOURCES ${MISC_SOURCES})
 set(EXTRA_SOURCES "")
 set(EXTRA_LIBS "")

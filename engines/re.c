@@ -181,63 +181,20 @@ static engine_return_t engine_re_whole_line_match(error_t **error, void *data, c
     return (ret ? ENGINE_WHOLE_LINE_MATCH : ENGINE_NO_MATCH);
 }
 
-static int32_t engine_re_split(error_t **error, void *data, const UString *subject, DPtrArray *array)
-{
-    UErrorCode status;
-    int32_t last, l, u, pieces;
-    FETCH_DATA(data, p, re_pattern_t);
-
-    last = l = u = pieces = 0;
-    status = U_ZERO_ERROR;
-    uregex_setText(p->uregex, subject->ptr, subject->len, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "uregex_setText");
-        return ENGINE_FAILURE;
-    }
-    ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ubrk_setText");
-        return ENGINE_FAILURE;
-    }
-    while (uregex_findNext(p->uregex, &status)) {
-        l = uregex_start(p->uregex, 0, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "uregex_start");
-            return ENGINE_FAILURE;
-        }
-        u = uregex_end(p->uregex, 0, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "uregex_end");
-            return ENGINE_FAILURE;
-        }
-        if (ubrk_isBoundary(p->ubrk, l) && ubrk_isBoundary(p->ubrk, u)) {
-            add_match(array, subject, last, l);
-            ++pieces;
-        }
-        last = u;
-    }
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "uregex_findNext");
-        return ENGINE_FAILURE;
-    }
-    if (!pieces) {
-        // NOP
-    } else if ((size_t) last < subject->len) {
-        add_match(array, subject, last, subject->len);
-        ++pieces;
-    }
-    re_pattern_reset(p);
-
-    return pieces;
-}
-
-static UBool uregex_fwd_n(URegularExpression *uregex, UBreakIterator *ubrk, size_t n, error_t **error)
-{
+static UBool uregex_fwd_n(
+    URegularExpression *uregex,
+    UBreakIterator *ubrk,
+    const UString *subject,
+    DPtrArray *array, /* NULL to skip n matches */
+    int32_t n,
+    int32_t *last,
+    error_t **error
+) {
     int32_t l, u;
     UErrorCode status;
 
     status = U_ZERO_ERROR;
-    while (n > 0 && uregex_findNext(uregex, &status)) {
+    while (n > 0 && U_SUCCESS(status) && uregex_findNext(uregex, &status)) {
         l = uregex_start(uregex, 0, &status);
         if (U_FAILURE(status)) {
             icu_error_set(error, FATAL, status, "uregex_start");
@@ -250,6 +207,10 @@ static UBool uregex_fwd_n(URegularExpression *uregex, UBreakIterator *ubrk, size
         }
         if (ubrk_isBoundary(ubrk, l) && ubrk_isBoundary(ubrk, u)) {
             --n;
+            if (NULL != array) {
+                add_match(array, subject, *last, l);
+            }
+            *last = u;
         }
     }
     if (U_FAILURE(status)) {
@@ -257,64 +218,59 @@ static UBool uregex_fwd_n(URegularExpression *uregex, UBreakIterator *ubrk, size
         return FALSE;
     }
 
-    return (0 == n);
+    if (0 == n) {
+        return TRUE;
+    } else {
+        if (NULL != array && *last < subject->len) {
+            add_match(array, subject, *last, subject->len);
+        }
+        return FALSE;
+    }
 }
 
-static int32_t engine_re_split2(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
+static UBool engine_re_split(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
 {
     UErrorCode status;
     dlist_element_t *el;
-    int32_t l, u, lastU, pieces;
+    int32_t l, lastU;
     FETCH_DATA(data, p, re_pattern_t);
 
+    lastU = l = 0;
     status = U_ZERO_ERROR;
-    lastU = pieces = l = u = 0;
     uregex_setText(p->uregex, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "uregex_setText");
-        return ENGINE_FAILURE;
+        return FALSE;
     }
     ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ubrk_setText");
-        return ENGINE_FAILURE;
+        return FALSE;
     }
     for (el = intervals->head; NULL != el; el = el->next) {
         FETCH_DATA(el->data, i, interval_t);
 
         if (i->lower_limit > 0) {
-            if (!uregex_fwd_n(p->uregex, p->ubrk, i->lower_limit - lastU, error)) {
+            if (!uregex_fwd_n(p->uregex, p->ubrk, subject, NULL, i->lower_limit - lastU, &l, error)) {
                 break;
             }
             l = uregex_end(p->uregex, 0, &status);
             if (U_FAILURE(status)) {
                 icu_error_set(error, FATAL, status, "uregex_end");
-                return ENGINE_FAILURE;
+                return FALSE;
             }
         }
-        if (!uregex_fwd_n(p->uregex, p->ubrk, i->upper_limit - i->lower_limit, error)) {
+        if (!uregex_fwd_n(p->uregex, p->ubrk, subject, array, i->upper_limit - i->lower_limit, &l, error)) {
             break;
         }
-        u = uregex_start(p->uregex, 0, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "uregex_start");
-            return ENGINE_FAILURE;
-        }
-        add_match(array, subject, l, u);
-        ++pieces;
         lastU = i->upper_limit;
-        l = u;
     }
     ubrk_unbindText(p->ubrk);
     if (NULL != *error) {
-        return ENGINE_FAILURE;
-    }
-    if (0 != l && 0 == u && (size_t) l < subject->len) {
-        add_match(array, subject, l, subject->len);
-        ++pieces;
+        return FALSE;
     }
 
-    return pieces;
+    return TRUE;
 }
 
 static void engine_re_destroy(void *data)
@@ -330,6 +286,5 @@ engine_t re_engine = {
     engine_re_match_all,
     engine_re_whole_line_match,
     engine_re_split,
-    engine_re_split2,
     engine_re_destroy
 };

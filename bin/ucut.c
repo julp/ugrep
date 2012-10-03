@@ -29,8 +29,9 @@ static UBool sFlag = FALSE;
 static const UChar DEFAULT_DELIM[] = { U_HT, 0 };
 
 static UString *ustr = NULL;
-static UString *delim = NULL;
 static UBreakIterator *ubrk = NULL;
+static UString *input_delim = NULL;
+static UString *output_delim = NULL;
 static interval_list_t *intervals = NULL;
 
 static DPtrArray *pieces = NULL;
@@ -58,7 +59,7 @@ static struct option long_options[] =
     {"fields",           required_argument, NULL, 'f'},
     {"version",          no_argument,       NULL, 'v'},
     {"only-delimited",   no_argument,       NULL, 's'},
-    {"output-delimiter", no_argument,       NULL, OUTPUT_DELIMITER_OPT},
+    {"output-delimiter", required_argument, NULL, OUTPUT_DELIMITER_OPT},
     {NULL,               no_argument,       NULL, 0}
 };
 
@@ -145,9 +146,8 @@ static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *
 
 static int procfile(reader_t *reader, const char *filename)
 {
-    int32_t j, count;
     error_t *error;
-    dlist_element_t *el;
+    int32_t j, count;
 
     error = NULL;
     if (reader_open(reader, &error, filename)) {
@@ -158,50 +158,27 @@ static int procfile(reader_t *reader, const char *filename)
             ustring_chomp(ustr);
             dptrarray_clear(pieces);
             if (fFlag) {
-#if 0
-                count = pdata.engine->split(&error, pdata.pattern, ustr, pieces);
-#else
-                count = pdata.engine->split2(&error, pdata.pattern, ustr, pieces, intervals);
-#endif
+                if (!pdata.engine->split(&error, pdata.pattern, ustr, pieces, intervals)) {
+                    print_error(error);
+                    return 1;
+                }
+                count = dptrarray_length(pieces);
             } else if (cFlag) {
                 count = split_on_indices(&error, ubrk, ustr, pieces, intervals);
             } else {
                 assert(FALSE);
             }
-            if (count < 0) {
-                print_error(error);
-            } else if (count > 0) {
-#if 0
-                if (fFlag) {
-                    for (el = intervals->head; NULL != el; el = el->next) {
-                        FETCH_DATA(el->data, i, interval_t);
+            if (count > 0) {
+                for (j = 0; j < count; j++) {
+                    match_t *m;
 
-                        for (j = i->lower_limit; j < MIN(count, i->upper_limit); j++) {
-                            match_t *m;
-
-                            m = dptrarray_at(pieces, j);
-                            u_file_write(m->ptr, m->len, ustdout);
-                            //u_file_write(delim->ptr, delim->len, ustdout); // TODO: already freed by RE engine ; can we make it dynamic (capture)?
-                            //u_fprintf(ustdout, "%d: %.*S (%d)\n", j + 1, m->len, m->ptr, m->len);
-                        }
+                    m = dptrarray_at(pieces, j);
+                    if (NULL != output_delim && 0 != j) {
+                        u_file_write(output_delim->ptr, output_delim->len, ustdout);
                     }
-                } else if (cFlag) {
-#else
-//                 if (fFlag || cFlag) {
-#endif
-// debug("count = %d", count);
-                    for (j = 0; j < count; j++) {
-                        match_t *m;
-
-                        m = dptrarray_at(pieces, j);
 // debug(">%.*S< (%d) >%S<", m->len, m->ptr, m->len, m->ptr);
-                        u_file_write(m->ptr, m->len, ustdout);
-                    }
-#if 0
-                } else {
-                    assert(FALSE);
+                    u_file_write(m->ptr, m->len, ustdout);
                 }
-#endif
                 u_file_write(EOL, EOL_LEN, ustdout);
             } else if (!sFlag && fFlag) {
                 u_file_write(ustr->ptr, ustr->len, ustdout);
@@ -224,15 +201,15 @@ int main(int argc, char **argv)
     error_t *error;
     reader_t *reader;
     UBool complement;
-    const char *intervals_arg, *delim_arg;
+    const char *intervals_arg, *input_delim_arg, *output_delim_arg;
 
     ret = 0;
     error = NULL;
     complement = FALSE;
     intervals = interval_list_new();
-    intervals_arg = delim_arg = NULL;
     env_init(UCUT_EXIT_FAILURE);
     reader = reader_new(DEFAULT_READER_NAME);
+    intervals_arg = input_delim_arg = output_delim_arg = NULL;
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
@@ -250,7 +227,7 @@ int main(int argc, char **argv)
                 intervals_arg = optarg;
                 break;
             case 'd':
-                delim_arg = optarg;
+                input_delim_arg = optarg;
                 break;
             case 'f':
                 fFlag = TRUE;
@@ -265,6 +242,9 @@ int main(int argc, char **argv)
             case COMPLEMENT_OPT:
                 complement = TRUE;
                 break;
+            case OUTPUT_DELIMITER_OPT:
+                output_delim_arg = optarg;
+                break;
             default:
                 if (!util_opt_parse(c, optarg, reader)) {
                     usage();
@@ -277,7 +257,7 @@ int main(int argc, char **argv)
 
     env_apply();
 
-    if (cFlag && (fFlag || NULL != delim_arg)) {
+    if (cFlag && (fFlag || NULL != input_delim_arg)) {
         usage();
     }
     if (!cFlag && !fFlag) {
@@ -299,31 +279,43 @@ int main(int argc, char **argv)
     }
     if (complement) {
         interval_list_complement(intervals, 0, INT32_MAX);
-#if 1
         if (interval_list_empty(intervals)) {
             fprintf(stderr, "non empty list of fields, characters or bytes expected\n");
+            return UCUT_EXIT_USAGE;
         }
-#endif
     }
 #if defined(DEBUG) && 0
     interval_list_debug(intervals);
 #endif
     env_register_resource(intervals, (func_dtor_t) interval_list_destroy);
     if (fFlag) {
-        if (NULL == delim_arg) {
-            delim = ustring_dup_string_len(DEFAULT_DELIM, STR_LEN(DEFAULT_DELIM));
+        if (NULL == input_delim_arg) {
+            input_delim = ustring_dup_string_len(DEFAULT_DELIM, STR_LEN(DEFAULT_DELIM));
         } else {
-            if (NULL == (delim = ustring_convert_argv_from_local(delim_arg, &error, TRUE))) {
+            if (NULL == (input_delim = ustring_convert_argv_from_local(input_delim_arg, &error, TRUE))) {
                 print_error(error);
             }
         }
-        //env_register_resource(delim, (func_dtor_t) ustring_destroy); // done by the engine?
-        if (NULL == (pdata.pattern = pdata.engine->compile(&error, delim, 0))) {
+        //env_register_resource(input_delim, (func_dtor_t) ustring_destroy); // done by the engine?
+        if (NULL == (pdata.pattern = pdata.engine->compile(&error, input_delim, 0))) {
             print_error(error);
         } else {
             env_register_resource(pdata.pattern, pdata.engine->destroy);
         }
+        if (NULL == output_delim_arg && pdata.engine != &re_engine) {
+            output_delim = input_delim; /* do not register output_delim */
+        }
     }
+    if (NULL != output_delim_arg) {
+        if (NULL == (output_delim = ustring_convert_argv_from_local(output_delim_arg, &error, TRUE))) {
+            print_error(error);
+        }
+        env_register_resource(output_delim, (func_dtor_t) ustring_destroy);
+    }
+    /*if (pdata.engine == &re_engine && NULL == output_delim_arg) {
+        fprintf(stderr, "Using regular expression implies an output-delimiter\n");
+        return UCUT_EXIT_USAGE;
+    }*/
     ustr = ustring_new();
     env_register_resource(ustr, (func_dtor_t) ustring_destroy);
     pieces = dptrarray_new(SIZE_TO_DUP_T(sizeof(match_t)), free);

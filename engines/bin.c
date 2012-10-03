@@ -2,6 +2,9 @@
 
 #include <unicode/ubrk.h>
 
+// defined in engines/fixed.c
+UBool binary_fwd_n(UBreakIterator *, const UString *, const UString *, DPtrArray *, size_t, int32_t *);
+
 typedef struct {
     uint32_t flags;
     UString *tmp; /* a temporary buffer for full case folding */
@@ -37,12 +40,12 @@ static void bin_pattern_destroy(bin_pattern_t *p)
  * Eg: if we search "Straße" in "123Straße456" match will be on "Straße4"
  * Because Straße is expanded to strasse, so the length has changed (ß < ss => + 1)
  **/
-# define CASE_FOLD_FORBIDDEN(/*error_t ***/ error, /*bin_pattern_t **/p)                         \
-    do {                                                                                         \
-        if (NULL != p->tmp) {                                                                    \
-            error_set(error, FATAL, "Due to full case folding, results (offsets) may be wrong"); \
-            return ENGINE_FAILURE;                                                               \
-        }                                                                                        \
+# define CASE_FOLD_FORBIDDEN(/*error_t ***/ error, /*bin_pattern_t **/p, return_value_if_forbidden) \
+    do {                                                                                            \
+        if (NULL != p->tmp) {                                                                       \
+            error_set(error, FATAL, "Due to full case folding, results (offsets) may be wrong");    \
+            return return_value_if_forbidden;                                                       \
+        }                                                                                           \
     } while (0);
 
 static void *engine_bin_compile(error_t **error, UString *ustr, uint32_t flags)
@@ -160,7 +163,7 @@ static engine_return_t engine_bin_match_all(error_t **error, void *data, const U
 
     matches = 0;
     status = U_ZERO_ERROR;
-    CASE_FOLD_FORBIDDEN(error, p);
+    CASE_FOLD_FORBIDDEN(error, p, ENGINE_FAILURE);
     if (ustring_empty(p->pattern)) {
         if (IS_WORD_BOUNDED(p->flags)) {
             if (ustring_empty(subject)) {
@@ -231,134 +234,42 @@ static engine_return_t engine_bin_whole_line_match(error_t **UNUSED(error), void
     }
 }
 
-static int32_t engine_bin_split(error_t **error, void *data, const UString *subject, DPtrArray *array)
+/**
+ * Don't modify this function, it reproduces a part of fixed engine (engine_fixed_split)
+ **/
+static UBool engine_bin_split(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
 {
-    UChar *m;
     UErrorCode status;
-    int32_t l, u, pieces;
+    int32_t l, lastU;
+    dlist_element_t *el;
     FETCH_DATA(data, p, bin_pattern_t);
 
-    l = u = pieces = 0;
+    lastU = l = 0;
     status = U_ZERO_ERROR;
-    CASE_FOLD_FORBIDDEN(error, p);
+
+    CASE_FOLD_FORBIDDEN(error, p, FALSE); /* the only engine specific thing */
+
     ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ubrk_setText");
-        return ENGINE_FAILURE;
-    }
-    while (NULL != (m = u_strFindFirst(subject->ptr + u, subject->len - u, p->pattern->ptr, p->pattern->len))) {
-        u = m - subject->ptr;
-        if (ubrk_isBoundary(p->ubrk, u) && ubrk_isBoundary(p->ubrk, u + p->pattern->len)) {
-            ++pieces;
-            add_match(array, subject, l, u);
-        }
-        l = u = u + p->pattern->len;
-    }
-    ubrk_unbindText(p->ubrk);
-    if (!pieces) {
-//         add_match(array, subject, 0, subject->len);
-//         ++pieces;
-    } else if ((size_t) u < subject->len) {
-        add_match(array, subject, u, subject->len);
-        ++pieces;
-    }
-
-    return pieces;
-}
-
-// TODO: duplicated with engines/fixed.c (move to misc/util.c)?
-static UBool binary_fwd_n(UBreakIterator *ubrk, const UString *pattern, const UString *subject, size_t n, int32_t *r)
-{
-    UChar *m;
-    int32_t pos;
-
-    pos = *r;
-    *r = USEARCH_DONE;
-    while (n > 0 && NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, pattern->ptr, pattern->len))) {
-        pos = m - subject->ptr;
-        if (ubrk_isBoundary(ubrk, pos) && ubrk_isBoundary(ubrk, pos + pattern->len)) {
-            --n;
-        }
-        pos += pattern->len;
-    }
-    if (0 == n) {
-        *r = pos;
-        return TRUE;
-    } else {
-        *r = USEARCH_DONE;
         return FALSE;
     }
-}
-
-/**
- * Note: body of engine_bin_split2 is out of sync with fixed engine.
- * Don't modify this function!
- **/
-static int32_t engine_bin_split2(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
-{
-#if 0
-        UChar *m;
-#endif
-    UErrorCode status;
-    dlist_element_t *el;
-    int32_t l, u, lastU, pieces;
-    FETCH_DATA(data, p, bin_pattern_t);
-
-    lastU = pieces = l = u = 0;
-    status = U_ZERO_ERROR;
-
-    CASE_FOLD_FORBIDDEN(error, p);
-    ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ubrk_setText");
-        return ENGINE_FAILURE;
-    }
-#if 0
-    while (NULL != (m = u_strFindFirst(subject->ptr + u, subject->len - u, p->pattern->ptr, p->pattern->len))) {
-        u = m - subject->ptr;
-        if (ubrk_isBoundary(p->ubrk, u) && ubrk_isBoundary(p->ubrk, u + p->pattern->len)) {
-            ++pieces;
-            add_match(array, subject, l, u);
-        }
-        l = u = u + p->pattern->len;
-    }
-#else
-    for (el = intervals->head; NULL != el && USEARCH_DONE != u; el = el->next) {
+    for (el = intervals->head; NULL != el; el = el->next) {
         FETCH_DATA(el->data, i, interval_t);
 
-//             if (i->lower_limit > 0) {
-            if (!binary_fwd_n(p->ubrk, p->pattern, subject, i->lower_limit - lastU, &l)) {
-debug("break");
+        if (i->lower_limit > 0) {
+            if (!binary_fwd_n(p->ubrk, p->pattern, subject, NULL, i->lower_limit - lastU, &l)) {
                 break;
             }
-//             }
-        if (!binary_fwd_n(p->ubrk, p->pattern, subject, i->upper_limit - i->lower_limit, &u)) {
+        }
+        if (!binary_fwd_n(p->ubrk, p->pattern, subject, array, i->upper_limit - i->lower_limit, &l)) {
             break;
         }
-        add_match(array, subject, l, u);
-        ++pieces;
         lastU = i->upper_limit;
-        l = u;
     }
-#endif
     ubrk_unbindText(p->ubrk);
-#if 0
-    if (!pieces) {
-//         add_match(array, subject, 0, subject->len);
-//         ++pieces;
-    } else if ((size_t) u < subject->len) {
-        add_match(array, subject, u, subject->len);
-        ++pieces;
-    }
-#else
-    if (USEARCH_DONE != l && USEARCH_DONE == u && (size_t) l < subject->len) {
-debug("l = %d, u = %d", l, u);
-        add_match(array, subject, l, subject->len);
-        ++pieces;
-    }
-#endif
 
-    return pieces;
+    return TRUE;
 }
 
 static void engine_bin_destroy(void *data)
@@ -368,12 +279,11 @@ static void engine_bin_destroy(void *data)
     bin_pattern_destroy(p);
 }
 
-engine_t fixed_engine = {
+engine_t bin_engine = {
     engine_bin_compile,
     engine_bin_match,
     engine_bin_match_all,
     engine_bin_whole_line_match,
     engine_bin_split,
-    engine_bin_split2,
     engine_bin_destroy
 };
