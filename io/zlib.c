@@ -82,7 +82,7 @@ static void zlib_close(void *fp)
 static UBool zlib_eof(void *fp)
 {
 #ifdef DEBUG_READS
-    debug("eof = %d", gzeof((gzFile) fp));
+    debug("eof = %d", DRNS(gzeof)((gzFile) fp));
 #endif /* DEBUG_READS */
     return DRNS(gzeof)((gzFile) fp);
 }
