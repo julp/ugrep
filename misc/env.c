@@ -227,7 +227,7 @@ void env_init(const char *argv0)
         char rbpath[MAXPATHLEN];
 
         status = U_ZERO_ERROR;
-        if (-1 == path_join(rbpath, STR_SIZE(rbpath), UGREP_RESOURCE_BUNDLE_DIR, "ugrep")) {
+        if (-1 == path_join(rbpath, STR_SIZE(rbpath), UGREP_RESOURCE_BUNDLE_DIR, "ugrep", NULL)) {
             assert(FALSE); /* TODO */
         }
         ures = ures_open(rbpath, NULL, &status);
