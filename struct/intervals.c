@@ -341,11 +341,22 @@ UBool interval_list_is_bounded(interval_list_t *intervals) /* NONNULL() */
 
 int32_t interval_list_length(interval_list_t *intervals) /* NONNULL() */
 {
+    int32_t length;
+    dlist_element_t *el;
+
     require_else_return_val(NULL != intervals, -1);
 
-    /* TODO */
+    if (interval_list_is_bounded(intervals)) {
+        for (el = intervals->head, length = 0; NULL != el; el = el->next) {
+            FETCH_DATA(el->data, i, interval_t);
 
-    return -1;
+            length += i->upper_limit - i->lower_limit;
+        }
+    } else {
+        length = -1;
+    }
+
+    return length;
 }
 
 #ifdef DEBUG
