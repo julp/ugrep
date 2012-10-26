@@ -173,6 +173,10 @@ void env_apply(void)
 static int32_t path_join(char *, size_t, ...);
 static char *binary_path(const char *, char *, size_t);
 
+#ifndef COMMON_RESOURCE
+void U_IMPORT *ugrep_dat;
+#endif /* !COMMON_RESOURCE */
+
 void env_init(const char *argv0)
 {
     const char *tmp;
@@ -227,13 +231,21 @@ void env_init(const char *argv0)
         char rbpath[MAXPATHLEN];
 
         status = U_ZERO_ERROR;
-        if (-1 == path_join(rbpath, STR_SIZE(rbpath), UGREP_RESOURCE_BUNDLE_DIR, "ugrep", NULL)) {
+#ifdef COMMON_RESOURCE
+        if (-1 == path_join(rbpath, STR_SIZE(rbpath), UGREP_RESOURCE_BUNDLE_DIR/*, "ugrep"*/, NULL)) {
             assert(FALSE); /* TODO */
         }
+# if 0
         ures = ures_open(rbpath, NULL, &status);
+# else
+        u_setDataDirectory(rbpath);
+        ures = ures_open("ugrep", NULL, &status);
+# endif /* 0 */
 stdio_debug("loading rbpath failed: %s", rbpath); /* TODO */
 stdio_debug("translation disabled: %s", u_errorName(status)); /* TODO */
-        if (U_FAILURE(status)) { /* try with a relative path from executable directory */
+        if (U_FAILURE(status))
+#endif /* COMMON_RESOURCE */
+        { /* try with a relative path from executable directory */
             *rbpath = '\0';
             status = U_ZERO_ERROR;
 # ifdef _MSC_VER
@@ -252,8 +264,20 @@ stdio_debug("translation disabled: %s", u_errorName(status)); /* TODO */
                 *rbpath = '\0';
             }
 # endif /* _MSC_VER */
+#if 0
             // TODO: append (/)../share/ugrep.dat to rbpath ?
             ures = ures_open(rbpath, NULL, &status);
+#else
+# ifdef COMMON_RESOURCE
+            u_setDataDirectory(rbpath);
+# else
+            udata_setAppData("ugrep", &ugrep_dat, &status);
+            if (U_FAILURE(status)) {
+                debug("udata_setAppData failed: %s\n", u_errorName(status));
+            }
+# endif /* COMMON_RESOURCE */
+            ures = ures_open("ugrep", NULL, &status);
+#endif /* 0 */
 stdio_debug("%s", rbpath);
         }
         if (U_FAILURE(status)) {

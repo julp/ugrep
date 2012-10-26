@@ -12,6 +12,7 @@ endif(MSVC)
 mark_as_advanced(CMAKE_C_FLAGS_MAINTAINER)
 set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES} Maintainer")
 
+set(COMMON_RESOURCE FALSE)
 set(UGREP_VERSION_MAJOR 0)
 set(UGREP_VERSION_MINOR 5)
 
@@ -64,7 +65,7 @@ if(MSVC)
     include_directories(${CMAKE_SOURCE_DIR}/win32/)
 endif(MSVC)
 
-set(UGREP_RESOURCE_BUNDLE_DIR "${CMAKE_INSTALL_PREFIX}/share/ugrep")
+set(UGREP_RESOURCE_BUNDLE_DIR "${CMAKE_INSTALL_PREFIX}/share/ugrep/") # trailing / needed
 
 configure_file(
     "config.h.in"
@@ -95,6 +96,10 @@ macro(declare_ugrep_binary _KEY)
     set("UgrepBinaries_${_KEY}" ${ARGN})
 endmacro(declare_ugrep_binary)
 
+if(COMMON_RESOURCE)
+    add_definitions(-DCOMMON_RESOURCE=1)
+endif(COMMON_RESOURCE)
+
 declare_ugrep_binary(ugrep bin/ugrep.c struct/fixed_circular_list.c ${COMMON_BASE_SOURCES} ${ENGINES_SOURCES})
 declare_ugrep_binary(ucat bin/ucat.c ${COMMON_BASE_SOURCES})
 declare_ugrep_binary(utr bin/utr.c struct/hashtable.c ${COMMON_BASE_SOURCES})
@@ -114,7 +119,21 @@ foreach (UgrepBinary ${UgrepBinaries})
     install(TARGETS ${UgrepBinary} DESTINATION bin)
 endforeach(UgrepBinary)
 
-generate_icu_resource_bundle(PACKAGE ugrep DESTINATION ${UGREP_RESOURCE_BUNDLE_DIR} rb/root.txt rb/fr.txt)
+if(COMMON_RESOURCE)
+    generate_icu_resource_bundle(
+        PACKAGE ugrep
+        DESTINATION ${UGREP_RESOURCE_BUNDLE_DIR}
+        FILES rb/root.txt rb/fr.txt
+    )
+else(COMMON_RESOURCE)
+    generate_icu_resource_bundle(
+        TYPE static
+        PACKAGE ugrep
+        DEPENDS "${UgrepBinaries}"
+        #DESTINATION ${UGREP_RESOURCE_BUNDLE_DIR}
+        FILES rb/root.txt rb/fr.txt
+    )
+endif(COMMON_RESOURCE)
 
 #install(CODE "EXEC_PROGRAM(${CMAKE_COMMAND} ARGS -E create_symlink \"${CMAKE_INSTALL_PREFIX}/bin/ugrep\" \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
 #list(APPEND CMAKE_INSTALL_MANIFEST_FILES \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
