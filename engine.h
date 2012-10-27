@@ -5,7 +5,7 @@
 # include "common.h"
 # include "struct/slist.h"
 # include "struct/intervals.h"
-# include "struct/dptrarray.h"
+# include "struct/darray.h"
 
 # define OPT_CASE_INSENSITIVE 0x00010000
 # define OPT_WORD_BOUND       0x00020000
@@ -29,14 +29,14 @@ typedef struct {
     size_t len;
 } match_t;
 
-static inline void add_match(DPtrArray *array, const UString *subject, int32_t l, int32_t u)
+static inline void add_match(DArray *array, const UString *subject, int32_t l, int32_t u)
 {
     match_t m;
 
     m.ptr = subject->ptr + l;
     m.len = u - l;
 debug("add_match [%d;%d[ for >%S< (>%.*S< ; %d)", l, u, subject->ptr, m.len, m.ptr, m.len);
-    dptrarray_push(array, &m);
+    darray_push(array, m);
 }
 
 typedef struct {
@@ -44,7 +44,7 @@ typedef struct {
     engine_return_t (*match)(error_t **, void *, const UString *);
     engine_return_t (*match_all)(error_t **, void *, const UString *, interval_list_t *);
     engine_return_t (*whole_line_match)(error_t **, void *, const UString *);
-    UBool (*split)(error_t **, void *, const UString *, DPtrArray *, interval_list_t *);
+    UBool (*split)(error_t **, void *, const UString *, DArray *, interval_list_t *);
     void (*destroy)(void *);
 } engine_t;
 

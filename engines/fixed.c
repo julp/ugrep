@@ -278,7 +278,7 @@ static engine_return_t engine_fixed_whole_line_match(error_t **error, void *data
 static UBool usearch_fwd_n(
     UStringSearch *usearch,
     const UString *subject,
-    DPtrArray *array, /* NULL to skip n matches */
+    DArray *array, /* NULL to skip n matches */
     int32_t n,
     int32_t *l,
     UErrorCode *status
@@ -306,7 +306,7 @@ UBool binary_fwd_n(
     UBreakIterator *ubrk,
     const UString *pattern,
     const UString *subject,
-    DPtrArray *array, /* NULL to skip n matches */
+    DArray *array, /* NULL to skip n matches */
     int32_t n,
     int32_t *r
 ) {
@@ -340,7 +340,7 @@ UBool binary_fwd_n(
     }
 }
 
-static UBool engine_fixed_split(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
+static UBool engine_fixed_split(error_t **error, void *data, const UString *subject, DArray *array, interval_list_t *intervals)
 {
     UErrorCode status;
     int32_t l, lastU;

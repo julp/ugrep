@@ -185,7 +185,7 @@ static UBool uregex_fwd_n(
     URegularExpression *uregex,
     UBreakIterator *ubrk,
     const UString *subject,
-    DPtrArray *array, /* NULL to skip n matches */
+    DArray *array, /* NULL to skip n matches */
     int32_t n,
     int32_t *last,
     error_t **error
@@ -228,7 +228,7 @@ static UBool uregex_fwd_n(
     }
 }
 
-static UBool engine_re_split(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
+static UBool engine_re_split(error_t **error, void *data, const UString *subject, DArray *array, interval_list_t *intervals)
 {
     UErrorCode status;
     dlist_element_t *el;

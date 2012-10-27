@@ -34,7 +34,7 @@ static UString *input_delim = NULL;
 static UString *output_delim = NULL;
 static interval_list_t *intervals = NULL;
 
-static DPtrArray *pieces = NULL;
+static DArray *pieces = NULL;
 static pattern_data_t pdata = { NULL, &fixed_engine };
 
 /* ========== getopt stuff ========== */
@@ -84,7 +84,7 @@ static UBool ubrk_fwd_n(UBreakIterator *ubrk, size_t n, int32_t *r)
     return (0 == n);
 }
 
-static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *ustr, DPtrArray *array, interval_list_t *intervals)
+static int32_t split_on_indices(error_t **error, UBreakIterator *ubrk, UString *ustr, DArray *array, interval_list_t *intervals)
 {
     dlist_element_t *el;
     int32_t pieces, l, u, lastU;
@@ -156,13 +156,13 @@ static int procfile(reader_t *reader, const char *filename)
                 print_error(error);
             }
             ustring_chomp(ustr);
-            dptrarray_clear(pieces);
+            darray_clear(pieces);
             if (fFlag) {
                 if (!pdata.engine->split(&error, pdata.pattern, ustr, pieces, intervals)) {
                     print_error(error);
                     return 1;
                 }
-                count = dptrarray_length(pieces);
+                count = darray_length(pieces);
             } else if (cFlag) {
                 count = split_on_indices(&error, ubrk, ustr, pieces, intervals);
             } else {
@@ -170,14 +170,14 @@ static int procfile(reader_t *reader, const char *filename)
             }
             if (count > 0) {
                 for (j = 0; j < count; j++) {
-                    match_t *m;
+                    match_t m;
 
-                    m = dptrarray_at(pieces, j);
+                    m = darray_at_unsafe(pieces, j, match_t);
                     if (NULL != output_delim && 0 != j) {
                         u_file_write(output_delim->ptr, output_delim->len, ustdout);
                     }
 // debug(">%.*S< (%d) >%S<", m->len, m->ptr, m->len, m->ptr);
-                    u_file_write(m->ptr, m->len, ustdout);
+                    u_file_write(m.ptr, m.len, ustdout);
                 }
                 u_file_write(EOL, EOL_LEN, ustdout);
             } else if (!sFlag && fFlag) {
@@ -322,12 +322,12 @@ int main(int argc, char **argv)
         int32_t len;
 
         if ((len = interval_list_length(intervals)) > 0) {
-            pieces = dptrarray_sized_new((size_t) len, SIZE_TO_DUP_T(sizeof(match_t)), free);
+            pieces = darray_sized_new((size_t) len, sizeof(match_t));
         } else {
-            pieces = dptrarray_new(SIZE_TO_DUP_T(sizeof(match_t)), free);
+            pieces = darray_new(sizeof(match_t));
         }
     }
-    env_register_resource(pieces, (func_dtor_t) dptrarray_destroy);
+    env_register_resource(pieces, (func_dtor_t) darray_destroy);
 
     if (0 == argc) {
         ret |= procfile(reader, "-");

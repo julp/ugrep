@@ -3,7 +3,7 @@
 #include <unicode/ubrk.h>
 
 // defined in engines/fixed.c
-UBool binary_fwd_n(UBreakIterator *, const UString *, const UString *, DPtrArray *, size_t, int32_t *);
+UBool binary_fwd_n(UBreakIterator *, const UString *, const UString *, DArray *, size_t, int32_t *);
 
 typedef struct {
     uint32_t flags;
@@ -237,7 +237,7 @@ static engine_return_t engine_bin_whole_line_match(error_t **UNUSED(error), void
 /**
  * Don't modify this function, it reproduces a part of fixed engine (engine_fixed_split)
  **/
-static UBool engine_bin_split(error_t **error, void *data, const UString *subject, DPtrArray *array, interval_list_t *intervals)
+static UBool engine_bin_split(error_t **error, void *data, const UString *subject, DArray *array, interval_list_t *intervals)
 {
     UErrorCode status;
     int32_t l, lastU;
