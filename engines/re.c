@@ -48,16 +48,17 @@ static void *engine_re_compile(error_t **error, UString *ustr, uint32_t flags)
         }
     }
     p->uregex = uregex_open(ustr->ptr, ustr->len, IS_CASE_INSENSITIVE(flags) ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
-    ustring_destroy(ustr); // ICU dups the pattern, so we can free it
     if (U_FAILURE(status)) {
         if (-1 != pe.line) {
             error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%S\n\t%*c\n", pe.offset, ustr->ptr, pe.offset, '^');
         } else {
             icu_error_set(error, FATAL, status, "uregex_open");
         }
+        ustring_destroy(ustr); // ICU dups the pattern, so we can free it
         re_pattern_destroy(p);
         return NULL;
     }
+    ustring_destroy(ustr); // ICU dups the pattern, so we can free it
 //     if (IS_WORD_BOUNDED(flags)) {
 //         p->ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
 //     } else {
