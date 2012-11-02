@@ -37,7 +37,7 @@ UBool darray_remove_at(DArray *, uint);
 void darray_remove_range(DArray *, uint, uint);
 void darray_set_size(DArray *, size_t);
 UBool darray_shift(DArray *, void *);
-DArray *darray_sized_new(size_t, size_t);
+DArray *darray_sized_new(int32_t, size_t);
 void darray_swap(DArray *, uint, uint);
 
 #endif /* !DARRAY_H */

@@ -25,17 +25,21 @@ static void darray_maybe_resize_of(DArray *da, size_t additional_length)
     darray_maybe_resize_to(da, da->length + additional_length);
 }
 
-DArray *darray_sized_new(size_t length, size_t element_size)
+DArray *darray_sized_new(int32_t length, size_t element_size)
 {
     DArray *da;
 
     da = mem_new(*da);
     da->data = NULL;
     da->element_size = element_size;
-    da->length = da->allocated = 0;
-    darray_maybe_resize_to(da, length);
-
-    da->length = 0;
+    if (length > 0) {
+        da->length = da->allocated = 0;
+        darray_maybe_resize_to(da, (size_t) length);
+    } else {
+        da->length = 0;
+        da->allocated = DARRAY_MIN_LENGTH;
+        da->data = malloc(da->element_size * da->allocated);
+    }
 
     return da;
 }

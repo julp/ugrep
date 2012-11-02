@@ -318,15 +318,7 @@ int main(int argc, char **argv)
     }*/
     ustr = ustring_new();
     env_register_resource(ustr, (func_dtor_t) ustring_destroy);
-    {
-        int32_t len;
-
-        if ((len = interval_list_length(intervals)) > 0) {
-            pieces = darray_sized_new((size_t) len, sizeof(match_t));
-        } else {
-            pieces = darray_new(sizeof(match_t));
-        }
-    }
+    pieces = darray_sized_new(interval_list_length(intervals), sizeof(match_t));
     env_register_resource(pieces, (func_dtor_t) darray_destroy);
 
     if (0 == argc) {
