@@ -17,6 +17,8 @@
 # define IS_WHOLE_LINE(flags)       ((flags & OPT_WHOLE_LINE_MATCH))
 # define IS_WORD_BOUNDED(flags)     ((flags & OPT_WORD_BOUND))
 
+# define WITH_GRAPHEME()            (UNIT_CODEPOINT != env_get_unit())
+
 typedef enum {
     ENGINE_FAILURE     = -1,
     ENGINE_NO_MATCH    =  0,

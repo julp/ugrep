@@ -35,8 +35,12 @@ assertOutputValueEx "-A 4 -B 6 (with -v)" "LC_ALL=C ./ugrep ${UGREP_OPTS} -v ${A
 
 ARGS='élève'
 assertOutputCommand "count matching lines (-c)" "./ugrep ${UGREP_OPTS} -c ${ARGS} ${UFILE} 2>/dev/null" "grep -c ${ARGS} ${FILE}" "-eq"
-ARGS='élève'
 assertOutputCommand "count non-matching lines (-vc)" "./ugrep ${UGREP_OPTS} -vc ${ARGS} ${UFILE} 2>/dev/null" "grep -vc ${ARGS} ${FILE}" "-eq"
+
+ARGS='-c e'
+INPUT="echo -e \"${E_ACUTE_NFD}\nl\n${E_GRAVE_NFD}\nv\ne\""
+assertOutputValue "grapheme consistent (-Ec)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme -E ${ARGS} 2>/dev/null" 1 "-eq"
+assertOutputValue "grapheme inconsistent (-Ec)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=codepoint -E ${ARGS} 2>/dev/null" 3 "-eq"
 
 # ./ugrep ${UGREP_OPTS} -q élève test/utf8_eleve.txt 2>/dev/null
 # assertTrue "[[ $? -eq 0 ]]"

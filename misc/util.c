@@ -357,10 +357,11 @@ void ubrk_unbindText(UBreakIterator *ubrk)
 {
     UErrorCode status;
 
-    assert(NULL != ubrk);
-    status = U_ZERO_ERROR;
-    ubrk_setText(ubrk, NULL, 0, &status);
-    assert(U_SUCCESS(status));
+    if (NULL != ubrk) {
+        status = U_ZERO_ERROR;
+        ubrk_setText(ubrk, NULL, 0, &status);
+        assert(U_SUCCESS(status));
+    }
 }
 
 static const UChar _UREGEXP_FAKE_USTR[] = { 0 };

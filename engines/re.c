@@ -3,9 +3,6 @@
 #include <unicode/ubrk.h>
 #include <unicode/uregex.h>
 
-static const UChar _UREGEXP_FAKE_USTR[] = { 0 };
-#define UREGEXP_FAKE_USTR _UREGEXP_FAKE_USTR, 0
-
 typedef struct {
     UBreakIterator *ubrk;
     URegularExpression *uregex;
@@ -59,11 +56,18 @@ static void *engine_re_compile(error_t **error, UString *ustr, uint32_t flags)
         return NULL;
     }
     ustring_destroy(ustr); // ICU dups the pattern, so we can free it
-//     if (IS_WORD_BOUNDED(flags)) {
-//         p->ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
-//     } else {
+#if 0
+    /* word or line boundaries implies grapheme consistency? */
+    if (IS_WORD_BOUNDED(flags)) {
+        p->ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
+    } else {
         p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
-//     }
+    }
+#else
+    if (!IS_WHOLE_LINE(flags) && !IS_WORD_BOUNDED(flags) && WITH_GRAPHEME()) {
+        p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
+    }
+#endif
     if (U_FAILURE(status)) {
         icu_error_set(error, FATAL, status, "ubrk_open");
         re_pattern_destroy(p);
@@ -102,12 +106,14 @@ static engine_return_t engine_re_match(error_t **error, void *data, const UStrin
             icu_error_set(error, FATAL, status, "uregex_start");
             return ENGINE_FAILURE;
         }
-        ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "ubrk_setText");
-            return ENGINE_FAILURE;
+        if (NULL != p->ubrk) { /* <=> !IS_WHOLE_LINE(flags) && !IS_WORD_BOUNDED(flags) && WITH_GRAPHEME() */
+            ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+            if (U_FAILURE(status)) {
+                icu_error_set(error, FATAL, status, "ubrk_setText");
+                return ENGINE_FAILURE;
+            }
+            ret = ubrk_isBoundary(p->ubrk, l) && ubrk_isBoundary(p->ubrk, u);
         }
-        ret = ubrk_isBoundary(p->ubrk, l) && ubrk_isBoundary(p->ubrk, u);
     }
     re_pattern_reset(p);
 
@@ -128,10 +134,12 @@ static engine_return_t engine_re_match_all(error_t **error, void *data, const US
         icu_error_set(error, FATAL, status, "uregex_setText");
         return ENGINE_FAILURE;
     }
-    ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ubrk_setText");
-        return ENGINE_FAILURE;
+    if (NULL != p->ubrk) { /* <=> !IS_WHOLE_LINE(flags) && !IS_WORD_BOUNDED(flags) && WITH_GRAPHEME() */
+        ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+        if (U_FAILURE(status)) {
+            icu_error_set(error, FATAL, status, "ubrk_setText");
+            return ENGINE_FAILURE;
+        }
     }
     while (uregex_findNext(p->uregex, &status)) {
         l = uregex_start(p->uregex, 0, &status);
@@ -144,7 +152,14 @@ static engine_return_t engine_re_match_all(error_t **error, void *data, const US
             icu_error_set(error, FATAL, status, "uregex_end");
             return ENGINE_FAILURE;
         }
-        if (ubrk_isBoundary(p->ubrk, l) && ubrk_isBoundary(p->ubrk, u)) {
+        if (NULL != p->ubrk) { /* <=> !IS_WHOLE_LINE(flags) && !IS_WORD_BOUNDED(flags) && WITH_GRAPHEME() */
+            if (ubrk_isBoundary(p->ubrk, l) && ubrk_isBoundary(p->ubrk, u)) {
+                matches++;
+                if (interval_list_add(intervals, subject->len, l, u)) {
+                    return ENGINE_WHOLE_LINE_MATCH;
+                }
+            }
+        } else {
             matches++;
             if (interval_list_add(intervals, subject->len, l, u)) {
                 return ENGINE_WHOLE_LINE_MATCH;
@@ -206,7 +221,15 @@ static UBool uregex_fwd_n(
             icu_error_set(error, FATAL, status, "uregex_end");
             return FALSE;
         }
-        if (ubrk_isBoundary(ubrk, l) && ubrk_isBoundary(ubrk, u)) {
+        if (NULL != ubrk) { /* <=> !IS_WHOLE_LINE(flags) && !IS_WORD_BOUNDED(flags) && WITH_GRAPHEME() */
+            if (ubrk_isBoundary(ubrk, l) && ubrk_isBoundary(ubrk, u)) {
+                --n;
+                if (NULL != array) {
+                    add_match(array, subject, *last, l);
+                }
+                *last = u;
+            }
+        } else {
             --n;
             if (NULL != array) {
                 add_match(array, subject, *last, l);
@@ -243,10 +266,12 @@ static UBool engine_re_split(error_t **error, void *data, const UString *subject
         icu_error_set(error, FATAL, status, "uregex_setText");
         return FALSE;
     }
-    ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
-    if (U_FAILURE(status)) {
-        icu_error_set(error, FATAL, status, "ubrk_setText");
-        return FALSE;
+    if (NULL != p->ubrk) { /* <=> !IS_WHOLE_LINE(flags) && !IS_WORD_BOUNDED(flags) && WITH_GRAPHEME() */
+        ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+        if (U_FAILURE(status)) {
+            icu_error_set(error, FATAL, status, "ubrk_setText");
+            return FALSE;
+        }
     }
     for (el = intervals->head; NULL != el; el = el->next) {
         FETCH_DATA(el->data, i, interval_t);
