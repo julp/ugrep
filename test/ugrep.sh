@@ -44,6 +44,14 @@ assertOutputValue "grapheme inconsistent (-c)" "${INPUT} | ./ugrep ${UGREP_OPTS}
 assertOutputValue "grapheme consistent (-Ec)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme -E ${ARGS} 2>/dev/null" 1 "-eq"
 assertOutputValue "grapheme inconsistent (-Ec)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=codepoint -E ${ARGS} 2>/dev/null" 3 "-eq"
 
+declare -r SDBDA_NFC=$'\xE1\xB9\xA9'
+declare -r SDBDA_NFD=$'\x73\xCC\xA3\xCC\x87'
+declare -r SDBDA_NONE=$'\x73\xCC\x87\xCC\xA3'
+
+INPUT="echo -e \"${SDBDA_NONE}\n${SDBDA_NFC}\n${SDBDA_NFD}\n\""
+assertOutputValue "NFC" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme --form=c -c '${SDBDA_NFD}' 2>/dev/null" 3 "-eq"
+assertOutputValue "NFD" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme --form=d -c '${SDBDA_NFC}' 2>/dev/null" 3 "-eq"
+
 # ./ugrep ${UGREP_OPTS} -q élève test/utf8_eleve.txt 2>/dev/null
 # assertTrue "[[ $? -eq 0 ]]"
 # ./ugrep ${UGREP_OPTS} -q zzz test/utf8_eleve.txt 2>/dev/null
