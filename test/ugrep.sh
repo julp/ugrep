@@ -39,6 +39,8 @@ assertOutputCommand "count non-matching lines (-vc)" "./ugrep ${UGREP_OPTS} -vc 
 
 ARGS='-c e'
 INPUT="echo -e \"${E_ACUTE_NFD}\nl\n${E_GRAVE_NFD}\nv\ne\""
+assertOutputValue "grapheme consistent (-c)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme ${ARGS} 2>/dev/null" 1 "-eq"
+assertOutputValue "grapheme inconsistent (-c)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=codepoint ${ARGS} 2>/dev/null" 3 "-eq"
 assertOutputValue "grapheme consistent (-Ec)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme -E ${ARGS} 2>/dev/null" 1 "-eq"
 assertOutputValue "grapheme inconsistent (-Ec)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=codepoint -E ${ARGS} 2>/dev/null" 3 "-eq"
 

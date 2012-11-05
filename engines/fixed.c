@@ -46,7 +46,7 @@ static void *engine_fixed_compile(error_t **error, UString *ustr, uint32_t flags
         if (!IS_WHOLE_LINE(flags)) {
             if (IS_WORD_BOUNDED(flags)) {
                 p->ubrk = ubrk_open(UBRK_WORD, NULL, NULL, 0, &status);
-            } else {
+            } else if (WITH_GRAPHEME()) {
                 p->ubrk = ubrk_open(UBRK_CHARACTER, NULL, NULL, 0, &status);
             }
             if (U_FAILURE(status)) {
@@ -136,14 +136,16 @@ static engine_return_t engine_fixed_match(error_t **error, void *data, const USt
 
         pos = 0;
         ret = ENGINE_NO_MATCH;
-        ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "ubrk_setText");
-            return ENGINE_FAILURE;
+        if (NULL != p->ubrk) {
+            ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+            if (U_FAILURE(status)) {
+                icu_error_set(error, FATAL, status, "ubrk_setText");
+                return ENGINE_FAILURE;
+            }
         }
         while (NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, p->pattern->ptr, p->pattern->len))) {
             pos = m - subject->ptr;
-            if (ubrk_isBoundary(p->ubrk, pos) && ubrk_isBoundary(p->ubrk, pos + p->pattern->len)) {
+            if (NULL == p->ubrk || (ubrk_isBoundary(p->ubrk, pos) && ubrk_isBoundary(p->ubrk, pos + p->pattern->len))) {
                 ret = ENGINE_MATCH_FOUND;
             }
             pos += p->pattern->len;
@@ -221,14 +223,16 @@ static engine_return_t engine_fixed_match_all(error_t **error, void *data, const
         int32_t pos;
 
         pos = 0;
-        ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "ubrk_setText");
-            return ENGINE_FAILURE;
+        if (NULL != p->ubrk) {
+            ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+            if (U_FAILURE(status)) {
+                icu_error_set(error, FATAL, status, "ubrk_setText");
+                return ENGINE_FAILURE;
+            }
         }
         while (NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, p->pattern->ptr, p->pattern->len))) {
             pos = m - subject->ptr;
-            if (ubrk_isBoundary(p->ubrk, pos) && ubrk_isBoundary(p->ubrk, pos + p->pattern->len)) {
+            if (NULL == p->ubrk || (ubrk_isBoundary(p->ubrk, pos) && ubrk_isBoundary(p->ubrk, pos + p->pattern->len))) {
                 matches++;
                 if (interval_list_add(intervals, subject->len, pos, pos + p->pattern->len)) {
                     return ENGINE_WHOLE_LINE_MATCH;
@@ -317,7 +321,7 @@ UBool binary_fwd_n(
 //     *r = USEARCH_DONE;
     while (n > 0 && NULL != (m = u_strFindFirst(subject->ptr + pos, subject->len - pos, pattern->ptr, pattern->len))) {
         pos = m - subject->ptr;
-        if (ubrk_isBoundary(ubrk, pos) && ubrk_isBoundary(ubrk, pos + pattern->len)) {
+        if (NULL == ubrk || (ubrk_isBoundary(ubrk, pos) && ubrk_isBoundary(ubrk, pos + pattern->len))) {
             --n;
             if (NULL != array) {
 //                 debug(">%.*S<", pos - *r, subject->ptr + *r);
@@ -374,10 +378,12 @@ static UBool engine_fixed_split(error_t **error, void *data, const UString *subj
             return FALSE;
         }
     } else {
-        ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
-        if (U_FAILURE(status)) {
-            icu_error_set(error, FATAL, status, "ubrk_setText");
-            return FALSE;
+        if (NULL != p->ubrk) {
+            ubrk_setText(p->ubrk, subject->ptr, subject->len, &status);
+            if (U_FAILURE(status)) {
+                icu_error_set(error, FATAL, status, "ubrk_setText");
+                return FALSE;
+            }
         }
         for (el = intervals->head; NULL != el; el = el->next) {
             FETCH_DATA(el->data, i, interval_t);
