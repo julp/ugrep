@@ -86,10 +86,12 @@ void line_clean(void *data) {
 /* ========== global variables ========== */
 
 extern engine_t fixed_engine;
+// extern engine_t bin_engine;
 extern engine_t re_engine;
 
 engine_t *engines[] = {
     &fixed_engine,
+//     &bin_engine,
     &re_engine
 };
 
@@ -475,7 +477,9 @@ void console_reset(color_type_t c)
 static void parse_userpref(void)
 {
     char *home;
+    char buffer[MAXPATHLEN];
 
+    buffer[0] = '\0';
     if (NULL == (home = getenv("HOME"))) {
 # ifdef _MSC_VER
 #  ifndef CSIDL_PROFILE
@@ -487,7 +491,8 @@ static void parse_userpref(void)
 
             hr = SHGetSpecialFolderLocation(NULL, CSIDL_PROFILE, &pidl);
             if (S_OK == hr) {
-                SHGetPathFromIDList(pidl, home);
+                SHGetPathFromIDList(pidl, buffer);
+                home = buffer;
                 CoTaskMemFree(pidl);
             }
         }
