@@ -46,11 +46,7 @@ static void *engine_re_compile(error_t **error, UString *ustr, uint32_t flags)
     }
     p->uregex = uregex_open(ustr->ptr, ustr->len, IS_CASE_INSENSITIVE(flags) ? UREGEX_CASE_INSENSITIVE : 0, &pe, &status);
     if (U_FAILURE(status)) {
-        if (-1 != pe.line) {
-            error_set(error, FATAL, "Invalid pattern: error at offset %d\n\t%S\n\t%*c\n", pe.offset, ustr->ptr, pe.offset, '^');
-        } else {
-            icu_error_set(error, FATAL, status, "uregex_open");
-        }
+        error_icu_set(error, FATAL, status, &pe, ustr->ptr, "uregex_open", NULL);
         ustring_destroy(ustr); // ICU dups the pattern, so we can free it
         re_pattern_destroy(p);
         return NULL;
@@ -152,14 +148,7 @@ static engine_return_t engine_re_match_all(error_t **error, void *data, const US
             icu_error_set(error, FATAL, status, "uregex_end");
             return ENGINE_FAILURE;
         }
-        if (NULL != p->ubrk) { /* <=> !IS_WHOLE_LINE(flags) && !IS_WORD_BOUNDED(flags) && WITH_GRAPHEME() */
-            if (ubrk_isBoundary(p->ubrk, l) && ubrk_isBoundary(p->ubrk, u)) {
-                matches++;
-                if (interval_list_add(intervals, subject->len, l, u)) {
-                    return ENGINE_WHOLE_LINE_MATCH;
-                }
-            }
-        } else {
+        if (NULL == p->ubrk || (ubrk_isBoundary(p->ubrk, l) && ubrk_isBoundary(p->ubrk, u))) {
             matches++;
             if (interval_list_add(intervals, subject->len, l, u)) {
                 return ENGINE_WHOLE_LINE_MATCH;
@@ -221,15 +210,7 @@ static UBool uregex_fwd_n(
             icu_error_set(error, FATAL, status, "uregex_end");
             return FALSE;
         }
-        if (NULL != ubrk) { /* <=> !IS_WHOLE_LINE(flags) && !IS_WORD_BOUNDED(flags) && WITH_GRAPHEME() */
-            if (ubrk_isBoundary(ubrk, l) && ubrk_isBoundary(ubrk, u)) {
-                --n;
-                if (NULL != array) {
-                    add_match(array, subject, *last, l);
-                }
-                *last = u;
-            }
-        } else {
+        if (NULL == ubrk || (ubrk_isBoundary(ubrk, l) && ubrk_isBoundary(ubrk, u))) {
             --n;
             if (NULL != array) {
                 add_match(array, subject, *last, l);

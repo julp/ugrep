@@ -160,10 +160,12 @@ static const size_t EOL_LEN = ARRAY_SIZE(EOL) - 1;
 #  define RED(str)    "\33[1;31m" str "\33[0m"
 #  define GREEN(str)  "\33[1;32m" str "\33[0m"
 #  define YELLOW(str) "\33[1;33m" str "\33[0m"
+#  define GRAY(str)   "\33[1;30m" str "\33[0m"
 # else
 #  define RED(str)    str
 #  define GREEN(str)  str
 #  define YELLOW(str) str
+#  define GRAY(str)   str
 # endif /* DEBUG && !_MSC_VER */
 
 typedef void *(*func_ctor_t)(void);        /* Constructor callback */
@@ -187,7 +189,7 @@ typedef func_dup_t func_cpy_t;             /* Alias */
 #  define OLD_RING     1
 # endif /* _MSC_VER */
 
-# define COPYRIGHT "\nCopyright (C) 2010-2012, julp\n"
+# define COPYRIGHT "\nCopyright (C) 2010-2013, julp\n"
 
 # include "alloc.h"
 
