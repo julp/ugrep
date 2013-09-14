@@ -279,10 +279,10 @@ int main(int argc, char **argv)
     }
     if (complement) {
         interval_list_complement(intervals, 0, INT32_MAX);
-        if (interval_list_empty(intervals)) {
-            fprintf(stderr, "non empty list of fields, characters or bytes expected\n");
-            return UCUT_EXIT_USAGE;
-        }
+    }
+    if (interval_list_empty(intervals)) {
+        fprintf(stderr, "non empty list of fields, characters or bytes expected\n");
+        return UCUT_EXIT_USAGE;
     }
 #if defined(DEBUG) && 0
     interval_list_debug(intervals);
