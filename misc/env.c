@@ -77,14 +77,14 @@ void print_error(error_t *error)
         type = error->type;
         switch (type) {
             case WARN:
-                u_fprintf(ustderr, "[ " YELLOW("WARN") " ] ");
+                u_fprintf(ustderrp, "[ " YELLOW("WARN") " ] ");
                 break;
             case FATAL:
-                u_fprintf(ustderr, "[ " RED("ERR ") " ] ");
+                u_fprintf(ustderrp, "[ " RED("ERR ") " ] ");
                 break;
             default:
                 type = FATAL;
-                u_fprintf(ustderr, "[ " RED("BUG ") " ] Unknown error type for:\n");
+                u_fprintf(ustderrp, "[ " RED("BUG ") " ] Unknown error type for:\n");
                 break;
         }
         u_fputs(error->message, ustderrp);
