@@ -6,6 +6,7 @@
 # pragma comment(lib,"Psapi.lib")
 char __progname[_MAX_PATH] = "<unknown>";
 #endif /* _MSC_VER */
+#include <signal.h>
 
 #include "common.h"
 
@@ -51,6 +52,13 @@ static int verbosity = INFO;
 static int verbosity = WARN;
 #endif /* DEBUG */
 static int exit_failure_value = 0;
+
+static void on_sigint(int signo)
+{
+    env_close();
+    signal(signo, SIG_DFL);
+    kill(getpid(), signo);
+}
 
 void env_set_verbosity(int type)
 {
@@ -320,6 +328,7 @@ void env_init(int failure_value)
         fputs("can't register atexit() callback", stderr);
         exit(EXIT_FAILURE);
     }
+    signal(SIGINT, on_sigint);
 }
 
 typedef struct resource_t {
