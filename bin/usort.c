@@ -9,6 +9,7 @@
 #include <unicode/ucol.h>
 
 #include "common.h"
+#include "parsenum.h"
 #include "struct/rbtree.h"
 
 
@@ -18,22 +19,50 @@ enum {
     USORT_EXIT_USAGE
 };
 
+typedef struct {
+    int32_t start_field;
+    int32_t end_field;
+    int32_t start_offset;
+    int32_t end_offset;
+    uint64_t options; // bdfgiMhnRrV
+} UsortKey;
+
+#define USORT_OPT_IGNORE_LEAD_BLANKS (1 << 0)
+#define USORT_OPT_DICTIONNARY_ORDER  (1 << 1)
+#define USORT_OPT_IGNORE_CASE        (1 << 2)
+#define USORT_OPT_IGNORE_NON_PRINT   (1 << 3)
+
+#define USORT_OPT_GENERAL_NUM_SORT   (1 << 4)
+#define USORT_OPT_MONTH_SORT         (1 << 5)
+#define USORT_OPT_HUMAN_SORT         (1 << 6)
+#define USORT_OPT_NUM_SORT           (1 << 7)
+#define USORT_OPT_RANDOM_SORT        (1 << 8)
+#define USORT_OPT_REVERSE_SORT       (1 << 9)
+#define USORT_OPT_VERSION_SORT       (1 << 10)
+
 /* ========== global variables ========== */
+
+static const UChar DEFAULT_SEPARATOR[] = { U_HT, 0 };
 
 static RBTree *tree = NULL;
 static UString *ustr = NULL;
 static UCollator *ucol = NULL;
+static UString *separator = NULL;
 
 static UBool bFlag = FALSE;
 static UBool rFlag = FALSE;
 static UBool uFlag = FALSE;
+
+static uint64_t global_options = 0;
 
 /* ========== getopt stuff ========== */
 
 enum {
     BINARY_OPT = GETOPT_SPECIFIC,
     MIN_OPT,
-    MAX_OPT
+    MAX_OPT,
+    SORT_OPT,
+    VERSION_OPT
 };
 
 enum {
@@ -42,20 +71,36 @@ enum {
     ALL
 };
 
-static char optstr[] = "bfnru";
+static char optstr[] = "bfk:nru";
 
 static struct option long_options[] =
 {
     GETOPT_COMMON_OPTIONS,
     {"binary-files",          required_argument, NULL, BINARY_OPT},
-    {"min",                   no_argument,       NULL, MIN_OPT},
     {"max",                   no_argument,       NULL, MAX_OPT},
+    {"min",                   no_argument,       NULL, MIN_OPT},
+    {"sort",                  required_argument, NULL, SORT_OPT},
+    {"version",               no_argument,       NULL, VERSION_OPT},
     {"ignore-leading-blanks", no_argument,       NULL, 'b'},
     {"ignore-case",           no_argument,       NULL, 'f'},
+    {"key",                   required_argument, NULL, 'k'},
     {"numeric-sort",          no_argument,       NULL, 'n'},
     {"reverse",               no_argument,       NULL, 'r'},
     {"unique",                no_argument,       NULL, 'u'},
     {NULL,                    no_argument,       NULL, 0}
+};
+
+struct x {
+    const char *name;
+    int short_opt_val;
+    uint64_t flag_value;
+} static sortnames[] = {
+    {"general-numeric", 'g', USORT_OPT_GENERAL_NUM_SORT},
+    {"human-numeric",   'h', USORT_OPT_HUMAN_SORT},
+    {"month",           'M', USORT_OPT_MONTH_SORT},
+    {"numeric",         'n', USORT_OPT_NUM_SORT},
+    {"random",          'R', USORT_OPT_RANDOM_SORT},
+    {"version",         'V', USORT_OPT_VERSION_SORT}
 };
 
 static void usage(void)
@@ -68,6 +113,8 @@ static void usage(void)
     );
     exit(USORT_EXIT_USAGE);
 }
+
+/* ========== helpers ========== */
 
 static void usort_print(const void *k, void *v)
 {
@@ -99,6 +146,94 @@ static void usort_toustring(UString *ustr, const void *key, void *value)
     ustring_sprintf(ustr, ">%.*S< (%d) => %d", kstr->len, kstr->ptr, kstr->len, count);
 }
 #endif
+
+static int parse_option(int opt, uint64_t *flags)
+{
+    size_t i;
+
+    for (i = 0; i < ARRAY_SIZE(sortnames); i++) {
+        if (sortnames[i].short_opt_val == opt) {
+            *flags |= sortnames[i].flag_value;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+// \d+(.\d+)?[bdfgiMhnRrV]*(,\d+(.\d+)?[bdfgiMhnRrV]*)?
+static UsortKey *parse_key(const char *string, error_t **error)
+{
+    int32_t min;
+    char *endptr;
+    const char *p;
+    ParseNumError err;
+    UsortKey key = {0}, *ret;
+
+    min = 1;
+    p = string;
+    if (
+        PARSE_NUM_NO_ERR != (err = parse_int32_t(p, &endptr, 10, &min, NULL, &key.start_field)) // ^\d+$
+        && (PARSE_NUM_ERR_NON_DIGIT_FOUND != err)                                               // ^\d+
+    ) {
+        error_set(error, FATAL, "%s:\n%s\n%*c", "TODO", string, endptr - string + 1, '^');
+        return NULL;
+    }
+    if ('.' == *endptr) {
+        p = endptr + 1;
+        if (
+            PARSE_NUM_NO_ERR != (err = parse_int32_t(p, &endptr, 10, &min, NULL, &key.start_offset)) // ^\d+\.\d+$
+            && PARSE_NUM_ERR_NON_DIGIT_FOUND != err                                                  // ^\d+\.\d+.*
+        ) {
+            error_set(error, FATAL, "%s:\n%s\n%*c", "TODO", string, endptr - string + 1, '^');
+            return NULL;
+        }
+    }
+    p = endptr;
+    while ('\0' != *p && ',' != *p) { // check .* is in fact [bdfgiMhnRrV]*
+        if (!parse_option(*p, &key.options)) {
+            error_set(error, FATAL, "invalid option '%c'", *p);
+            return NULL;
+        }
+        ++p;
+    }
+    if (',' == *p) {
+        if (
+            PARSE_NUM_NO_ERR != (err = parse_int32_t(++p, &endptr, 10, &min, NULL, &key.end_field)) // ,\d+$
+            && (PARSE_NUM_ERR_NON_DIGIT_FOUND != err && '.' != *endptr)                             // ,\d+\.
+        ) {
+            error_set(error, FATAL, "%s:\n%s\n%*c", "TODO", string, endptr - string + 1, '^');
+            return NULL;
+        }
+        p = endptr;
+        if ('.' == *endptr) {
+            if (
+                PARSE_NUM_NO_ERR != (err = parse_int32_t(++p, &endptr, 10, &min, NULL, &key.end_offset)) // ,\d+\.\d+$
+                && PARSE_NUM_ERR_NON_DIGIT_FOUND != err                                                  // ,\d+\.\d+.*$
+            ) {
+                error_set(error, FATAL, "%s:\n%s\n%*c", "TODO", string, endptr - string + 1, '^');
+                return NULL;
+            }
+        }
+        p = endptr;
+        while ('\0' != *p) { // check .* is in fact [bdfgiMhnRrV]*
+            if (!parse_option(*p, &key.options)) {
+                error_set(error, FATAL, "invalid option '%c'", *p);
+                return NULL;
+            }
+            ++p;
+        }
+    }
+    if ('\0' != *p) {
+        error_set(error, FATAL, "extra characters found:\n%s\n%*c", string, p - string + 1, '^');
+        return NULL;
+    }
+
+    ret = mem_new(*ret);
+    memcpy(ret, &key, sizeof(*ret));
+
+    return ret;
+}
 
 // echo -en "1\n10\n12\n100\n101\n1" | ./usort
 static int procfile(reader_t *reader, const char *filename)
@@ -164,23 +299,34 @@ int main(int argc, char **argv)
         switch (c) {
             case 'b':
                 bFlag = TRUE;
+                global_options |= USORT_OPT_IGNORE_LEAD_BLANKS;
                 break;
             case 'f':
                 ucol_setStrength(ucol, UCOL_SECONDARY);
+                global_options |= USORT_OPT_IGNORE_CASE;
+                break;
+            case 'k':
+                if (NULL == parse_key(optarg, &error)) {
+                    print_error(error);
+                    return EXIT_FAILURE;
+                }
                 break;
             case 'n':
                 ucol_setAttribute(ucol, UCOL_NUMERIC_COLLATION, UCOL_ON, &status);
                 if (U_FAILURE(status)) {
                     //
                 }
+                global_options |= USORT_OPT_NUM_SORT;
                 break;
             case 'r':
                 rFlag = TRUE;
+                global_options |= USORT_OPT_REVERSE_SORT;
                 break;
             case 'u':
                 uFlag = TRUE;
+//                 global_options |= ?;
                 break;
-            case 'V':
+            case VERSION_OPT:
                 fprintf(stderr, "BSD usort version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 return EXIT_SUCCESS;
             case MIN_OPT:
