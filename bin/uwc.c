@@ -61,7 +61,7 @@ int main(int argc, char **argv)
                 break;
             case 'c':
                 // unsupported, no sense
-                fprintf(stderr, "Working with bytes makes no sense: %s works in UTF-16, after a possible charset conversion and normalization\n", "uwc");
+                fprintf(stderr, "Working with bytes makes no sense: %s works in UTF-16, after a possible charset conversion and normalization\n", __progname);
                 break;
             case 'l':
                 mode |= LINES;
@@ -85,50 +85,6 @@ int main(int argc, char **argv)
     env_apply();
 
     // process
-#if 1
-# include <parsenum.h>
-# include <inttypes.h>
-    {
-        char *endptr;
-        int8_t v, min = 5;
-        v = 0;
-        printf("%d/%" PRIi8 " = parse_int8_t('129') %c\n", parse_int8_t("129", &endptr, 0, NULL, NULL, &v), v, '\0' == *endptr ? '-' : *endptr);
-        v = 0;
-        printf("%d/%" PRIi8 " = parse_int8_t('') %c\n", parse_int8_t("", &endptr, 0, NULL, NULL, &v), v, '\0' == *endptr ? '-' : *endptr);
-        v = 0;
-        printf("%d/%" PRIi8 " = parse_int8_t('j10') %c\n", parse_int8_t("j10", &endptr, 0, NULL, NULL, &v), v, '\0' == *endptr ? '-' : *endptr);
-        v = 0;
-        printf("%d/%" PRIi8 " = parse_int8_t('5') %c\n", parse_int8_t("5", &endptr, 0, NULL, NULL, &v), v, '\0' == *endptr ? '-' : *endptr);
-        v = 0;
-        printf("%d/%" PRIi8 " = parse_int8_t('2', min = 5) %c\n", parse_int8_t("2", &endptr, 0, &min, NULL, &v), v, '\0' == *endptr ? '-' : *endptr);
-        v = 0;
-        printf("%d/%" PRIi8 " = parse_int8_t('0b1001') %c\n", parse_int8_t("0b1001", &endptr, 0, NULL, NULL, &v), v, '\0' == *endptr ? '-' : *endptr);
-        v = 0;
-        printf("%d/%" PRIi8 " = parse_int8_t('0b1201') %c\n", parse_int8_t("0b1201", &endptr, 0, NULL, NULL, &v), v, '\0' == *endptr ? '-' : *endptr);
-    }
-    {
-        printf("\n");
-    }
-    {
-        uint8_t v, min = 5;
-        v = 0;
-        printf("%d/%" PRIu8 " = parse_uint8_t('256')\n", parse_uint8_t("256", NULL, 0, NULL, NULL, &v), v);
-        v = 0;
-        printf("%d/%" PRIu8 " = parse_uint8_t('-1')\n", parse_uint8_t("-1", NULL, 0, NULL, NULL, &v), v);
-        v = 0;
-        printf("%d/%" PRIu8 " = parse_uint8_t('')\n", parse_uint8_t("", NULL, 0, NULL, NULL, &v), v);
-        v = 0;
-        printf("%d/%" PRIu8 " = parse_uint8_t('j10')\n", parse_uint8_t("j10", NULL, 0, NULL, NULL, &v), v);
-        v = 0;
-        printf("%d/%" PRIu8 " = parse_uint8_t('5')\n", parse_uint8_t("5", NULL, 0, NULL, NULL, &v), v);
-        v = 0;
-        printf("%d/%" PRIu8 " = parse_uint8_t('2', min = 5)\n", parse_uint8_t("2", NULL, 0, &min, NULL, &v), v);
-        v = 0;
-        printf("%d/%" PRIu8 " = parse_uint8_t('0b1001')\n", parse_uint8_t("0b1001", NULL, 0, NULL, NULL, &v), v);
-        v = 0;
-        printf("%d/%" PRIu8 " = parse_uint8_t('0b1201')\n", parse_uint8_t("0b1201", NULL, 0, NULL, NULL, &v), v);
-    }
-#endif
 
     return (0 == ret ? UWC_EXIT_SUCCESS : UWC_EXIT_FAILURE);
 }

@@ -200,6 +200,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Maintainer")
         SOURCES test/intervals.c
         OBJECTS COMMON NONFTS_BASE
     )
+    declare_ugrep_binary(
+        parsenum
+        SOURCES test/parsenum.c
+        OBJECTS COMMON NONFTS_BASE
+    )
 endif(CMAKE_BUILD_TYPE STREQUAL "Maintainer")
 
 #install(CODE "EXEC_PROGRAM(${CMAKE_COMMAND} ARGS -E create_symlink \"${CMAKE_INSTALL_PREFIX}/bin/ugrep\" \"${CMAKE_INSTALL_PREFIX}/bin/ufgrep\")
