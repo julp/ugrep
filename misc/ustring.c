@@ -732,7 +732,7 @@ void ustring_dump(UString *ustr) /* NONNULL() */
     UChar *p;
     UChar32 c;
     size_t i, len;
-    const int replacement_len = 6;
+    const int replacement_len = STR_SIZE("0x0000");
     const char replacement[] = "0x%04X";
 
     require_else_return(NULL != ustr);
