@@ -597,7 +597,7 @@ int main(int argc, char **argv)
                 // NOP, ignored, doesn't apply to Unicode
                 break;
             case 'v':
-                fprintf(stderr, "BSD utr version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
+                fprintf(stderr, "BSD %s version %u.%u\n" COPYRIGHT, __progname, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 return UTR_EXIT_SUCCESS;
             default:
                 if (!util_opt_parse(c, optarg, reader)) {

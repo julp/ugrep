@@ -178,7 +178,7 @@ int main(int argc, char **argv)
                 TFlag = TRUE;
                 break;
             case 'V':
-                fprintf(stderr, "BSD ucat version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
+                fprintf(stderr, "BSD %s version %u.%u\n" COPYRIGHT, __progname, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 return UCAT_EXIT_SUCCESS;
             case 'b':
                 bFlag = TRUE;

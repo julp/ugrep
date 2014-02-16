@@ -1095,7 +1095,7 @@ int main(int argc, char **argv)
                 LFlag = TRUE;
                 break;
             case 'V':
-                fprintf(stderr, "BSD ugrep version %u.%u\n" COPYRIGHT, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
+                fprintf(stderr, "BSD %s version %u.%u\n" COPYRIGHT, __progname, UGREP_VERSION_MAJOR, UGREP_VERSION_MINOR);
                 return UGREP_EXIT_SUCCESS;
             case 'c':
                 cFlag = TRUE;

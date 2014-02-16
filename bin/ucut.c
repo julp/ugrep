@@ -220,7 +220,7 @@ int main(int argc, char **argv)
                 pdata.engine = &fixed_engine;
                 break;
             case 'b':
-                fprintf(stderr, "Working with bytes makes no sense: %s works in UTF-16, after a possible charset conversion and normalization\n", "ucut");
+                fprintf(stderr, "Working with bytes makes no sense: %s works in UTF-16, after a possible charset conversion and normalization\n", __progname);
                 return UCUT_EXIT_FAILURE;
             case 'c':
                 cFlag = TRUE;
