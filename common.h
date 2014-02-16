@@ -181,6 +181,15 @@ typedef func_dup_t func_cpy_t;             /* Alias */
 #  define MIN(a, b) ((a) < (b) ? (a) : (b))
 # endif /* !MIN */
 
+# define HAS_FLAG(value, flag) \
+    (0 != ((value) & (flag)))
+
+# define SET_FLAG(value, flag) \
+    ((value) |= (flag))
+
+# define UNSET_FLAG(value, flag) \
+    ((value) &= ~(flag))
+
 # define FETCH_DATA(from, to, type) \
     type *to = (type *) (from)
 
