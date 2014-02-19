@@ -168,8 +168,8 @@ declare_ugrep_binary(
     usort
     INSTALL TRUE
     SOURCES bin/usort.c
-    struct/rbtree.c
-    OBJECTS COMMON NONFTS_BASE
+    struct/rbtree.c struct/dptrarray.c
+    OBJECTS COMMON NONFTS_BASE ENGINES
 )
 declare_ugrep_binary(
     uwc

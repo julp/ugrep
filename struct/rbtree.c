@@ -3,12 +3,12 @@
 
 #define MAINTAIN_FIRST_LAST
 
-static int ucol_key_cmp(const void *k1, const void *k2)
+int ucol_key_cmp(const void *k1, const void *k2)
 {
     return strcmp((const char *) k1, (const char *) k2);
 }
 
-static int ucol_key_cmp_r(const void *k1, const void *k2)
+int ucol_key_cmp_r(const void *k1, const void *k2)
 {
     return strcmp((const char *) k2, (const char *) k1);
 }
@@ -20,7 +20,6 @@ typedef enum {
 
 struct _RBTreeNode {
     void *key;
-    void *computed_key;
     void *value;
     RBTreeColor color;
     RBTreeNode *left;
@@ -40,9 +39,6 @@ struct _RBTree {
     func_dtor_t value_dtor_func;
     dup_t key_duper;
     dup_t value_duper;
-    //func_dtor_t computed_key_dtor_func;
-    func_key_compute_t key_compute_func;
-    void *private_compute_data;
 };
 
 static RBTreeNode *rbtreenode_new(void *key, void *value)
@@ -54,7 +50,6 @@ static RBTreeNode *rbtreenode_new(void *key, void *value)
     node->color = RED;
     node->key = key;
     node->value = value;
-    node->computed_key = NULL;
 
     return node;
 }
@@ -68,7 +63,6 @@ static RBTreeNode *rbtreenode_nil_new(void)
     node->color = BLACK;
     node->key = NULL;
     node->value = NULL;
-    node->computed_key = NULL;
 
     return node;
 }
@@ -92,24 +86,6 @@ RBTree *rbtree_new(
     tree->cmp_func = cmp_func;
     tree->key_dtor_func = key_dtor_func;
     tree->value_dtor_func = value_dtor_func;
-    //tree->computed_key_dtor_func = NULL;
-    tree->private_compute_data = NULL;
-
-    return tree;
-}
-
-RBTree *rbtree_collated_new(
-    UCollator *ucol, int inversed,
-    dup_t key_duper, dup_t value_duper,
-    func_dtor_t key_dtor_func, func_dtor_t value_dtor_func
-) /* NONNULL(1) WARN_UNUSED_RESULT */ {
-    RBTree *tree;
-
-    require_else_return_null(NULL != ucol);
-
-    tree = rbtree_new(inversed ? ucol_key_cmp_r : ucol_key_cmp, key_duper, value_duper, key_dtor_func, value_dtor_func);
-    tree->private_compute_data = ucol;
-    tree->key_compute_func = ustring_to_collation_key;
 
     return tree;
 }
@@ -218,23 +194,13 @@ static RBTreeNode *rbtreenode_next(RBTree *tree, RBTreeNode *node) /* NONNULL() 
 int rbtree_insert(RBTree *tree, void *key, void *value, uint32_t flags, void **oldvalue) /* NONNULL(1) */
 {
     int cmp;
-    void *computed_key;
     RBTreeNode *y, *x, *new;
 
-    computed_key = NULL;
-    if (NULL != tree->key_compute_func) {
-        computed_key = tree->key_compute_func(key, tree->private_compute_data);
-    }
     y = tree->nil;
     x = tree->root;
     while (x != tree->nil) {
         y = x;
-        if (NULL != tree->key_compute_func) {
-            cmp = tree->cmp_func(computed_key, x->computed_key);
-        } else {
-            cmp = tree->cmp_func(key, x->key);
-        }
-        if (0 == cmp) {
+        if (0 == (cmp = tree->cmp_func(key, x->key))) {
             if (flags & RBTREE_INSERT_ON_DUP_KEY_FETCH) {
                 *oldvalue = x->value;
             } else {
@@ -248,9 +214,6 @@ int rbtree_insert(RBTree *tree, void *key, void *value, uint32_t flags, void **o
                     x->value = clone(tree->value_duper, value);
                 }
             }
-            if (NULL != computed_key) {
-                free(computed_key);
-            }
             return 0;
         } else if (cmp < 0) {
             x = x->left;
@@ -259,9 +222,6 @@ int rbtree_insert(RBTree *tree, void *key, void *value, uint32_t flags, void **o
         }
     }
     new = rbtreenode_new(clone(tree->key_duper, key), clone(tree->value_duper, value));
-    if (NULL != tree->key_compute_func) {
-        new->computed_key = computed_key;
-    }
     new->parent = y;
     new->left = tree->nil;
     new->right = tree->nil;
@@ -272,11 +232,7 @@ int rbtree_insert(RBTree *tree, void *key, void *value, uint32_t flags, void **o
         tree->first = tree->last = new;
 #endif /* MAINTAIN_FIRST_LAST */
     } else {
-        if (NULL != tree->key_compute_func) {
-            cmp = tree->cmp_func(new->computed_key, y->computed_key);
-        } else {
-            cmp = tree->cmp_func(new->key, y->key);
-        }
+        cmp = tree->cmp_func(new->key, y->key);
         if (cmp < 0) {
             y->left = new;
 #ifdef MAINTAIN_FIRST_LAST
@@ -340,34 +296,18 @@ RBTreeNode *rbtree_lookup(RBTree *tree, void *key) /* NONNULL(1) */
 {
     int cmp;
     RBTreeNode *y, *x;
-    void *computed_key;
 
-    computed_key = NULL;
-    if (NULL != tree->key_compute_func) {
-        computed_key = tree->key_compute_func(key, tree->private_compute_data);
-    }
     y = tree->nil;
     x = tree->root;
     while (x != tree->nil) {
         y = x;
-        if (NULL != tree->key_compute_func) {
-            cmp = tree->cmp_func(computed_key, x->computed_key);
-        } else {
-            cmp = tree->cmp_func(key, x->key);
-        }
-        if (0 == cmp) {
-            if (NULL != computed_key) {
-                free(computed_key);
-            }
+        if (0 == (cmp = tree->cmp_func(key, x->key))) {
             return x;
         } else if (cmp < 0) {
             x = x->left;
         } else /*if (cmp > 0)*/ {
             x = x->right;
         }
-    }
-    if (NULL != computed_key) {
-        free(computed_key);
     }
 
     return NULL;
@@ -588,9 +528,6 @@ int rbtree_remove(RBTree *tree, void *key) /* NONNULL(1) */
     if (NULL != tree->key_dtor_func) {
         tree->key_dtor_func(z->key);
     }
-    if (NULL != z->computed_key) {
-        free(z->computed_key);
-    }
     free(z);
 
     return 1;
@@ -608,9 +545,6 @@ static void _rbtree_destroy(RBTree *tree, RBTreeNode *node) /* NONNULL(1) */
         }
         if (NULL != tree->key_dtor_func) {
             tree->key_dtor_func(node->key);
-        }
-        if (NULL != node->computed_key) {
-            free(node->computed_key);
         }
         free(node);
     }

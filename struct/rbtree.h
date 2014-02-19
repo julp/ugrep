@@ -11,7 +11,6 @@
 
 typedef int (*func_cmp_t)(const void *, const void *); /* Comparaison callback (like strcmp) */
 typedef void (*func_apply_t)(const void *, void *);    /* Foreach callback (value) */
-typedef void *(*func_key_compute_t)(const void *, const void *);
 
 typedef enum
 {
@@ -23,8 +22,10 @@ typedef enum
 typedef struct _RBTree RBTree;
 typedef struct _RBTreeNode RBTreeNode;
 
+int ucol_key_cmp(const void *k1, const void *k2);
+int ucol_key_cmp_r(const void *k1, const void *k2);
+
 void rbtree_clear(RBTree *) NONNULL();
-RBTree *rbtree_collated_new(UCollator *, int, dup_t, dup_t, func_dtor_t, func_dtor_t) NONNULL(1) WARN_UNUSED_RESULT;
 # ifdef DEBUG
 void rbtree_debug(RBTree *, toUString)  NONNULL();
 # endif /* DEBUG */

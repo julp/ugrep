@@ -1,14 +1,6 @@
 #include "common.h"
 #include "dptrarray.h"
 
-struct _DPtrArray {
-    void **data;
-    size_t length;
-    size_t allocated;
-    dup_t duper;
-    func_dtor_t dtor_func;
-};
-
 #define D_PTR_ARRAY_INCREMENT 8
 
 static void dptrarray_maybe_resize_to(DPtrArray *this, size_t total_length) /* NONNULL() */
@@ -96,12 +88,12 @@ void *dptrarray_shift(DPtrArray *this) /* NONNULL() */
     return data;
 }
 
-void dptrarray_push(DPtrArray *this, void *data) /* NONNULL(1) */
+void *dptrarray_push(DPtrArray *this, void *data) /* NONNULL(1) */
 {
     assert(NULL != this);
 
     dptrarray_maybe_resize_of(this, 1);
-    this->data[this->length++] = clone(this->duper, data);
+    return this->data[this->length++] = clone(this->duper, data);
 }
 
 void dptrarray_unshift(DPtrArray *this, void *data) /* NONNULL(1) */
@@ -207,4 +199,27 @@ size_t dptrarray_length(DPtrArray *this) /* NONNULL() */
     assert(NULL != this);
 
     return this->length;
+}
+
+void *dptrarray_to_array(DPtrArray *this, int copy, int null_terminated) /* NONNULL() */
+{
+    void **ary;
+
+    assert(NULL != this);
+
+    ary = mem_new_n(*this->data, this->length + !!null_terminated);
+    if (copy) {
+        size_t i;
+
+        for (i = 0; i < this->length; i++) {
+            ary[i] = clone(this->duper, this->data[i]);
+        }
+    } else {
+        memcpy(ary, this->data, this->length * sizeof(*this->data));
+    }
+    if (null_terminated) {
+        ary[this->length] = NULL;
+    }
+
+    return ary;
 }

@@ -359,19 +359,33 @@ static UBool engine_fixed_split(error_t **error, void *data, const UString *subj
             icu_error_set(error, FATAL, status, "usearch_setText");
             return FALSE;
         }
-        for (el = intervals->head; NULL != el; el = el->next) {
-            FETCH_DATA(el->data, i, interval_t);
+/* <X> */
+        if (NULL == intervals) {
+            int32_t u;
 
-            if (i->lower_limit > 0) {
-                if (!usearch_fwd_n(p->usearch, subject, NULL, i->lower_limit - lastU, &l, &status)) {
+            while (U_SUCCESS(status) && USEARCH_DONE != (u = usearch_next(p->usearch, &status))) {
+                add_match(array, subject, l, u);
+                l = u += usearch_getMatchedLength(p->usearch);
+            }
+            add_match(array, subject, l, subject->len);
+        } else {
+/* </X> */
+            for (el = intervals->head; NULL != el; el = el->next) {
+                FETCH_DATA(el->data, i, interval_t);
+
+                if (i->lower_limit > 0) {
+                    if (!usearch_fwd_n(p->usearch, subject, NULL, i->lower_limit - lastU, &l, &status)) {
+                        break;
+                    }
+                }
+                if (!usearch_fwd_n(p->usearch, subject, array, i->upper_limit - i->lower_limit, &l, &status)) {
                     break;
                 }
+                lastU = i->upper_limit;
             }
-            if (!usearch_fwd_n(p->usearch, subject, array, i->upper_limit - i->lower_limit, &l, &status)) {
-                break;
-            }
-            lastU = i->upper_limit;
+/* <X> */
         }
+/* </X> */
         usearch_unbindText(p->usearch);
         if (U_FAILURE(status)) {
             icu_error_set(error, FATAL, status, "usearch_next");
@@ -385,19 +399,38 @@ static UBool engine_fixed_split(error_t **error, void *data, const UString *subj
                 return FALSE;
             }
         }
-        for (el = intervals->head; NULL != el; el = el->next) {
-            FETCH_DATA(el->data, i, interval_t);
+/* <X> */
+        if (NULL == intervals) {
+            UChar *m;
+            int32_t u;
 
-            if (i->lower_limit > 0) {
-                if (!binary_fwd_n(p->ubrk, p->pattern, subject, NULL, i->lower_limit - lastU, &l)) {
+            u = 0;
+            while (NULL != (m = u_strFindFirst(subject->ptr + u, subject->len - u, p->pattern->ptr, p->pattern->len))) {
+                u = m - subject->ptr;
+                if (NULL == p->ubrk || (ubrk_isBoundary(p->ubrk, u) && ubrk_isBoundary(p->ubrk, u + p->pattern->len))) {
+                    add_match(array, subject, l, u);
+                }
+                l = u = u + p->pattern->len;
+            }
+            add_match(array, subject, l, subject->len);
+        } else {
+/* </X> */
+            for (el = intervals->head; NULL != el; el = el->next) {
+                FETCH_DATA(el->data, i, interval_t);
+
+                if (i->lower_limit > 0) {
+                    if (!binary_fwd_n(p->ubrk, p->pattern, subject, NULL, i->lower_limit - lastU, &l)) {
+                        break;
+                    }
+                }
+                if (!binary_fwd_n(p->ubrk, p->pattern, subject, array, i->upper_limit - i->lower_limit, &l)) {
                     break;
                 }
+                lastU = i->upper_limit;
             }
-            if (!binary_fwd_n(p->ubrk, p->pattern, subject, array, i->upper_limit - i->lower_limit, &l)) {
-                break;
-            }
-            lastU = i->upper_limit;
+/* <X> */
         }
+/* </X> */
         ubrk_unbindText(p->ubrk);
     }
 
