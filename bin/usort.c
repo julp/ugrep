@@ -53,12 +53,13 @@ typedef struct {
 #define USORT_OPT_IGNORE_CASE        (1 << 2)
 #define USORT_OPT_IGNORE_NON_PRINT   (1 << 3)
 #define USORT_OPT_SORT_MASK          (~(USORT_OPT_IGNORE_LEAD_BLANKS | USORT_OPT_DICTIONNARY_ORDER | USORT_OPT_IGNORE_CASE | USORT_OPT_IGNORE_NON_PRINT))
-#define USORT_OPT_GENERAL_NUM_SORT   (1 << 4)
-#define USORT_OPT_MONTH_SORT         (1 << 5)
-#define USORT_OPT_HUMAN_SORT         (1 << 6)
-#define USORT_OPT_NUM_SORT           (1 << 7)
-#define USORT_OPT_RANDOM_SORT        (1 << 8)
-#define USORT_OPT_VERSION_SORT       (1 << 9)
+#define USORT_OPT_NUM_SORT           (1 << 4)
+#define USORT_OPT_DEFAULT_SORT       (1 << 5)
+#define USORT_OPT_GENERAL_NUM_SORT   (1 << 6)
+#define USORT_OPT_MONTH_SORT         (1 << 7)
+#define USORT_OPT_HUMAN_SORT         (1 << 8)
+#define USORT_OPT_RANDOM_SORT        (1 << 9)
+#define USORT_OPT_VERSION_SORT       (1 << 10)
 
 /* ========== global variables ========== */
 
@@ -98,7 +99,7 @@ enum {
     ALL
 };
 
-static char optstr[] = "bfk:nrt:u";
+static char optstr[] = "bfghk:MnRrt:uV";
 
 static struct option long_options[] =
 {
@@ -110,11 +111,16 @@ static struct option long_options[] =
     {"version",               no_argument,       NULL, VERSION_OPT},
     {"ignore-leading-blanks", no_argument,       NULL, 'b'},
     {"ignore-case",           no_argument,       NULL, 'f'},
+    {"general-numeric-sort",  no_argument,       NULL, 'g'},
+    {"humanc-numeric-sort",   no_argument,       NULL, 'h'},
     {"key",                   required_argument, NULL, 'k'},
+    {"month-sort",            no_argument,       NULL, 'M'},
     {"numeric-sort",          no_argument,       NULL, 'n'},
+    {"random-sort",           no_argument,       NULL, 'R'},
     {"reverse",               no_argument,       NULL, 'r'},
     {"field-separator",       required_argument, NULL, 't'},
     {"unique",                no_argument,       NULL, 'u'},
+    {"version-sort",          no_argument,       NULL, 'V'},
     {NULL,                    no_argument,       NULL, 0}
 };
 
@@ -232,7 +238,7 @@ static UBool ucol_sorter_equals(const void *object, uint64_t flags)
     UErrorCode status;
 
     status = U_ZERO_ERROR;
-    if (flags >= USORT_OPT_GENERAL_NUM_SORT) {
+    if ((flags & USORT_OPT_SORT_MASK) > USORT_OPT_DEFAULT_SORT) {
         return FALSE;
     }
     if (HAS_FLAG(flags, USORT_OPT_IGNORE_CASE) && UCOL_SECONDARY != ucol_getStrength((const UCollator *) object)) {
@@ -261,7 +267,7 @@ static uint8_t *ucol_sorter_keygen(const void *object, const UChar *source, int3
 }
 
 static Sorter sorters[] = {
-    { 0, ucol_sorter_create, ucol_sorter_equals, ucol_sorter_keygen },
+    { USORT_OPT_DEFAULT_SORT | USORT_OPT_NUM_SORT , ucol_sorter_create, ucol_sorter_equals, ucol_sorter_keygen },
     { USORT_OPT_MONTH_SORT, month_sorter_create, month_sorter_equals, month_sorter_keygen }
 };
 
@@ -334,16 +340,28 @@ static void usort_toustring(UString *ustr, const void *key, void *value)
 }
 #endif
 
-static int parse_option(int opt, uint64_t *flags)
+static int parse_option(int opt, uint64_t *flags, error_t **error)
 {
     size_t i;
 
     for (i = 0; i < ARRAY_SIZE(sortnames); i++) {
         if (sortnames[i].short_opt_val == opt) {
-            *flags |= sortnames[i].flag_value;
-            return TRUE;
+            if (0 != (*flags & USORT_OPT_SORT_MASK)) {
+                size_t j;
+
+                for (j = 0; j < ARRAY_SIZE(sortnames); j++) {
+                    if ((*flags & USORT_OPT_SORT_MASK) == sortnames[j].flag_value) {
+                        error_set(error, FATAL, "option '%c' (%s sort) is incompatible with previous option '%c' (%s sort)", opt, sortnames[i].name, sortnames[j].short_opt_val, sortnames[j].name);
+                    }
+                }
+                return FALSE;
+            } else {
+                *flags |= sortnames[i].flag_value;
+                return TRUE;
+            }
         }
     }
+    error_set(error, FATAL, "invalid option '%c'", opt);
 
     return FALSE;
 }
@@ -354,10 +372,16 @@ static UBool create_sorter(USortField *field, error_t **error)
     uint64_t flags;
 
     flags = field->options & USORT_OPT_SORT_MASK;
+    // <find better>
+    if (0 == flags) {
+        field->options |= USORT_OPT_DEFAULT_SORT;
+        flags = field->options & USORT_OPT_SORT_MASK;
+    }
+    // </find better>
     // if not, create one
     if (NULL == field->sorter) {
         for (i = 0; i < ARRAY_SIZE(sorters); i++) {
-            if (sorters[i].implemented == flags) {
+            if (HAS_FLAG(sorters[i].implemented, flags)) {
                 field->sorter = &sorters[i];
                 field->private = field->sorter->create(field->options, error);
                 if (NULL != *error) {
@@ -412,8 +436,8 @@ static UBool parse_field(const char *string, error_t **error)
     }
     p = endptr;
     while ('\0' != *p && ',' != *p) { // check .* is in fact [bdfgiMhnRrV]*
-        if (!parse_option(*p, &field.options)) {
-            error_set(error, FATAL, "invalid option '%c'", *p);
+        if (!parse_option(*p, &field.options, error)) {
+//             error_set(error, FATAL, "invalid option '%c'", *p);
             return FALSE;
         }
         ++p;
@@ -440,8 +464,8 @@ static UBool parse_field(const char *string, error_t **error)
         }
         p = endptr;
         while ('\0' != *p) { // check .* is in fact [bdfgiMhnRrV]*
-            if (!parse_option(*p, &field.options)) {
-                error_set(error, FATAL, "invalid option '%c'", *p);
+            if (!parse_option(*p, &field.options, error)) {
+//                 error_set(error, FATAL, "invalid option '%c'", *p);
                 return FALSE;
             }
             ++p;
@@ -461,6 +485,9 @@ static UBool parse_field(const char *string, error_t **error)
         uint64_t flags;
 
         flags = field.options & USORT_OPT_SORT_MASK;
+//         if (0 == flags) {
+//             field.options |= USORT_OPT_DEFAULT_SORT;
+//         }
         // share a sorter if a compatible one has already been created
         for (i = 0; i < dptrarray_length(fields); i++) {
             f = dptrarray_at_unsafe(fields, i, USortField);
@@ -671,12 +698,12 @@ int main(int argc, char **argv)
             case 'k':
                 if (!parse_field(optarg, &error)) {
                     print_error(error);
-                    return EXIT_FAILURE;
+//                     return EXIT_FAILURE;
                 }
                 break;
-            case 'n':
-                global_options |= USORT_OPT_NUM_SORT;
-                break;
+//             case 'n':
+//                 global_options |= USORT_OPT_NUM_SORT;
+//                 break;
             case 'r':
                 cmp_func = ucol_key_cmp_r;
                 break;
@@ -695,6 +722,16 @@ int main(int argc, char **argv)
                 break;
             case MAX_OPT:
                 wanted = MAX_ONLY;
+                break;
+            case 'g':
+            case 'h':
+            case 'M':
+            case 'n':
+            case 'R':
+            case 'V':
+                if (!parse_option(c, &global_options, &error)) {
+                    print_error(error);
+                }
                 break;
             case SORT_OPT:
             {
@@ -736,6 +773,10 @@ int main(int argc, char **argv)
         USortField default_field = INIT_USORT_FIELD;
 
         default_field.options = global_options;
+//         if (0 == (default_field.options & USORT_OPT_SORT_MASK)) {
+//             default_field.options |= USORT_OPT_DEFAULT_SORT;
+//         }
+        // TODO: check options
         if (!create_sorter(&default_field, &error)) {
             print_error(error);
         }
