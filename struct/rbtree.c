@@ -3,14 +3,55 @@
 
 #define MAINTAIN_FIRST_LAST
 
+static int memcmp_l(
+    const uint8_t *str1, int32_t str1_len,
+    const uint8_t *str2, int32_t str2_len
+) {
+    if (str1 != str2) {
+        int32_t min_len;
+
+        if (str2_len < str1_len) {
+            min_len = str2_len;
+        } else {
+            min_len = str1_len;
+        }
+        while (min_len--/* > 0*/) {
+            if (*str1 != *str2) {
+                return *str1 - *str2;
+            }
+            ++str1, ++str2;
+        }
+    }
+
+    return str1_len - str2_len;
+}
+
+void rbkey_destroy(RBKey *k)
+{
+    free(k->key);
+    free(k);
+}
+
 int ucol_key_cmp(const void *k1, const void *k2)
 {
-    return strcmp((const char *) k1, (const char *) k2);
+    const RBKey *r1, *r2;
+
+    r1 = (const RBKey *) k1;
+    r2 = (const RBKey *) k2;
+
+    return memcmp_l(r1->key, r1->key_len, r2->key, r2->key_len);
+//     return strcmp((const char *) k1, (const char *) k2);
 }
 
 int ucol_key_cmp_r(const void *k1, const void *k2)
 {
-    return strcmp((const char *) k2, (const char *) k1);
+    const RBKey *r1, *r2;
+
+    r1 = (const RBKey *) k1;
+    r2 = (const RBKey *) k2;
+
+    return memcmp_l(r2->key, r2->key_len, r1->key, r1->key_len);
+//     return strcmp((const char *) k2, (const char *) k1);
 }
 
 typedef enum {

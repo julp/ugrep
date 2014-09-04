@@ -28,7 +28,7 @@ typedef struct {
     uint64_t implemented;
     void *(*create)(uint64_t flags, error_t **error);
     UBool (*equals)(const void *object, uint64_t flags);
-    uint8_t *(*keygen)(const void *object, const UChar *source, int32_t sourceLength, error_t **error);
+    RBKey *(*keygen)(const void *object, const UChar *source, int32_t sourceLength, error_t **error);
 } Sorter;
 
 typedef struct {
@@ -60,6 +60,7 @@ typedef struct {
 #define USORT_OPT_HUMAN_SORT         (1 << 8)
 #define USORT_OPT_RANDOM_SORT        (1 << 9)
 #define USORT_OPT_VERSION_SORT       (1 << 10)
+#define USORT_OPT_IP_ADDRESS_SORT    (1 << 11)
 
 /* ========== global variables ========== */
 
@@ -99,7 +100,7 @@ enum {
     ALL
 };
 
-static char optstr[] = "bfghk:MnRrt:uV";
+static char optstr[] = "bfghik:MnRrt:uV";
 
 static struct option long_options[] =
 {
@@ -113,6 +114,7 @@ static struct option long_options[] =
     {"ignore-case",           no_argument,       NULL, 'f'},
     {"general-numeric-sort",  no_argument,       NULL, 'g'},
     {"humanc-numeric-sort",   no_argument,       NULL, 'h'},
+    {"ip-address-sort",       no_argument,       NULL, 'i'},
     {"key",                   required_argument, NULL, 'k'},
     {"month-sort",            no_argument,       NULL, 'M'},
     {"numeric-sort",          no_argument,       NULL, 'n'},
@@ -131,6 +133,7 @@ struct {
 } static sortnames[] = {
     {"general-numeric", 'g', USORT_OPT_GENERAL_NUM_SORT},
     {"human-numeric",   'h', USORT_OPT_HUMAN_SORT},
+    {"ip",              'i', USORT_OPT_IP_ADDRESS_SORT},
     {"month",           'M', USORT_OPT_MONTH_SORT},
     {"numeric",         'n', USORT_OPT_NUM_SORT},
     {"random",          'R', USORT_OPT_RANDOM_SORT},
@@ -150,7 +153,7 @@ static void usage(void)
 
 /* ========== sort engines ========== */
 
-static void *month_sorter_create(uint64_t flags, error_t **error)
+static void *month_sorter_create(uint64_t UNUSED(flags), error_t **error)
 {
     UDateFormat *df;
     UErrorCode status;
@@ -173,10 +176,11 @@ static UBool month_sorter_equals(const void *UNUSED(object), uint64_t flags)
 }
 
 /* compare (unknown) < 'JAN' < ... < 'DEC' */
-static uint8_t *month_sorter_keygen(const void *object, const UChar *source, int32_t sourceLength, error_t **error)
+static RBKey *month_sorter_keygen(const void *object, const UChar *source, int32_t sourceLength, error_t **error)
 {
     int32_t month;
-    uint8_t *result;
+//     uint8_t *result;
+    RBKey *result;
     UDateFormat *df;
     UErrorCode status;
     static UCalendar *ucal = NULL;
@@ -201,9 +205,13 @@ static uint8_t *month_sorter_keygen(const void *object, const UChar *source, int
         // month = 0; ?
         icu_error_set(error, FATAL, status, "ucal_get");
     }
-    result = mem_new_n(*result, 2);
-    result[0] = month;
-    result[1] = 0;
+//     result = mem_new_n(*result, 2);
+//     result[0] = month;
+//     result[1] = 0;
+    result = mem_new(*result);
+    result->key = mem_new(*result->key);
+    *result->key = month;
+    result->key_len = 1;
 
     return result;
 }
@@ -251,24 +259,68 @@ static UBool ucol_sorter_equals(const void *object, uint64_t flags)
     return TRUE;
 }
 
-static uint8_t *ucol_sorter_keygen(const void *object, const UChar *source, int32_t sourceLength, error_t **UNUSED(error))
+static RBKey *ucol_sorter_keygen(const void *object, const UChar *source, int32_t sourceLength, error_t **UNUSED(error))
 {
     uint8_t *key;
+    RBKey* result;
     int32_t key_len;
     const UCollator *ucol;
 
     ucol = (const UCollator *) object;
     key_len = ucol_getSortKey(ucol, source, sourceLength, NULL, 0);
-    key = mem_new_n(*key, key_len + 1);
+    key = mem_new_n(*key, key_len/* + 1*/);
     ensure(key_len == ucol_getSortKey(ucol, source, sourceLength, key, key_len));
-    key[key_len] = 0;
+//     key[key_len] = 0;
+    result = mem_new(*result);
+    result->key = key;
+    result->key_len = key_len;
 
-    return key;
+//     return key;
+    return result;
+}
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+static UBool ip_sorter_equals(const void *UNUSED(object), uint64_t flags)
+{
+    return HAS_FLAG(flags, USORT_OPT_IP_ADDRESS_SORT);
+}
+
+// NOTE: faster (?) IP "hashing", with a numeric sort, you get the same result
+static RBKey *ip_sorter_keygen(const void *UNUSED(object), const UChar *source, int32_t sourceLength, error_t **UNUSED(error))
+{
+    RBKey *result;
+    struct in6_addr addr6;
+    char buffer[INET6_ADDRSTRLEN + 1];
+
+    if (sourceLength >= STR_SIZE(buffer)) {
+        memset(&addr6, 0, sizeof(addr6)); // error, treat it as a "zero address"
+    } else {
+        u_austrncpy(buffer, source, STR_LEN(buffer));
+        buffer[STR_LEN(buffer)] = '\0';
+        if (1 == inet_pton(AF_INET, buffer, &addr6)) {
+            // ok
+        } else if (1 == inet_pton(AF_INET6, buffer, &addr6)) {
+            // ok
+        } else {
+            memset(&addr6, 0, sizeof(addr6)); // error, treat it as a "zero address"
+        }
+    }
+    result = mem_new(*result);
+    result->key = mem_new(addr6);
+    result->key_len = sizeof(addr6);
+    memcpy(result->key, &addr6, sizeof(addr6));
+
+    return result;
 }
 
 static Sorter sorters[] = {
     { USORT_OPT_DEFAULT_SORT | USORT_OPT_NUM_SORT , ucol_sorter_create, ucol_sorter_equals, ucol_sorter_keygen },
-    { USORT_OPT_MONTH_SORT, month_sorter_create, month_sorter_equals, month_sorter_keygen }
+    { USORT_OPT_MONTH_SORT, month_sorter_create, month_sorter_equals, month_sorter_keygen },
+    { USORT_OPT_IP_ADDRESS_SORT, NULL, ip_sorter_equals, ip_sorter_keygen }
 };
 
 /* ========== helpers ========== */
@@ -383,7 +435,9 @@ static UBool create_sorter(USortField *field, error_t **error)
         for (i = 0; i < ARRAY_SIZE(sorters); i++) {
             if (HAS_FLAG(sorters[i].implemented, flags)) {
                 field->sorter = &sorters[i];
-                field->private = field->sorter->create(field->options, error);
+                if (NULL != field->sorter->create) {
+                    field->private = field->sorter->create(field->options, error);
+                }
                 if (NULL != *error) {
                     return FALSE;
                 }
@@ -684,7 +738,7 @@ int main(int argc, char **argv)
     reader = reader_new(DEFAULT_READER_NAME);
 
     status = U_ZERO_ERROR;
-    fields = dptrarray_new(SIZE_TO_DUP_T(sizeof(USortField)), NULL);
+    fields = dptrarray_new(SIZE_TO_DUP_T(sizeof(USortField)), free);
     env_register_resource(fields, (func_dtor_t) dptrarray_destroy);
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {
@@ -725,6 +779,7 @@ int main(int argc, char **argv)
                 break;
             case 'g':
             case 'h':
+            case 'i':
             case 'M':
             case 'n':
             case 'R':
@@ -793,6 +848,7 @@ int main(int argc, char **argv)
     }
 # endif
     machine_ordered_fields = dptrarray_to_array(fields, FALSE, FALSE);
+    env_register_resource(machine_ordered_fields, free);
 # ifdef DEBUG
     print_fields();
 # endif
@@ -812,7 +868,7 @@ int main(int argc, char **argv)
     env_register_resource(pieces, (func_dtor_t) darray_destroy);
 #endif
 //     tree = rbtree_collated_new(ucol, rFlag, (dup_t) ustring_dup, uFlag ? NODUP : SIZE_TO_DUP_T(sizeof(int)), (func_dtor_t) ustring_destroy, uFlag ? NULL : free);
-    tree = rbtree_new(cmp_func, NODUP /* key duper */, (dup_t) ustring_dup /*value duper */, free /* key dtor */, (func_dtor_t) ustring_destroy /* value dtor */);
+    tree = rbtree_new(cmp_func, NODUP /* key duper */, (dup_t) ustring_dup /*value duper */, (func_dtor_t) rbkey_destroy/*free*/ /* key dtor */, (func_dtor_t) ustring_destroy /* value dtor */);
     env_register_resource(tree, (func_dtor_t) rbtree_destroy);
     ustr = ustring_new();
     env_register_resource(ustr, (func_dtor_t) ustring_destroy);

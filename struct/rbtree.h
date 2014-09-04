@@ -19,9 +19,15 @@ typedef enum
     POST_ORDER /* Postfixed */
 } traverse_mode_t;
 
+typedef struct {
+    uint8_t *key;
+    int32_t key_len;
+} RBKey;
+
 typedef struct _RBTree RBTree;
 typedef struct _RBTreeNode RBTreeNode;
 
+void rbkey_destroy(RBKey *);
 int ucol_key_cmp(const void *k1, const void *k2);
 int ucol_key_cmp_r(const void *k1, const void *k2);
 
