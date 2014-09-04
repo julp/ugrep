@@ -45,7 +45,7 @@ typedef struct {
 typedef struct {
     UString *line;
     uint32_t count;
-    uint8_t **keys; /* TODO: array of keys (each piece/field has a key) */
+    /*uint8_t **/RBKey *keys; /* TODO: array of keys (each piece/field has a key) */
 } Line;
 
 #define USORT_OPT_IGNORE_LEAD_BLANKS (1 << 0)
@@ -649,8 +649,8 @@ echo -en "0Xjanvier\n0Xfévrier\n0Xmars\n0Xavril" | ./usort -t 'X' -r --sort=mon
 */
 static int procfile(reader_t *reader, const char *filename)
 {
+    RBKey *key;
     error_t *error;
-    const uint8_t *key;
 
     key = NULL;
     error = NULL;
@@ -683,11 +683,24 @@ assert(field->start_field <= count);
                     key = field->sorter->keygen(field->private, m.ptr, m.len, &error);
                     if (NULL != error) {
                         if (NULL != key) {
-                            free(key);
+                            rbkey_destroy(key);
                         }
                         break; // error is handled right after
                     }
-debug("For >%S<, sort on >%.*S< (%d) >%S<: key = 0x%02X", ustr->ptr, m.len, m.ptr, m.len, m.ptr, key[0]);
+#ifdef DEBUG
+                    {
+                        int i, j;
+                        char *dump;
+
+                        dump = mem_new_n(*dump, STR_LEN("0xXX") * key->key_len + 1);
+                        for (i = j = 0; i < key->key_len; i++, j += STR_LEN("0xXX")) {
+                            sprintf(dump + j, "0x%02X", key->key[i]);
+                        }
+                        dump[j] = '\0';
+                        debug("For >%S<, sort on >%.*S< (%d) >%S<: key = >%s<", ustr->ptr, m.len, m.ptr, m.len, m.ptr, dump);
+                        free(dump);
+                    }
+#endif /* DEBUG */
                 }
             } else {
                 break; // error is handled right after
