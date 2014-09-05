@@ -364,7 +364,8 @@ static void print_fields(void)
     size_t i;
 
     for (i = 0; i < dptrarray_length(fields); i++) {
-        printf(
+        fprintf(
+            stderr,
             "order : %d, start_field = %d, end_field = %d, start_offset = %d, end_offset = %d, options = %lu\n",
             machine_ordered_fields[i]->order,
             machine_ordered_fields[i]->start_field,
