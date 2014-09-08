@@ -116,19 +116,21 @@ UString *ustring_dup_string(const UChar *from) /* NONNULL() */
     return ustring_dup_string_len(from, (size_t) u_strlen(from));
 }
 
-UString *ustring_adopt_string_len(const UChar *from, size_t len)
+UString *ustring_adopt_string_len(UChar *from, size_t len) /* NONNULL() */
 {
     UString *ustr;
+
+    require_else_return_null(NULL != from);
 
     ustr = mem_new(*ustr);
     ustr->len = len;
     ustr->allocated = len + 1;
-    ustr->ptr = (UChar *) from;
+    ustr->ptr = from;
 
     return ustr;
 }
 
-UString *ustring_adopt_string(const UChar *from) /* NONNULL() */
+UString *ustring_adopt_string(UChar *from) /* NONNULL() */
 {
     require_else_return_null(NULL != from);
 
@@ -139,11 +141,17 @@ UString *ustring_adopt_string(const UChar *from) /* NONNULL() */
 
 UBool ustring_startswith(UString *ustr, UChar *str, size_t length) /* NONNULL() */
 {
+    require_else_return_false(NULL != ustr);
+    require_else_return_false(NULL != str);
+
     return ustr->len >= length && 0 == u_memcmp(ustr->ptr, str, length);
 }
 
 UBool ustring_endswith(UString *ustr, UChar *str, size_t length) /* NONNULL() */
 {
+    require_else_return_false(NULL != ustr);
+    require_else_return_false(NULL != str);
+
     return ustr->len >= length && 0 == u_memcmp(ustr->ptr + ustr->len - length, str, length);
 }
 
@@ -356,6 +364,8 @@ void ustring_destroy(UString *ustr) /* NONNULL() */
 UChar *ustring_orphan(UString *ustr) /* NONNULL() */
 {
     UChar *ret;
+
+    require_else_return_null(NULL != ustr);
 
     ret = ustr->ptr;
     free(ustr);
@@ -787,7 +797,7 @@ void ustring_dump(UString *ustr) /* NONNULL() */
     }
 }
 
-void ustring_sprintf(UString *ustr, const char *format, ...) /* NONNULL(1, 2) */
+void ustring_sprintf(UString *ustr, const char *format, ...) /* PRINTF(2, 3) NONNULL(1, 2) */
 {
     va_list args;
     int32_t ret;

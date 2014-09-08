@@ -18,8 +18,8 @@ typedef enum {
     UCASE_COUNT
 } UCaseType;
 
-UString *ustring_adopt_string(const UChar *) NONNULL();
-UString *ustring_adopt_string_len(const UChar *, size_t);
+UString *ustring_adopt_string(UChar *) NONNULL();
+UString *ustring_adopt_string_len(UChar *, size_t);
 void ustring_append_char(UString *, UChar) NONNULL();
 void ustring_append_char32(UString *, UChar32) NONNULL();
 void ustring_append_string(UString *, const UChar *) NONNULL();
@@ -46,7 +46,7 @@ void ustring_prepend_string(UString *, const UChar *) NONNULL();
 void ustring_prepend_string_len(UString *, const UChar *, int32_t) NONNULL();
 void ustring_rtrim(UString *) NONNULL();
 UString *ustring_sized_new(size_t) WARN_UNUSED_RESULT;
-void ustring_sprintf(UString *, const char *, ...) NONNULL(1, 2);
+void ustring_sprintf(UString *, const char *, ...) PRINTF(2, 3) NONNULL(1, 2);
 UBool ustring_startswith(UString *, UChar *, size_t) NONNULL();
 int32_t ustring_subreplace_len(UString *, const UChar *, size_t, size_t, size_t) NONNULL(1);
 void ustring_sync(const UString *, UString *, double) NONNULL();
