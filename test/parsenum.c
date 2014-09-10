@@ -27,13 +27,9 @@
             /* TODO: PRIi8 vs PRIu8 modifier */ \
             printf("parse_%s(%s): %d parsed (%d expected)\n", #type, string, v, expected_value); \
         } \
-        if (0 == stopchar) { \
-            ret &= NULL == endptr; \
-        } else { \
-            ret &= *endptr == stopchar; \
-            if (*endptr != stopchar) { \
-                printf("parse_%s(%s): stopped on 0x%02X (0x%02X expected)\n", #type, string, *endptr, stopchar); \
-            } \
+        ret &= *endptr == stopchar; \
+        if (*endptr != stopchar) { \
+            printf("parse_%s(%s): stopped on 0x%02X (0x%02X expected)\n", #type, string, *endptr, stopchar); \
         } \
     } while (0);
 

@@ -4,35 +4,43 @@
 #define parse_signed(type, unsigned_type, value_type_min, value_type_max) \
     ParseNumError parse_## type(const char *nptr, char **endptr, int base, type *min, type *max, type *ret) { \
         char c; \
+        char ***spp; \
         int negative; \
-        const char *s; \
         int any, cutlim; \
-        unsigned_type cutoff, acc; \
         ParseNumError err; \
+        unsigned_type cutoff, acc; \
  \
-        s = nptr; \
         acc = any = 0; \
-        *endptr = NULL; \
+        negative = FALSE; \
         err = PARSE_NUM_NO_ERR; \
-        if ('-' == *s) { \
-            ++s; \
+        if (NULL == endptr) { \
+            char **sp; \
+ \
+            sp = (char **) &nptr; \
+            spp = &sp; \
+        } else { \
+            spp = &endptr; \
+            *endptr = (char *) nptr; \
+        } \
+        if ('-' == ***spp) { \
+            ++**spp; \
             negative = TRUE; \
         } else { \
             negative = FALSE; \
-            if ('+' == *s) { \
-                ++s; \
+            if ('+' == ***spp) { \
+                ++**spp; \
             } \
         } \
-        if ((0 == base || 2 == base) && '0' == *s && ('b' == s[1] || 'B' == s[1])) { \
-            s += 2; \
+        if ((0 == base || 2 == base) && '0' == ***spp && ('b' == (**spp)[1] || 'B' == (**spp)[1])) { \
+            **spp += 2; \
             base = 2; \
         } \
-        if ((0 == base || 16 == base) && '0' == *s && ('x' == s[1] || 'X' == s[1])) { \
-            s += 2; \
+        if ((0 == base || 16 == base) && '0' == ***spp && ('x' == (**spp)[1] || 'X' == (**spp)[1])) { \
+            **spp += 2; \
             base = 16; \
         } \
         if (0 == base) { \
-            base = '0' == *s ? 8 : 10; \
+            base = '0' == ***spp ? 8 : 10; \
         } \
         if (base < 2 || base > 36) { \
             return PARSE_NUM_ERR_INVALID_BASE; \
@@ -40,25 +48,19 @@
         cutoff = negative ? (unsigned_type) - (value_type_min + value_type_max) + value_type_max : value_type_max; \
         cutlim = cutoff % base; \
         cutoff /= base; \
-        for (/*  NOP */; '\0' != *s; s++) { \
-            if (*s >= '0' && *s <= '9') { \
-                c = *s - '0'; \
-            } else if (base > 10 && *s >= 'A' && *s <= 'Z') { \
-                c = *s - 'A' - 10; \
-            } else if (base > 10 && *s >= 'a' && *s <= 'z') { \
-                c = *s - 'a' - 10; \
+        for (/* NOP */; '\0' != ***spp; ++**spp) { \
+            if (***spp >= '0' && ***spp <= '9') { \
+                c = ***spp - '0'; \
+            } else if (base > 10 && ***spp >= 'A' && ***spp <= 'Z') { \
+                c = ***spp - 'A' - 10; \
+            } else if (base > 10 && ***spp >= 'a' && ***spp <= 'z') { \
+                c = ***spp - 'a' - 10; \
             } else { \
                 err = PARSE_NUM_ERR_NON_DIGIT_FOUND; \
-                if (NULL != endptr) { \
-                    *endptr = (char *) s; \
-                } \
                 break; \
             } \
             if (c >= base) { \
                 err = PARSE_NUM_ERR_NON_DIGIT_FOUND; \
-                if (NULL != endptr) { \
-                    *endptr = (char *) s; \
-                } \
                 break; \
             } \
             if (any < 0 || acc > cutoff || (acc == cutoff && c > cutlim)) { \
@@ -106,60 +108,62 @@ parse_signed(int64_t, uint64_t, INT64_MIN, INT64_MAX);
 #define parse_unsigned(type, value_type_max) \
     ParseNumError parse_## type(const char *nptr, char **endptr, int base, type *min, type *max, type *ret) { \
         char c; \
+        char ***spp; \
         int negative; \
-        const char *s; \
         int any, cutlim; \
         type cutoff, acc; \
         ParseNumError err; \
  \
-        s = nptr; \
         acc = any = 0; \
-        *endptr = NULL; \
+        negative = FALSE; \
         err = PARSE_NUM_NO_ERR; \
-        if ('-' == *s) { \
-            ++s; \
+        if (NULL == endptr) { \
+            char **sp; \
+ \
+            sp = (char **) &nptr; \
+            spp = &sp; \
+        } else { \
+            spp = &endptr; \
+            *endptr = (char *) nptr; \
+        } \
+        if ('-' == ***spp) { \
+            ++**spp; \
             negative = TRUE; \
         } else { \
             negative = FALSE; \
-            if ('+' == *s) { \
-                ++s; \
+            if ('+' == ***spp) { \
+                ++**spp; \
             } \
         } \
-        if ((0 == base || 2 == base) && '0' == *s && ('b' == s[1] || 'B' == s[1])) { \
-            s += 2; \
+        if ((0 == base || 2 == base) && '0' == ***spp && ('b' == (**spp)[1] || 'B' == (**spp)[1])) { \
+            **spp += 2; \
             base = 2; \
         } \
-        if ((0 == base || 16 == base) && '0' == *s && ('x' == s[1] || 'X' == s[1])) { \
-            s += 2; \
+        if ((0 == base || 16 == base) && '0' == ***spp && ('x' == (**spp)[1] || 'X' == (**spp)[1])) { \
+            **spp += 2; \
             base = 16; \
         } \
         if (0 == base) { \
-            base = '0' == *s ? 8 : 10; \
+            base = '0' == ***spp ? 8 : 10; \
         } \
         if (base < 2 || base > 36) { \
             return PARSE_NUM_ERR_INVALID_BASE; \
         } \
         cutoff = value_type_max / base; \
         cutlim = value_type_max % base; \
-        for (/*  NOP */; '\0' != *s; s++) { \
-            if (*s >= '0' && *s <= '9') { \
-                c = *s - '0'; \
-            } else if (base > 10 && *s >= 'A' && *s <= 'Z') { \
-                c = *s - 'A' - 10; \
-            } else if (base > 10 && *s >= 'a' && *s <= 'z') { \
-                c = *s - 'a' - 10; \
+        for (/* NOP */; '\0' != ***spp; ++**spp) { \
+            if (***spp >= '0' && ***spp <= '9') { \
+                c = ***spp - '0'; \
+            } else if (base > 10 && ***spp >= 'A' && ***spp <= 'Z') { \
+                c = ***spp - 'A' - 10; \
+            } else if (base > 10 && ***spp >= 'a' && ***spp <= 'z') { \
+                c = ***spp - 'a' - 10; \
             } else { \
                 err = PARSE_NUM_ERR_NON_DIGIT_FOUND; \
-                if (NULL != endptr) { \
-                    *endptr = (char *) s; \
-                } \
                 break; \
             } \
             if (c >= base) { \
                 err = PARSE_NUM_ERR_NON_DIGIT_FOUND; \
-                if (NULL != endptr) { \
-                    *endptr = (char *) s; \
-                } \
                 break; \
             } \
             if (any < 0 || acc > cutoff || (acc == cutoff && c > cutlim)) { \
