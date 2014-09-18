@@ -2,6 +2,9 @@
 
 # define UGREP_USTRING_H
 
+# include <unicode/ubrk.h>
+# include "struct/darray.h"
+
 typedef struct {
     UChar *ptr;
     size_t len;
@@ -36,10 +39,11 @@ UString *ustring_dup_string_len(const UChar *, size_t) NONNULL();
 UBool ustring_empty(const UString *) NONNULL();
 UBool ustring_endswith(UString *, UChar *, size_t) NONNULL();
 UBool ustring_fullcase(UString *, UChar *, int32_t, UCaseType, error_t **) NONNULL(1);
+void ustring_index(UString *, UBreakIterator *, DArray *) NONNULL();
 int32_t ustring_insert_len(UString *, size_t, const UChar *, size_t) NONNULL(1);
 void ustring_ltrim(UString *) NONNULL();
 UString *ustring_new(void) WARN_UNUSED_RESULT;
-UBool ustring_normalize(UString *, UNormalizationMode);
+UBool ustring_normalize(UString *, UNormalizationMode) NONNULL(1);
 UChar *ustring_orphan(UString *) NONNULL();
 void ustring_prepend_char(UString *, UChar) NONNULL();
 void ustring_prepend_string(UString *, const UChar *) NONNULL();

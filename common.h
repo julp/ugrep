@@ -198,7 +198,7 @@ typedef func_dup_t func_cpy_t;             /* Alias */
 #  define OLD_RING     1
 # endif /* _MSC_VER */
 
-# define COPYRIGHT "\nCopyright (C) 2010-2013, julp\n"
+# define COPYRIGHT "\nCopyright (C) 2010-2014, julp\n"
 
 # include "alloc.h"
 

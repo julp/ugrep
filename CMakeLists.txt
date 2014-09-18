@@ -43,7 +43,8 @@ set(COMMON_BASE_SOURCES io/mmap.c io/stdio.c io/string.c io/reader.c struct/slis
 #file(GLOB MISC_SOURCES ${CMAKE_SOURCE_DIR}/misc/*.c)
 #list(APPEND COMMON_BASE_SOURCES ${MISC_SOURCES})
 list(APPEND COMMON_BASE_SOURCES misc/alloc.c misc/env.c misc/error.c misc/ustring.c misc/parsenum.c)
-set(ENGINES_SOURCES engines/fixed.c engines/re.c engines/bin.c struct/intervals.c struct/darray.c)
+list(APPEND COMMON_BASE_SOURCES struct/darray.c)
+set(ENGINES_SOURCES engines/fixed.c engines/re.c engines/bin.c struct/intervals.c)
 set(EXTRA_SOURCES "")
 set(EXTRA_LIBS "")
 

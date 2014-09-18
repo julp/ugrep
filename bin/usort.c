@@ -61,6 +61,7 @@ typedef struct {
 #define USORT_OPT_RANDOM_SORT        (1 << 9)
 #define USORT_OPT_VERSION_SORT       (1 << 10)
 #define USORT_OPT_IP_ADDRESS_SORT    (1 << 11)
+#define USORT_OPT_DATE_SORT          (1 << 12)
 
 /* ========== global variables ========== */
 
@@ -100,7 +101,7 @@ enum {
     ALL
 };
 
-static char optstr[] = "bfghik:MnRrt:uV";
+static char optstr[] = "bdfghik:MnRrt:uV";
 
 static struct option long_options[] =
 {
@@ -111,6 +112,7 @@ static struct option long_options[] =
     {"sort",                  required_argument, NULL, SORT_OPT},
     {"version",               no_argument,       NULL, VERSION_OPT},
     {"ignore-leading-blanks", no_argument,       NULL, 'b'},
+    {"date-sort",             no_argument,       NULL, 'd'},
     {"ignore-case",           no_argument,       NULL, 'f'},
     {"general-numeric-sort",  no_argument,       NULL, 'g'},
     {"humanc-numeric-sort",   no_argument,       NULL, 'h'},
@@ -131,6 +133,7 @@ struct {
     int short_opt_val;
     uint64_t flag_value;
 } static sortnames[] = {
+    {"date",            'd', USORT_OPT_DATE_SORT},
     {"general-numeric", 'g', USORT_OPT_GENERAL_NUM_SORT},
     {"human-numeric",   'h', USORT_OPT_HUMAN_SORT},
     {"ip",              'i', USORT_OPT_IP_ADDRESS_SORT},
@@ -279,15 +282,68 @@ static RBKey *ucol_sorter_keygen(const void *object, const UChar *source, int32_
     return result;
 }
 
+#include <unicode/udat.h>
+
+static UDateFormat *udout = NULL;
+
+static void *date_sorter_create(uint64_t UNUSED(flags), error_t **error)
+{
+    UDateFormat *udin;
+    UErrorCode status;
+    UChar output_format[] = { 0x0079, 0x0079, 0x0079, 0x0079, 0x004D, 0x004D, 0x0064, 0x0064, 0x0048, 0x0048, 0x006D, 0x006D, 0x0073, 0x0073, 0 }; /* yyyyMMddHHmmss */
+
+    status = U_ZERO_ERROR;
+    udin = udat_open(UDAT_NONE, UDAT_SHORT, NULL, NULL, -1, NULL, -1, &status);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "udat_open");
+        return NULL;
+    }
+    env_register_resource(udin, (func_dtor_t) udat_close);
+    //
+    udout = udat_open(UDAT_IGNORE, UDAT_IGNORE, NULL, NULL, -1, output_format, STR_LEN(output_format), &status);
+    if (U_FAILURE(status)) {
+        icu_error_set(error, FATAL, status, "udat_open");
+        return NULL;
+    }
+    env_register_resource(udout, (func_dtor_t) udat_close);
+
+    return udin;
+}
+
+static UBool date_sorter_equals(const void *UNUSED(object), uint64_t flags)
+{
+    return HAS_FLAG(flags, USORT_OPT_DATE_SORT);
+}
+
+// echo -e "19/09/1986\n03/10/1984\n22/09/1955" | ./usort -d
+static RBKey *date_sorter_keygen(const void *object, const UChar *source, int32_t sourceLength, error_t **UNUSED(error))
+{
+    UDate d;
+    int32_t l;
+    RBKey *result;
+    UErrorCode status;
+
+    status = U_ZERO_ERROR;
+    d = udat_parse((const UDateFormat *) object, source, sourceLength, NULL, &status);
+    if (U_FAILURE(status)) {
+        d = 0;
+    }
+    l = udat_format(udout, d, NULL, 0, NULL, &status);
+    assert(U_BUFFER_OVERFLOW_ERROR == status);
+    status = U_ZERO_ERROR;
+    result = mem_new(*result);
+    result->key = mem_new_n(UChar, l);
+    result->key_len = l * sizeof(UChar);
+    assert(udat_format(udout, d, (UChar *) result->key, l, NULL, &status) == l);
+    assert(U_STRING_NOT_TERMINATED_WARNING == status);
+
+    return result;
+}
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
-static UBool ip_sorter_equals(const void *UNUSED(object), uint64_t flags)
-{
-    return HAS_FLAG(flags, USORT_OPT_IP_ADDRESS_SORT);
-}
 
 // NOTE: faster (?) IP "hashing", with a numeric sort, you get the same result
 static RBKey *ip_sorter_keygen(const void *UNUSED(object), const UChar *source, int32_t sourceLength, error_t **UNUSED(error))
@@ -317,9 +373,15 @@ static RBKey *ip_sorter_keygen(const void *UNUSED(object), const UChar *source, 
     return result;
 }
 
+static UBool ip_sorter_equals(const void *UNUSED(object), uint64_t flags)
+{
+    return HAS_FLAG(flags, USORT_OPT_IP_ADDRESS_SORT);
+}
+
 static Sorter sorters[] = {
     { USORT_OPT_DEFAULT_SORT | USORT_OPT_NUM_SORT , ucol_sorter_create, ucol_sorter_equals, ucol_sorter_keygen },
     { USORT_OPT_MONTH_SORT, month_sorter_create, month_sorter_equals, month_sorter_keygen },
+    { USORT_OPT_DATE_SORT, date_sorter_create, date_sorter_equals, date_sorter_keygen },
     { USORT_OPT_IP_ADDRESS_SORT, NULL, ip_sorter_equals, ip_sorter_keygen }
 };
 
@@ -791,6 +853,7 @@ int main(int argc, char **argv)
             case MAX_OPT:
                 wanted = MAX_ONLY;
                 break;
+            case 'd':
             case 'g':
             case 'h':
             case 'i':

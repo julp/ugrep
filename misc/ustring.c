@@ -847,9 +847,34 @@ UBool ustring_transliterate(UString *ustr, UTransliterator *utrans, error_t **er
     return TRUE;
 }
 
+/**
+ * NOTE:
+ * - ubrk have to be already initialized (we don't take care of its internal mode - UBRK_(?:CHARACTER|WORD|LINE|SENTENCE) - so
+ *   we can use this function to pre-index code points, graphemes or ... to their code unit positions.
+ * - index have to be already created with darray_new(sizeof(int32_t)) or darray_sized_new(..., sizeof(int32_t))
+ **/
+void ustring_index(UString *ustr, UBreakIterator *ubrk, DArray *index) /* NONNULL() */
+{
+    int32_t l, u;
+
+    require_else_return(NULL != ustr);
+    require_else_return(NULL != ubrk);
+    require_else_return(NULL != index);
+    require_else_return(sizeof(int32_t) == index->element_size);
+
+    l = 0;
+    darray_clear(index);
+    if (UBRK_DONE != (u = ubrk_first(ubrk))) {
+        do {
+            darray_append(index, l);
+            l = u;
+        } while (UBRK_DONE != (u = ubrk_next(ubrk)));
+    }
+}
+
 /* ==================== normalization ==================== */
 
-static UChar *u_strdup(UChar *src, int32_t len)
+static UChar *u_strdup_len(UChar *src, int32_t len)
 {
     UChar *cpy;
 
@@ -863,7 +888,8 @@ static UChar *u_strdup(UChar *src, int32_t len)
     return cpy;
 }
 
-UBool ustring_normalize(UString *ustr, UNormalizationMode mode)
+// TODO: reach back error to caller
+UBool ustring_normalize(UString *ustr, UNormalizationMode mode/*, error_t **error*/) /* NONNULL(1) */
 {
     UErrorCode status;
 
@@ -874,7 +900,7 @@ UBool ustring_normalize(UString *ustr, UNormalizationMode mode)
         UChar *tmp;
         int32_t res_len;
 
-        tmp = u_strdup(ustr->ptr, ustr->len);
+        tmp = u_strdup_len(ustr->ptr, ustr->len);
         res_len = unorm_normalize(tmp, ustr->len, mode, 0, NULL, 0, &status);
         if (U_BUFFER_OVERFLOW_ERROR == status) {
             status = U_ZERO_ERROR;
@@ -883,6 +909,9 @@ UBool ustring_normalize(UString *ustr, UNormalizationMode mode)
         }
         assert(U_ZERO_ERROR == status);
         free(tmp);
+        /*if (U_FAILURE(status)) {
+            icu_error_set(error, FATAL, status, "unorm_normalize");
+        }*/
     }
 
     return U_SUCCESS(status);
