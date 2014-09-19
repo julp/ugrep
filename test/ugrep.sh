@@ -38,17 +38,25 @@ assertOutputCommand "count matching lines (-c)" "./ugrep ${UGREP_OPTS} -c ${ARGS
 assertOutputCommand "count non-matching lines (-vc)" "./ugrep ${UGREP_OPTS} -vc ${ARGS} ${UFILE} 2>/dev/null" "grep -vc ${ARGS} ${FILE}" "-eq"
 
 ARGS='-c e'
-INPUT="echo -e \"${E_ACUTE_NFD}\nl\n${E_GRAVE_NFD}\nv\ne\""
+INPUT="echo -en \"${E_ACUTE_NFD}\nl\n${E_GRAVE_NFD}\nv\ne\""
 assertOutputValue "grapheme consistent (-c)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme ${ARGS} 2>/dev/null" 1 "-eq"
 assertOutputValue "grapheme inconsistent (-c)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=codepoint ${ARGS} 2>/dev/null" 3 "-eq"
 assertOutputValue "grapheme consistent (-Ec)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme -E ${ARGS} 2>/dev/null" 1 "-eq"
 assertOutputValue "grapheme inconsistent (-Ec)" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=codepoint -E ${ARGS} 2>/dev/null" 3 "-eq"
 
+ARGS='--color=never -m 2 a'
+INPUT="echo -en \"a\na\na\na\""
+assertOutputCommand "max-count" "${INPUT} | ./ugrep ${UGREP_OPTS} ${ARGS} 2>/dev/null" "echo -en \"a\na\""
+assertOutputValue "count + max-count" "${INPUT} | ./ugrep ${UGREP_OPTS} -c ${ARGS} 2>/dev/null" 2 "-eq"
+ARGS='--color=never -vm 2 z'
+assertOutputCommand "revert-match + max-count" "${INPUT} | ./ugrep ${UGREP_OPTS} ${ARGS} 2>/dev/null" "echo -en \"a\na\""
+assertOutputValue "revert-match + count + max-count" "${INPUT} | ./ugrep -c ${UGREP_OPTS} ${ARGS} 2>/dev/null" 2 "-eq"
+
 declare -r SDBDA_NFC=$'\xE1\xB9\xA9'
 declare -r SDBDA_NFD=$'\x73\xCC\xA3\xCC\x87'
 declare -r SDBDA_NONE=$'\x73\xCC\x87\xCC\xA3'
 
-INPUT="echo -e \"${SDBDA_NONE}\n${SDBDA_NFC}\n${SDBDA_NFD}\n\""
+INPUT="echo -en \"${SDBDA_NONE}\n${SDBDA_NFC}\n${SDBDA_NFD}\n\""
 assertOutputValue "NFC" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme --form=c -c '${SDBDA_NFD}' 2>/dev/null" 3 "-eq"
 assertOutputValue "NFD" "${INPUT} | ./ugrep ${UGREP_OPTS} --unit=grapheme --form=d -c '${SDBDA_NFC}' 2>/dev/null" 3 "-eq"
 
