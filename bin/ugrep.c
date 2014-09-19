@@ -17,6 +17,7 @@
 #include <ctype.h>
 
 #include "engine.h"
+#include "parsenum.h"
 #include "struct/fixed_circular_list.h"
 
 #define SEP_MATCH_UCHAR    0x003a
@@ -112,8 +113,9 @@ static UBool cFlag = FALSE;
 static UBool lFlag = FALSE;
 static UBool LFlag = FALSE;
 
-static size_t after_context = 0;
-static size_t before_context = 0;
+static uint32_t after_context = 0;
+static uint32_t before_context = 0;
+static uint32_t max_count = UINT32_MAX;
 
 static UBool file_print = FALSE; // -H/h
 #ifndef NO_COLOR
@@ -174,7 +176,7 @@ enum {
     //READER_OPT
 };
 
-static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilnqsvwx" FTS_COMMON_OPTIONS_STRING;
+static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilm:nqsvwx" FTS_COMMON_OPTIONS_STRING;
 
 static struct option long_options[] =
 {
@@ -201,6 +203,7 @@ static struct option long_options[] =
     {"no-filename",         no_argument,       NULL, 'h'},
     {"ignore-case",         no_argument,       NULL, 'i'}, // POSIX
     {"files-with-matches",  no_argument,       NULL, 'l'},
+    {"max-count",           required_argument, NULL, 'm'},
     {"line-number",         no_argument,       NULL, 'n'}, // POSIX
     {"quiet",               no_argument,       NULL, 'q'}, // POSIX
     {"silent",              no_argument,       NULL, 'q'}, // POSIX
@@ -732,7 +735,7 @@ void fixed_circular_list_print(fixed_circular_list_t *l) /* NONNULL() */
 
 static int procfile(reader_t *reader, const char *filename, void *userdata)
 {
-    int *matches;
+    uint32_t *matches;
     UString *ustr;
     error_t *error;
 #ifndef NO_COLOR
@@ -741,15 +744,15 @@ static int procfile(reader_t *reader, const char *filename, void *userdata)
 # endif /* _MSC_VER */
     UBool _colorize;
 #endif /* !NO_COLOR */
-    size_t last_line_print;
-    int arg_matches; // matches (for the current file) against command arguments (-v)
+    uint32_t last_line_print;
+    uint32_t arg_matches; // matches (for the current file) against command arguments (-v)
     int _after_context;
 
     error = NULL;
     arg_matches = 0;
     _after_context = 0;
     last_line_print = 0;
-    matches = (int *) userdata;
+    matches = (uint32_t *) userdata;
 #ifndef NO_COLOR
     _colorize = colorize && (before_context || after_context || !vFlag);
 #endif /* !NO_COLOR */
@@ -961,6 +964,9 @@ static int procfile(reader_t *reader, const char *filename, void *userdata)
                     }
                 }
             }
+            if (arg_matches >= max_count) {
+                goto endfile;
+            }
         }
 endfile:
         if (!_line_print) {
@@ -1008,12 +1014,12 @@ int main(int argc, char **argv)
 #ifndef NO_COLOR
     int color;
 #endif /* !NO_COLOR */
-    int matches;
     UBool iFlag;
     UBool wFlag;
     uint32_t flags;
     int strength;
     error_t *error;
+    uint32_t matches;
     int pattern_type; // -E/F
 
     ret = 0;
@@ -1065,20 +1071,18 @@ int main(int argc, char **argv)
             case 'B':
             case 'C':
                 if (NULL != optarg) {
-                    long val;
-                    char *endptr;
+                    int32_t min, val;
 
-                    errno = 0;
-                    val = strtol(optarg, &endptr, 10);
-                    if (0 != errno || endptr == optarg || *endptr != '\0' || val </*=*/ 0) {
-                        fprintf(stderr, "Context out of range\n");
+                    min = 0;
+                    if (PARSE_NUM_NO_ERR != parse_int32_t(optarg, NULL, 10, &min, NULL, &val)) {
+                        fprintf(stderr, "Invalid context '%s'\n", optarg);
                         return UGREP_EXIT_USAGE;
                     }
                     if ('A' != c) {
-                        before_context = val;
+                        before_context = (uint32_t) val;
                     }
                     if ('B' != c) {
-                        after_context = val;
+                        after_context = (uint32_t) val;
                     }
                 }
                 break;
@@ -1125,6 +1129,18 @@ int main(int argc, char **argv)
             case 'q':
                 file_print = line_print = FALSE;
                 break;
+            case 'm':
+            {
+                int32_t min, val;
+
+                min = 0;
+                if (PARSE_NUM_NO_ERR != parse_int32_t(optarg, NULL, 10, &min, NULL, &val)) {
+                    fprintf(stderr, "Invalid limit '%s'\n", optarg);
+                    return UGREP_EXIT_USAGE;
+                }
+                max_count = (uint32_t) val;
+                break;
+            }
             case 'n':
                 nFlag = TRUE;
                 break;

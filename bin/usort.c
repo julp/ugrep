@@ -315,7 +315,7 @@ static UBool date_sorter_equals(const void *UNUSED(object), uint64_t flags)
     return HAS_FLAG(flags, USORT_OPT_DATE_SORT);
 }
 
-// echo -e "19/09/1986\n03/10/1984\n22/09/1955" | ./usort -d
+// echo -en "19/09/1986\n03/10/1984\n22/09/1955" | ./usort -d
 static RBKey *date_sorter_keygen(const void *object, const UChar *source, int32_t sourceLength, error_t **UNUSED(error))
 {
     UDate d;
