@@ -554,7 +554,6 @@ static UBool parse_field(const char *string, error_t **error)
     p = endptr;
     while ('\0' != *p && ',' != *p) { // check .* is in fact [bdfgiMhnRrV]*
         if (!parse_option(*p, &field.options, error)) {
-//             error_set(error, FATAL, "invalid option '%c'", *p);
             return FALSE;
         }
         ++p;
@@ -582,7 +581,6 @@ static UBool parse_field(const char *string, error_t **error)
         p = endptr;
         while ('\0' != *p) { // check .* is in fact [bdfgiMhnRrV]*
             if (!parse_option(*p, &field.options, error)) {
-//                 error_set(error, FATAL, "invalid option '%c'", *p);
                 return FALSE;
             }
             ++p;
@@ -828,12 +826,8 @@ int main(int argc, char **argv)
             case 'k':
                 if (!parse_field(optarg, &error)) {
                     print_error(error);
-//                     return EXIT_FAILURE;
                 }
                 break;
-//             case 'n':
-//                 global_options |= USORT_OPT_NUM_SORT;
-//                 break;
             case 'r':
                 cmp_func = ucol_key_cmp_r;
                 break;
