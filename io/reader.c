@@ -20,6 +20,9 @@ extern reader_imp_t zlib_reader_imp;
 #if defined(HAVE_BZIP2) || defined(DYNAMIC_READERS)
 extern reader_imp_t bzip2_reader_imp;
 #endif /* HAVE_BZIP2 || DYNAMIC_READERS */
+#if defined(HAVE_LZMA) || defined(DYNAMIC_READERS)
+extern reader_imp_t lzma_reader_imp;
+#endif /* HAVE_LZMA || DYNAMIC_READERS */
 
 static const reader_imp_t *available_readers[] = {
     &mmap_reader_imp,
@@ -30,6 +33,9 @@ static const reader_imp_t *available_readers[] = {
 #if defined(HAVE_BZIP2) || defined(DYNAMIC_READERS)
     &bzip2_reader_imp,
 #endif /* HAVE_BZIP2 || DYNAMIC_READERS */
+#if defined(HAVE_LZMA) || defined(DYNAMIC_READERS)
+    &lzma_reader_imp,
+#endif /* HAVE_LZMA || DYNAMIC_READERS */
     NULL
 };
 
@@ -344,7 +350,7 @@ const reader_imp_t *reader_get_by_name(const char *name) /* NONNULL() */
     require_else_return_null(NULL != name);
 
     for (imp = available_readers; NULL != *imp; imp++) {
-        if (!strcmp((*imp)->name, name)) {
+        if (0 == strcmp((*imp)->name, name)) {
 #ifdef DYNAMIC_READERS
             if ((*imp)->internal || (NULL != (*imp)->trydload && !(*imp)->trydload())) {
 #else
@@ -368,7 +374,7 @@ UBool reader_set_imp_by_name(reader_t *this, const char *name) /* NONNULL() */
     require_else_return_false(NULL != name);
 
     for (imp = available_readers; NULL != *imp; imp++) {
-        if (!strcmp((*imp)->name, name)) {
+        if (0 == strcmp((*imp)->name, name)) {
 #ifdef DYNAMIC_READERS
             if ((*imp)->internal || (NULL != (*imp)->trydload && !(*imp)->trydload())) {
 #else

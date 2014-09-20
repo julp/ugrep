@@ -13,7 +13,7 @@ typedef struct {
 } BZIP2;
 
 #ifdef DYNAMIC_READERS
-static const char *(*DRNS(BZ2_bzerror))(BZFILE *,int *) = NULL;
+static const char *(*DRNS(BZ2_bzerror))(BZFILE *, int *) = NULL;
 static BZFILE *(*DRNS(BZ2_bzReadOpen))(int *, FILE *, int, int, void *, int) = NULL;
 static int (*DRNS(BZ2_bzRead))(int *, BZFILE *, void *, int) = NULL;
 static void (*DRNS(BZ2_bzReadClose))(int *, BZFILE *) = NULL;

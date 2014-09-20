@@ -101,7 +101,7 @@ typedef struct {
     size_t lineno;
     UBool binary;
 
-    int fd;   /* responsability of imp to close it if necessary */
+    int fd;   /* this is not the responsability of imp to close it */
     void *fp; /* responsability of imp to free and/or close it if necessary */
     UConverter *ucnv;
     struct {

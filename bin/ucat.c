@@ -143,8 +143,16 @@ int main(int argc, char **argv)
     env_init(UCAT_EXIT_FAILURE);
     reader = reader_new(DEFAULT_READER_NAME);
 
-#if defined(HAVE_BZIP2) || defined(HAVE_ZLIB) || defined(DYNAMIC_READERS)
+#if defined(HAVE_BZIP2) || defined(HAVE_ZLIB) || defined(HAVE_LZMA) || defined(DYNAMIC_READERS)
+    assert('u' == __progname[0]);
     switch (__progname[1]) {
+# if defined(HAVE_LZMA) || defined(DYNAMIC_READERS)
+        case 'x':
+            if ('z' == __progname[2]) {
+                reader_set_imp_by_name(reader, "lzma");
+            }
+            break;
+# endif /* HAVE_LZMA || DYNAMIC_READERS */
 # if defined(HAVE_BZIP2) || defined(DYNAMIC_READERS)
         case 'b':
             if ('z' == __progname[2]) {
@@ -158,7 +166,7 @@ int main(int argc, char **argv)
             break;
 # endif /* HAVE_ZLIB || DYNAMIC_READERS */
     }
-#endif /* HAVE_BZIP2 || HAVE_ZLIB */
+#endif /* HAVE_BZIP2 || HAVE_ZLIB || HAVE_LZMA */
 
     while (-1 != (c = getopt_long(argc, argv, optstr, long_options, NULL))) {
         switch (c) {

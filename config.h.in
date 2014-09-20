@@ -2,6 +2,7 @@
 #define UGREP_VERSION_MINOR @UGREP_VERSION_MINOR@
 #cmakedefine HAVE_ZLIB
 #cmakedefine HAVE_BZIP2
+#cmakedefine HAVE_LZMA
 #cmakedefine HAVE_DLFCN_H
 #cmakedefine HAVE_LIBDL
 #define SIZEOF_VOIDP @SIZEOF_VOIDP@

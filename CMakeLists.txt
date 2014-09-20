@@ -34,6 +34,7 @@ check_library_exists("dl" "dlopen" "lib" HAVE_LIBDL)
 find_package(ICU 4.4 COMPONENTS i18n io REQUIRED)
 find_package(ZLIB QUIET)
 find_package(BZip2 QUIET)
+find_package(LibLZMA QUIET)
 
 # TODO:
 # - slist.c only for FTS and ENGINES_SOURCES
@@ -74,7 +75,14 @@ if(BZIP2_FOUND)
     set(HAVE_BZIP2 TRUE)
 endif(BZIP2_FOUND)
 
-if(DYNAMIC_READER OR (NOT ZLIB_FOUND AND NOT BZIP2_FOUND))
+if(LIBLZMA_FOUND)
+    list(APPEND COMMON_BASE_SOURCES io/lzma.c)
+    include_directories(${LIBLZMA_INCLUDE_DIRS})
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${LIBLZMA_LIBRARIES})
+    set(HAVE_LZMA TRUE)
+endif(LIBLZMA_FOUND)
+
+if(DYNAMIC_READER OR (NOT ZLIB_FOUND AND NOT BZIP2_FOUND AND NOT LIBLZMA_FOUND))
     if(HAVE_LIBDL)
         set(EXTRA_LIBS ${EXTRA_LIBS} "dl")
     endif(HAVE_LIBDL)
@@ -98,9 +106,10 @@ configure_file(
 )
 
 message("==> CMAKE_BUILD_TYPE : ${CMAKE_BUILD_TYPE}")
-message("==> BZIP2 : ${BZIP2_FOUND}")
+message("==> BZIP2 : ${BZIP2_VERSION_STRING}")
 message("==> ICU   : ${ICU_VERSION}")
 message("==> ZLIB  : ${ZLIB_VERSION_STRING}")
+message("==> LZMA  : ${LIBLZMA_VERSION_STRING}")
 
 list(REMOVE_DUPLICATES EXTRA_SOURCES)
 
