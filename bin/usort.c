@@ -319,7 +319,7 @@ static UBool date_sorter_equals(const void *UNUSED(object), uint64_t flags)
 static RBKey *date_sorter_keygen(const void *object, const UChar *source, int32_t sourceLength, error_t **UNUSED(error))
 {
     UDate d;
-    int32_t l;
+    int32_t l, fl;
     RBKey *result;
     UErrorCode status;
 
@@ -334,7 +334,8 @@ static RBKey *date_sorter_keygen(const void *object, const UChar *source, int32_
     result = mem_new(*result);
     result->key = mem_new_n(UChar, l);
     result->key_len = l * sizeof(UChar);
-    assert(udat_format(udout, d, (UChar *) result->key, l, NULL, &status) == l);
+    fl = udat_format(udout, d, (UChar *) result->key, l, NULL, &status);
+    assert(fl == l);
     assert(U_STRING_NOT_TERMINATED_WARNING == status);
 
     return result;
