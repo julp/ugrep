@@ -28,7 +28,7 @@
 #  define __has_attribute(x) 0
 # endif /* !__has_attribute */
 
-# if __GNUC__ || __has_attribute(unused)
+# if GCC_VERSION || __has_attribute(unused)
 #  define UNUSED(x) UNUSED_ ## x __attribute__((unused))
 # else
 #  define UNUSED
