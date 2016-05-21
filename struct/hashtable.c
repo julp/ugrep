@@ -290,10 +290,10 @@ void hashtable_debug(Hashtable *this, toUString toustring) /* NONNULL() */
     ustr = ustring_new();
     for (i = 0; i < this->size; i++) {
         if (BUCKET_EMPTY_OR_DELETED(this->buckets[i])) {
-            fprintf(stderr, "[%2d] %s\n", i, IS_BUCKET_DELETED(this->buckets[i]) ? "deleted" : "empty");
+            fprintf(stderr, "[%2zu] %s\n", i, IS_BUCKET_DELETED(this->buckets[i]) ? "deleted" : "empty");
         } else {
             toustring(ustr, this->buckets[i].key, this->buckets[i].value);
-            u_fprintf(ustderr, "[%2d] H = %u, %S\n", i, this->buckets[i].hash, ustr->ptr);
+            u_fprintf(ustderr, "[%2zu] H = %u, %S\n", i, this->buckets[i].hash, ustr->ptr);
         }
     }
     ustring_destroy(ustr);

@@ -24,6 +24,9 @@ check_type_size("void *" SIZEOF_VOIDP)
 check_type_size("long" SIZEOF_LONG)
 check_type_size("long long" SIZEOF_LONG_LONG)
 
+include(CheckFunctionExists)
+check_function_exists("strchrnul" HAVE_STRCHRNUL)
+
 include(CheckIncludeFile)
 check_include_file(dlfcn.h HAVE_DLFCN_H)
 

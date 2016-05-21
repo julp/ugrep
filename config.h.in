@@ -5,6 +5,7 @@
 #cmakedefine HAVE_LZMA
 #cmakedefine HAVE_DLFCN_H
 #cmakedefine HAVE_LIBDL
+#cmakedefine HAVE_STRCHRNUL
 #define SIZEOF_VOIDP @SIZEOF_VOIDP@
 #define SIZEOF_LONG @SIZEOF_LONG@
 #define SIZEOF_LONG_LONG @SIZEOF_LONG_LONG@
