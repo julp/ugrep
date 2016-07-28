@@ -24,6 +24,11 @@ typedef struct {
 # define darray_at_unsafe(/*DArray **/ da, /*uint*/ offset, T) \
     ((T *) ((void *) (da)->data))[(offset)]
 
+# define darray_top_unsafe(/*DArray **/ da, T) \
+    darray_at_unsafe(da, 0, T)
+
+typedef unsigned int uint;
+
 void darray_append_all(DArray *, const void * const, size_t);
 UBool darray_at(DArray *, uint, void *);
 void darray_clear(DArray *);
