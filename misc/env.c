@@ -1,3 +1,4 @@
+#include <sys/param.h>
 #include <unistd.h>
 #ifdef _MSC_VER
 # define STRICT
