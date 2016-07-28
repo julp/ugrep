@@ -106,6 +106,7 @@ static interval_list_t *intervals = NULL;
 # endif /* !_MSC_VER */
 #endif /* !NO_COLOR */
 
+static UBool oFlag = FALSE;
 static UBool xFlag = FALSE;
 static UBool nFlag = FALSE;
 static UBool vFlag = FALSE;
@@ -176,7 +177,7 @@ enum {
     //READER_OPT
 };
 
-static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilm:nqsvwx" FTS_COMMON_OPTIONS_STRING;
+static char optstr[] = "0123456789A:B:C:EFHLVce:f:hilm:noqsvwx" FTS_COMMON_OPTIONS_STRING;
 
 static struct option long_options[] =
 {
@@ -205,6 +206,7 @@ static struct option long_options[] =
     {"files-with-matches",  no_argument,       NULL, 'l'},
     {"max-count",           required_argument, NULL, 'm'},
     {"line-number",         no_argument,       NULL, 'n'}, // POSIX
+    {"only-match",          no_argument,       NULL, 'o'},
     {"quiet",               no_argument,       NULL, 'q'}, // POSIX
     {"silent",              no_argument,       NULL, 'q'}, // POSIX
     {"no-messages",         no_argument,       NULL, 's'}, // POSIX
@@ -218,7 +220,7 @@ static void usage(void)
 {
     fprintf(
         stderr,
-        "usage: %s [-0123456789EFHLRVchilnqrsvwx] [-A num] [-B num]\n"
+        "usage: %s [-0123456789EFHLRVchilnoqrsvwx] [-A num] [-B num]\n"
         "\t[-e pattern] [-f file] [--binary-files=value]\n"
         "\t[pattern] [file ...]\n",
         __progname
@@ -792,7 +794,7 @@ static int procfile(reader_t *reader, const char *filename, void *userdata)
                     ret = pdata->engine->whole_line_match(&error, pdata->pattern, ustr);
                 } else {
 #ifndef NO_COLOR
-                    if (_colorize && _line_print) {
+                    if (oFlag || (_colorize && _line_print)) {
                         ret = pdata->engine->match_all(&error, pdata->pattern, ustr, intervals);
                     } else {
 #endif /* !NO_COLOR */
@@ -827,18 +829,18 @@ static int procfile(reader_t *reader, const char *filename, void *userdata)
             if (_line_print) {
 #ifndef NO_COLOR
 # ifndef _MSC_VER
-                if (_colorize && pattern_matches) {
+                if (!oFlag && _colorize && pattern_matches) {
                     if (ENGINE_WHOLE_LINE_MATCH == ret) {
                         if (*colors[LINE_MATCH].value) {
                             ustring_prepend_string(ustr, colors[LINE_MATCH].value);
                             ustring_append_string_len(ustr, reset, reset_len);
                         }
                     } else {
-                        if (*colors[SINGLE_MATCH].value) {
-                            int32_t decalage;
-                            dlist_element_t *el;
+                        if (!oFlag && *colors[SINGLE_MATCH].value) {
                             UChar *before;
+                            int32_t decalage;
                             int32_t before_len;
+                            dlist_element_t *el;
 
                             decalage = 0;
                             before = colors[SINGLE_MATCH].value;
@@ -886,36 +888,49 @@ static int procfile(reader_t *reader, const char *filename, void *userdata)
                             if (nFlag) {
                                 print_line(reader->lineno - i, l->match, TRUE, FALSE);
                             }
-#if defined(NO_COLOR) || !defined(_MSC_VER)
-                            u_fputs(l->ustr->ptr, ustdout);
-#else
-                            if (ENGINE_WHOLE_LINE_MATCH == l->ret && _colorize && colors[LINE_MATCH].value) {
-                                console_apply_color(LINE_MATCH);
-                                u_fputs(l->ustr->ptr, ustdout);
-                                console_reset(LINE_MATCH);
-                            } else if (l->pattern_matches /* > 0 */ && _colorize && colors[SINGLE_MATCH].value) {
+                            if (oFlag) {
                                 dlist_element_t *e;
-                                int32_t last = 0;
 
-                                for (e = l->intervals->head; NULL != e; e = e->next) {
+                                for (e = intervals->head; NULL != e; e = e->next) {
                                     FETCH_DATA(e->data, i, interval_t);
 
-                                    if (last < i->lower_limit) {
-                                        u_file_write(l->ustr->ptr + last, i->lower_limit - last, ustdout);
-                                    }
                                     console_apply_color(SINGLE_MATCH);
                                     u_file_write(l->ustr->ptr + i->lower_limit, i->upper_limit - i->lower_limit, ustdout);
                                     console_reset(SINGLE_MATCH);
-                                    last = i->upper_limit;
+                                    u_file_write(EOL, EOL_LEN, ustdout);
                                 }
-                                if (last < ustr->len) {
-                                    u_file_write(l->ustr->ptr + last, ustr->len - last, ustdout);
-                                }
-                                u_file_write(EOL, EOL_LEN, ustdout);
                             } else {
+#if defined(NO_COLOR) || !defined(_MSC_VER)
                                 u_fputs(l->ustr->ptr, ustdout);
-                            }
+#else
+                                if (ENGINE_WHOLE_LINE_MATCH == l->ret && _colorize && colors[LINE_MATCH].value) {
+                                    console_apply_color(LINE_MATCH);
+                                    u_fputs(l->ustr->ptr, ustdout);
+                                    console_reset(LINE_MATCH);
+                                } else if (l->pattern_matches /* > 0 */ && _colorize && colors[SINGLE_MATCH].value) {
+                                    int32_t last = 0;
+                                    dlist_element_t *e;
+
+                                    for (e = l->intervals->head; NULL != e; e = e->next) {
+                                        FETCH_DATA(e->data, i, interval_t);
+
+                                        if (last < i->lower_limit) {
+                                            u_file_write(l->ustr->ptr + last, i->lower_limit - last, ustdout);
+                                        }
+                                        console_apply_color(SINGLE_MATCH);
+                                        u_file_write(l->ustr->ptr + i->lower_limit, i->upper_limit - i->lower_limit, ustdout);
+                                        console_reset(SINGLE_MATCH);
+                                        last = i->upper_limit;
+                                    }
+                                    if (last < ustr->len) {
+                                        u_file_write(l->ustr->ptr + last, ustr->len - last, ustdout);
+                                    }
+                                    u_file_write(EOL, EOL_LEN, ustdout);
+                                } else {
+                                    u_fputs(l->ustr->ptr, ustdout);
+                                }
 #endif /* NO_COLOR || !_MSC_VER */
+                            }
                         }
                     }
                     last_line_print = reader->lineno;
@@ -937,8 +952,8 @@ static int procfile(reader_t *reader, const char *filename, void *userdata)
                             u_fputs(ustr->ptr, ustdout);
                             console_reset(LINE_MATCH);
                         } else if (line->pattern_matches /* > 0 */ && _colorize && colors[SINGLE_MATCH].value) {
-                            dlist_element_t *e;
                             int32_t last = 0;
+                            dlist_element_t *e;
 
                             for (e = intervals->head; NULL != e; e = e->next) {
                                 FETCH_DATA(e->data, i, interval_t);
@@ -1125,6 +1140,9 @@ int main(int argc, char **argv)
                 break;
             case 'l':
                 lFlag = TRUE;
+                break;
+            case 'o':
+                oFlag = TRUE;
                 break;
             case 'q':
                 file_print = line_print = FALSE;
